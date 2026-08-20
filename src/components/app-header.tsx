@@ -1,15 +1,16 @@
+import Link from 'next/link'
 import type { SessionUser } from '@/lib/session'
 import { Search, LogOut } from 'lucide-react'
 
 export function AppHeader({ user }: { user: SessionUser }) {
   return (
     <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-4 border-b border-border bg-surface px-4">
-      <a href="/" className="flex shrink-0 items-center gap-2">
+      <Link href="/" className="flex shrink-0 items-center gap-2">
         <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent text-sm font-bold text-white">
           D
         </span>
         <span className="hidden text-sm font-bold text-ink sm:inline">팀 문서 관리</span>
-      </a>
+      </Link>
 
       {/* M4에서 실제 검색으로 연결. 지금은 자리만 잡아둔다. */}
       <form action="/search" className="relative mx-auto w-full max-w-md">

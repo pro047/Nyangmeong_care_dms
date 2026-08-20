@@ -3,6 +3,9 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { randomUUID } from 'node:crypto'
 import { env } from './env'
 
+/** 팀 내부 도구 기준 상한. 늘리려면 S3 멀티파트 업로드가 필요해진다. */
+export const MAX_UPLOAD_BYTES = 100 * 1024 * 1024
+
 export const s3 = new S3Client({
   region: env.AWS_REGION,
   credentials: {
