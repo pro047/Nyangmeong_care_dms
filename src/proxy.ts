@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { jwtVerify } from 'jose'
 
-// 미들웨어는 Edge 런타임이라 lib/env(zod 전체 검증)를 끌어오지 않고 필요한 값만 직접 읽는다.
+// 프록시(구 미들웨어)는 Edge 런타임이라 lib/env(zod 전체 검증)를 끌어오지 않고 필요한 값만 직접 읽는다.
 const key = new TextEncoder().encode(process.env.AUTH_SECRET)
 
 const PUBLIC_PATHS = ['/login', '/api/auth/login', '/api/auth/callback']
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl
   if (PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + '/'))) {
     return NextResponse.next()

@@ -1,26 +1,35 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@theme {
+  /* 팀 내부 도구라 라이트 모드 단일. 목록 밀도가 높아 대비를 또렷하게 잡는다. */
+  --color-canvas: #f7f8fa;
+  --color-surface: #ffffff;
+  --color-border: #e4e7ec;
+  --color-border-strong: #d0d5dd;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --color-ink: #101828;
+  --color-ink-muted: #667085;
+  --color-ink-subtle: #98a2b3;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-accent: #4338ca;
+  --color-accent-hover: #3730a3;
+  --color-accent-soft: #eef2ff;
+
+  --color-danger: #d92d20;
+  --color-danger-soft: #fef3f2;
+  --color-success: #067647;
+
+  --font-sans: var(--font-noto-sans-kr), system-ui, sans-serif;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+}
+
+/* 파일명·문서 제목이 길어도 레이아웃이 밀리지 않도록 */
+.truncate-cell {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

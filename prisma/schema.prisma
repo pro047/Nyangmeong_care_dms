@@ -45,6 +45,7 @@ model Document {
   createdById String   @map("created_by")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
 
   folder    Folder?           @relation(fields: [folderId], references: [id], onDelete: SetNull)
   createdBy User              @relation("DocumentCreator", fields: [createdById], references: [id])
@@ -52,7 +53,7 @@ model Document {
   tags      DocumentTag[]
 
   @@index([folderId])
-  @@index([updatedAt])
+  @@index([deletedAt, updatedAt])
   @@map("documents")
 }
 
