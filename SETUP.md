@@ -5,18 +5,59 @@
 
 ---
 
-## 1. 개발용 DB (Neon 무료) — 3분
+## 1. 개발용 DB — 기존 RDS에 SSH 터널로 직결
 
-로컬에 Docker/PostgreSQL이 없으므로 개발 중엔 Neon 무료 티어를 쓴다.
-운영 배포 때 `DATABASE_URL`만 기존 RDS 주소로 바꾸면 되고, 둘 다 PostgreSQL이라 스키마는 그대로 호환된다.
+로컬에 Docker/PostgreSQL이 없으므로, 기존 EC2를 경유해 RDS에 붙는다.
+RDS를 인터넷에 노출하지 않고, 배포할 때 DB를 갈아끼울 필요도 없다.
 
-1. https://neon.tech 접속 → GitHub 계정으로 가입
-2. `Create project` → 이름 `dms`, 리전 `AWS ap-southeast-1` (한국에서 제일 가까운 무료 리전)
-3. 표시되는 `Connection string` 복사 (`postgresql://...?sslmode=require` 형태)
-4. `.env`의 `DATABASE_URL`에 붙여넣기
+```
+내 PC:15432  ──SSH 터널──▶  EC2  ──VPC 내부──▶  RDS:5432
+```
 
-> RDS를 개발에도 쓰고 싶다면 퍼블릭 액세스를 열어야 하는데, 운영 중인 프로젝트 2개가
-> 같은 인스턴스에 붙어 있으므로 권장하지 않는다.
+### 1-1. RDS 안에 `dms` 데이터베이스 생성
+
+인스턴스를 새로 만드는 게 아니라 기존 인스턴스 안에 DB만 추가한다.
+기존 프로젝트 2개와 완전히 분리된 네임스페이스라 테이블이 섞이지 않는다.
+
+EC2에 접속해서:
+
+```bash
+psql -h <RDS엔드포인트> -U <마스터유저> -d postgres -c "CREATE DATABASE dms;"
+```
+
+psql이 없으면 `sudo dnf install -y postgresql15` (Amazon Linux 2023)
+또는 `sudo apt install -y postgresql-client` (Ubuntu).
+
+### 1-2. 로컬에서 터널 열기
+
+Git Bash **별도 창**에서 실행하고, 개발하는 동안 계속 열어둔다.
+
+```bash
+ssh -i ~/.ssh/<키파일>.pem -N -L 15432:<RDS엔드포인트>:5432 ec2-user@<EC2퍼블릭IP>
+```
+
+`-N`은 셸 없이 포워딩만 한다는 뜻. 터널이 끊기면 Prisma가 연결 에러를 내는데,
+터널만 다시 띄우면 된다.
+
+### 1-3. `.env`
+
+```
+DATABASE_URL="postgresql://유저:비번@localhost:15432/dms?sslmode=require&connection_limit=5"
+```
+
+> **`connection_limit=5`를 반드시 넣을 것.**
+> Prisma 기본 커넥션 풀이 크고 개발 중 HMR로 계속 재연결되기 때문에,
+> 제한이 없으면 같은 RDS 인스턴스를 쓰는 **운영 프로젝트 2개가 커넥션 부족으로 죽을 수 있다.**
+
+> 비밀번호에 `@ : / ?` 등이 있으면 URL 인코딩할 것 (`@` → `%40`).
+> 인증서 오류가 나면 `sslmode=require` → `sslmode=no-verify`.
+> 터널을 타서 호스트명이 `localhost`라 RDS 인증서의 도메인과 맞지 않아서 발생한다.
+
+### 대안: Neon 무료 티어
+
+터널 유지가 번거로우면 https://neon.tech 에서 무료 PostgreSQL을 만들어
+`DATABASE_URL`에 넣어도 된다. 단, 배포(M6) 때 RDS로 전환하며 마이그레이션을
+다시 적용해야 한다. RDS 직결은 그 단계가 아예 없다.
 
 ## 2. 디스코드 OAuth 앱 — 5분
 

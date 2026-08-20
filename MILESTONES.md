@@ -43,7 +43,7 @@
 
 ## M1 — 로그인이 실제로 동작한다 · 약 3시간
 
-- [ ] Neon DB 연결 + `db:push`로 스키마 반영
+- [ ] EC2 SSH 터널로 RDS 연결 (`dms` DB 생성) + `db:push`로 스키마 반영
 - [ ] `/login` 페이지 (디스코드 버튼, `?error=` 메시지 표시)
 - [ ] 앱 셸: 상단바(로고·검색창·아바타·로그아웃) + 좌측 사이드바 자리
 - [ ] `/` 를 기본 템플릿에서 빈 문서 목록으로 교체
@@ -95,7 +95,7 @@
 - [ ] 로컬 빌드 후 산출물 전송 (인스턴스 저사양 대비) + PM2
 - [ ] Nginx 리버스 프록시 + Let's Encrypt HTTPS
 - [ ] 디스코드 OAuth 콜백 · S3 CORS에 운영 주소 추가
-- [ ] `DATABASE_URL`을 Neon → RDS로 전환, `prisma migrate deploy`
+- [ ] 서버 `.env`의 `DATABASE_URL`을 RDS 직결 주소로 (개발은 터널 경유였음) + `prisma migrate deploy`
 
 **완료 기준** — 팀원 6명이 각자 접속해 로그인한다.
 
