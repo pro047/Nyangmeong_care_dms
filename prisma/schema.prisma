@@ -1,0 +1,98 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// 디스코드 OAuth로 로그인한 팀원. 권한 구분 없이 전원 동등.
+model User {
+  id        String   @id @default(cuid())
+  discordId String   @unique @map("discord_id")
+  username  String
+  avatarUrl String?  @map("avatar_url")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  createdDocuments Document[]        @relation("DocumentCreator")
+  uploadedVersions DocumentVersion[]
+
+  @@map("users")
+}
+
+/// 자기참조 트리. parentId가 null이면 최상위 폴더.
+model Folder {
+  id        String   @id @default(cuid())
+  name      String
+  parentId  String?  @map("parent_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  parent    Folder?    @relation("FolderTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children  Folder[]   @relation("FolderTree")
+  documents Document[]
+
+  @@unique([parentId, name])
+  @@map("folders")
+}
+
+/// 문서의 논리적 단위. 실제 파일은 전부 DocumentVersion에 있다.
+model Document {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  folderId    String?  @map("folder_id")
+  createdById String   @map("created_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  folder    Folder?           @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  createdBy User              @relation("DocumentCreator", fields: [createdById], references: [id])
+  versions  DocumentVersion[]
+  tags      DocumentTag[]
+
+  @@index([folderId])
+  @@index([updatedAt])
+  @@map("documents")
+}
+
+/// 재업로드할 때마다 versionNo가 올라간다. 이전 버전의 S3 객체는 지우지 않는다.
+model DocumentVersion {
+  id           String   @id @default(cuid())
+  documentId   String   @map("document_id")
+  versionNo    Int      @map("version_no")
+  s3Key        String   @map("s3_key")
+  fileName     String   @map("file_name")
+  mimeType     String   @map("mime_type")
+  sizeBytes    Int      @map("size_bytes")
+  changeNote   String?  @map("change_note")
+  uploadedById String   @map("uploaded_by")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  uploadedBy User     @relation(fields: [uploadedById], references: [id])
+
+  @@unique([documentId, versionNo])
+  @@index([documentId, versionNo(sort: Desc)])
+  @@map("document_versions")
+}
+
+model Tag {
+  id        String        @id @default(cuid())
+  name      String        @unique
+  documents DocumentTag[]
+
+  @@map("tags")
+}
+
+model DocumentTag {
+  documentId String @map("document_id")
+  tagId      String @map("tag_id")
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  tag      Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([documentId, tagId])
+  @@index([tagId])
+  @@map("document_tags")
+}
