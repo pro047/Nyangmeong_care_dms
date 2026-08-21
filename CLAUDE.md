@@ -40,10 +40,40 @@ Next.js 16 · React 19 · TypeScript · Tailwind 4 · Prisma 7 + PostgreSQL(RDS)
 드라이버 어댑터가 필수다(`@prisma/adapter-pg`). 생성 위치는 `src/generated/prisma`이고
 import 경로는 `@/generated/prisma/client`.
 
-**`DATABASE_URL`의 `connection_limit=5`를 반드시 유지할 것.**
-이 RDS 인스턴스에는 **운영 중인 다른 프로젝트 2개가 함께 물려 있다.** 제한이 없으면
-개발 중 HMR 재연결로 커넥션이 고갈돼 그 프로젝트들이 죽을 수 있다. 같은 이유로
+**같은 `DATABASE_URL`을 두 파서가 다르게 읽는다.** 어댑터가 필수가 되면서 생긴 함정이다.
+"마이그레이션은 되는데 앱만 죽는" 증상이 나오면 여기를 의심한다.
+
+| | 파서 | `sslmode=require` | `connection_limit` |
+|---|---|---|---|
+| `db push`·`migrate` | Prisma 엔진(Rust) | 검증 **안 함** | 적용됨 |
+| 앱 런타임 | `PrismaPg` → node-postgres | **`verify-full`로 취급** | **무시됨** |
+
+그래서 `.env`에 `uselibpqcompat=true`가 필요하다. 빼면 앱만
+`P1011 TlsConnectionError: self-signed certificate in certificate chain`으로 죽는다.
+터널을 타면 호스트명이 `localhost`라 `verify-full`은 **원리상 통과할 수 없다**.
+근거와 M6 대응은 `SETUP.md`의 "두 파서" 절에 있다.
+
+**커넥션 상한은 두 군데에 있고 둘 다 필요하다.** 공유 RDS(`hymn-stg-db`)의
+`max_connections`가 **79뿐이다** (2026-08-21 실측). 제한이 없으면 HMR 재연결로
+풀이 닫히지 않고 쌓여 **혼자서도 고갈시킬 수 있다.** 위험의 주체는 남이 아니라 나다.
+
+- `src/lib/prisma.ts`의 `new PrismaPg({ ..., max: 5 })` — **앱 런타임**을 막는다
+- `DATABASE_URL`의 `connection_limit=5` — **CLI**(`db push`·`migrate`)를 막는다
+
+**둘 중 하나만 두면 안 된다.** Prisma 7은 드라이버 어댑터가 필수라 앱의 풀은
+node-postgres 것이고 `max`를 보는데, `connection_limit`은 Prisma 자체 풀(Rust)
+파라미터다. 이름이 달라서 **조용히 버려지고 pg 기본값 10이 적용된다** (실측으로 확인).
+
+같은 인스턴스에서 **hymn 백엔드가 `postgres` DB에 커넥션 4개로 돌고 있다.**
+DMS는 별도 DB `dms`를 쓰므로 테이블은 안 섞이지만 커넥션 풀은 공유한다.
 RDS 인스턴스 설정(파라미터 그룹, 보안 그룹, 마스터 비밀번호)을 건드리지 말 것.
+
+> 이 문단은 원래 "운영 중인 다른 프로젝트 2개가 물려 있다"고 적혀 있었다.
+> 2026-08-21 실측 결과 **사용자 DB는 `postgres` 하나뿐이고 붙어 있는 앱도 hymn
+> 하나**였다 — `docker ps`의 컨테이너 2개(nginx 프론트 + uvicorn 백엔드)를
+> 프로젝트 2개로 옮겨 적은 것으로 보인다. 결론(제한 유지)은 같지만 근거가 달랐다.
+> 재확인: `psql ... -c "SHOW max_connections;"`,
+> `SELECT datname, count(*) FROM pg_stat_activity GROUP BY datname;`
 
 **`.env`에 더미 값이 들어 있다.** 실제 자격증명이 아니므로 로그인·업로드는 동작하지 않는다.
 `.env`는 gitignore 대상이고, `.gitignore`의 `!.env.example` 예외를 지우지 말 것
