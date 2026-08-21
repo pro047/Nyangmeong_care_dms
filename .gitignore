@@ -43,3 +43,6 @@ next-env.d.ts
 
 # prisma generated client
 /src/generated
+
+# serial-agent-pipeline 산출물
+.pipeline/

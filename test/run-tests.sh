@@ -1,0 +1,308 @@
+#!/usr/bin/env bash
+# orchestrate.sh 게이트 검증 스위트
+#
+# 검증하는 것: 게이트가 "통과시키는가"가 아니라 "막는가"
+# API 호출 0회. fake-claude 를 PATH 앞에 끼워넣는다.
+#
+# 사용법: ./test/run-tests.sh
+
+set -uo pipefail
+
+HERE="$(cd "$(dirname "$0")" && pwd)"
+SRC="$(dirname "$HERE")"
+
+PASS=0; FAIL=0
+green() { printf '\033[32m%s\033[0m\n' "$*"; }
+red()   { printf '\033[31m%s\033[0m\n' "$*"; }
+
+# ── 매 테스트마다 깨끗한 샌드박스 repo 를 만든다
+setup() {
+  SANDBOX="$(mktemp -d)"
+  cd "$SANDBOX"
+  git init -q .
+  git config user.email t@t; git config user.name t
+  mkdir -p prompts test
+  cp "$SRC/orchestrate.sh" .
+  cp "$SRC/prompts/"*.md prompts/
+  cp "$HERE/fake-claude" test/claude       # ← 이름이 'claude' 여야 가로챈다
+  chmod +x orchestrate.sh test/claude
+  # 보호 파일 게이트 검증용. 없으면 지문 비교가 '수정'이 아니라 '생성'을 보게 된다.
+  printf '{\n  "name": "sandbox"\n}\n' > package.json
+  echo 'export default {}' > vitest.config.mts
+  echo x > x.txt; git add -A; git commit -qm init
+  export PATH="$SANDBOX/test:$PATH"
+}
+
+teardown() { cd /; rm -rf "$SANDBOX"; }
+
+# expect <설명> <기대exit코드> -- <env할당들...>
+expect() {
+  local desc=$1 want=$2; shift 3
+  setup
+  local got=0
+  env "$@" AUTO=1 TEST_CMD="true" ./orchestrate.sh feat >/dev/null 2>&1 || got=$?
+  if [ "$got" -eq "$want" ]; then
+    green "  PASS  $desc (exit $got)"; PASS=$((PASS+1))
+  else
+    red   "  FAIL  $desc — 기대 exit $want, 실제 $got"; FAIL=$((FAIL+1))
+  fi
+  teardown
+}
+
+echo "=== 정상 경로 ==="
+expect "전부 정상이면 0으로 끝난다" 0 -- FAKE_SCENARIO=ok
+
+echo
+echo "=== 게이트가 막아야 하는 것들 ==="
+expect "STATUS 라인 없으면 죽는다 (설계)"        2 -- FAKE_SCENARIO_DESIGN=no_status
+expect "STATUS 라인 없으면 죽는다 (구현)"        2 -- FAKE_SCENARIO_IMPL=no_status
+expect "STATUS 라인 없으면 죽는다 (검증)"        2 -- FAKE_SCENARIO_VERIFY=no_status
+expect "산출물 파일 없으면 죽는다"               2 -- FAKE_SCENARIO_DESIGN=no_file
+expect "에이전트 에러면 죽는다"                  2 -- FAKE_SCENARIO_DESIGN=agent_error
+expect "프로세스가 죽으면 죽는다"                2 -- FAKE_SCENARIO_DESIGN=crash
+expect "BLOCKED 는 exit 3 (사람 호출)"           3 -- FAKE_SCENARIO_DESIGN=blocked
+expect "구현 BLOCKED 도 exit 3"                  3 -- FAKE_SCENARIO_IMPL=blocked
+expect "STATUS 라인 없으면 죽는다 (판단검증)"    2 -- FAKE_SCENARIO_JUDGE=no_status
+expect "판단검증 카운트 라인 없으면 죽는다"      2 -- FAKE_SCENARIO_JUDGE=judge_nocount
+expect "판단검증 BLOCKED 도 exit 3"              3 -- FAKE_SCENARIO_JUDGE=blocked
+
+echo
+echo "=== 판단 검증 게이트 ==="
+# 이 게이트의 존재 이유: 반박·미확인이 있는 설계가 AUTO=1 로 조용히 구현까지
+# 흘러가면 안 된다. 즉 검사할 것은 "통과하는가"가 아니라 "무인이어도 멈추는가".
+#
+# 게이트는 /dev/tty 에서 읽으므로, 터미널이 있으면 대기하고 없으면 즉시 중단한다.
+# 둘 중 어느 쪽이 되든 불변식은 하나다 — **IMPL.md 가 만들어지지 않는다.**
+# 그래서 phase 가 아니라 그걸 단정한다 (tty 유무에 따라 결과가 갈리지 않게).
+setup
+env FAKE_SCENARIO_JUDGE=judge_flagged AUTO=1 TEST_CMD="true" \
+  ./orchestrate.sh feat >/dev/null 2>&1 &
+pid=$!
+for _ in $(seq 1 60); do
+  [ -f .pipeline/feat/JUDGE.md ] && ! kill -0 $pid 2>/dev/null && break
+  grep -q 'phase: GATE' .pipeline/feat/STATE.md 2>/dev/null && break
+  sleep 0.1
+done
+kill $pid 2>/dev/null; wait $pid 2>/dev/null
+if grep -q '^UNVERIFIED: 2 REFUTED: 1' .pipeline/feat/JUDGE.md 2>/dev/null \
+   && [ ! -f .pipeline/feat/IMPL.md ]; then
+  green "  PASS  반박이 있으면 AUTO=1 이어도 구현으로 넘어가지 않는다"; PASS=$((PASS+1))
+else
+  red   "  FAIL  판단 검증 게이트가 무인 모드를 막지 못함 (IMPL.md 생성됨)"; FAIL=$((FAIL+1))
+fi
+teardown
+
+# tty 없는 환경(cron·백그라운드·CI)에서 게이트가 **의도한 경로로** 죽는지.
+# 이 스크립트는 set -e 로 도는데, /dev/tty 를 못 열면 read 가 rc=1 → 그 자리에서
+# exit 1 이 되어 die 를 건너뛴다. 그러면 호출자가 "게이트에서 막힘"(exit 2)을
+# 다른 실패와 구분할 수 없다. 실전 1회 실행에서 실제로 겪은 뒤 넣은 케이스다.
+#
+# macOS 에 setsid 가 없어서 python3 로 세션을 떼어 controlling terminal 을 없앤다.
+# 테스트 전용 의존성이고, 없으면 케이스를 건너뛴다 (조용히 통과시키지 않는다).
+if command -v python3 >/dev/null 2>&1; then
+  setup
+  got=0
+  python3 -c 'import os,sys; os.setsid(); os.execvp(sys.argv[1], sys.argv[1:])' \
+    env FAKE_SCENARIO_JUDGE=judge_flagged AUTO=1 TEST_CMD=true \
+    ./orchestrate.sh feat >/dev/null 2>&1 || got=$?
+  if [ "$got" -eq 2 ] && [ ! -f .pipeline/feat/IMPL.md ] \
+     && grep -q 'phase: DIED' .pipeline/feat/STATE.md 2>/dev/null; then
+    green "  PASS  tty 가 없으면 게이트가 exit 2 로 죽는다 (die 경로)"; PASS=$((PASS+1))
+  else
+    red   "  FAIL  tty 부재 시 종료 경로 — exit=$got (기대 2), phase=$(grep -m1 'phase:' .pipeline/feat/STATE.md 2>/dev/null)"
+    FAIL=$((FAIL+1))
+  fi
+  teardown
+else
+  red "  SKIP  tty 부재 케이스 — python3 없음 (setsid 대체 불가)"
+fi
+
+# 대조군 — 게이트가 '항상 막는' 게 아니라는 것. 이게 없으면 위 PASS 는 무의미하다.
+setup
+got=0
+env FAKE_SCENARIO_JUDGE=judge_clean AUTO=1 TEST_CMD="true" \
+  ./orchestrate.sh feat >/dev/null 2>&1 || got=$?
+if [ "$got" -eq 0 ] && [ -f .pipeline/feat/IMPL.md ]; then
+  green "  PASS  미확인·반박 0 이면 그대로 진행한다 (대조군)"; PASS=$((PASS+1))
+else
+  red   "  FAIL  깨끗한 판정인데 진행이 막혔다 — exit=$got"; FAIL=$((FAIL+1))
+fi
+teardown
+
+# 설계가 새로 돌면 판정도 다시 받아야 한다 (JUDGE.md 가 DESIGN.md 보다 오래됐으면 재실행)
+setup
+mkdir -p .pipeline/feat
+printf 'STATUS: DONE\nUNVERIFIED: 0 REFUTED: 0\n\n(지난 판정)\n' > .pipeline/feat/JUDGE.md
+sleep 1
+printf 'STATUS: DONE\n\n(새 설계)\n' > .pipeline/feat/DESIGN.md
+env FAKE_SCENARIO=ok AUTO=1 TEST_CMD="true" ./orchestrate.sh feat >/dev/null 2>&1
+if [ -f .pipeline/feat/judge.result.json ]; then
+  green "  PASS  설계가 판정보다 새로우면 판단 검증을 다시 돌린다"; PASS=$((PASS+1))
+else
+  red   "  FAIL  낡은 JUDGE.md 를 그대로 재사용했다"; FAIL=$((FAIL+1))
+fi
+teardown
+
+setup
+mkdir -p .pipeline/feat
+printf 'STATUS: DONE\n\n(사람이 이미 검토한 설계)\n' > .pipeline/feat/DESIGN.md
+sleep 1
+printf 'STATUS: DONE\nUNVERIFIED: 0 REFUTED: 0\n\n(이미 받은 판정)\n' > .pipeline/feat/JUDGE.md
+env FAKE_SCENARIO=ok AUTO=1 TEST_CMD="true" ./orchestrate.sh feat >/dev/null 2>&1
+if [ ! -f .pipeline/feat/judge.result.json ] \
+   && grep -q '이미 받은 판정' .pipeline/feat/JUDGE.md; then
+  green "  PASS  판정이 설계보다 새로우면 재사용한다"; PASS=$((PASS+1))
+else
+  red   "  FAIL  판단 검증 재사용 실패"; FAIL=$((FAIL+1))
+fi
+teardown
+
+echo
+echo "=== 프롬프트 치환 ==="
+# orchestrate.sh 가 export 하지 않은 변수를 프롬프트가 참조하면 envsubst 가 빈
+# 문자열로 치환한다. 에이전트는 "셸이 `` 를 실행한다" 같은 깨진 문장을 받는데,
+# 파이프라인은 정상 동작하므로 아무도 모른다. 실제로 $TEST_CMD 가 그랬다.
+setup
+rendered_ok=1
+for f in prompts/design.md prompts/judge.md prompts/impl.md prompts/verify.md; do
+  out=$(FEATURE=feat WORK=/w ROOT=/r TEST_CMD="npm test" envsubst < "$f")
+  # 빈 백틱 = 치환됐는데 값이 없었다는 뜻
+  # 정확히 백틱 2개(앞뒤가 백틱이 아닌) = 빈 인라인 코드. ``` 펜스는 제외된다.
+  printf '%s' "$out" | grep -qE '(^|[^`])``([^`]|$)' && { rendered_ok=0; echo "         빈 치환: $f"; }
+  # 살아남은 $VAR = export 목록에 없는 변수
+  printf '%s' "$out" | grep -qE '\$[A-Z_][A-Z_0-9]*' && { rendered_ok=0; echo "         미치환: $f"; }
+done
+if [ "$rendered_ok" -eq 1 ]; then
+  green "  PASS  모든 프롬프트가 빈 치환 없이 렌더된다"; PASS=$((PASS+1))
+else
+  red   "  FAIL  프롬프트 치환이 깨짐 (orchestrate.sh 의 export 목록 확인)"; FAIL=$((FAIL+1))
+fi
+teardown
+
+echo
+echo "=== 보호 파일 게이트 (프로젝트 전용) ==="
+# CLAUDE.md 가 못박은 파일(package.json 등)을 구현 단계가 건드리면 검증으로
+# 넘어가기 전에 죽어야 한다. 확인할 것은 "죽는가"와 "VERIFY 로 안 넘어갔는가" 둘 다다.
+setup
+got=0
+env FAKE_SCENARIO_IMPL=impl_protected AUTO=1 TEST_CMD="true" \
+  ./orchestrate.sh feat >/dev/null 2>&1 || got=$?
+if [ "$got" -eq 2 ] && [ ! -f .pipeline/feat/VERIFY.md ]; then
+  green "  PASS  구현이 package.json 을 건드리면 검증 전에 죽는다"; PASS=$((PASS+1))
+else
+  red   "  FAIL  보호 파일 게이트 — exit=$got (기대 2), VERIFY.md=$([ -f .pipeline/feat/VERIFY.md ] && echo 생성됨 || echo 없음)"
+  FAIL=$((FAIL+1))
+fi
+teardown
+
+# 대조군 — 보호 파일을 안 건드리면 통과해야 한다. 이게 없으면 위 PASS 는
+# "게이트가 항상 막는다"와 구분되지 않는다.
+setup
+got=0
+env FAKE_SCENARIO=ok AUTO=1 TEST_CMD="true" ./orchestrate.sh feat >/dev/null 2>&1 || got=$?
+if [ "$got" -eq 0 ] && [ -f .pipeline/feat/VERIFY.md ]; then
+  green "  PASS  보호 파일을 안 건드리면 게이트가 안 뜬다 (대조군)"; PASS=$((PASS+1))
+else
+  red   "  FAIL  보호 파일 게이트가 정상 경로를 막았다 — exit=$got"; FAIL=$((FAIL+1))
+fi
+teardown
+
+echo
+setup
+got=0
+env FAKE_SCENARIO_VERIFY=verify_protected AUTO=1 TEST_CMD="true" \
+  ./orchestrate.sh feat >/dev/null 2>&1 || got=$?
+if [ "$got" -eq 2 ]; then
+  green "  PASS  검증이 vitest 설정을 고치면 테스트 실행 전에 죽는다"; PASS=$((PASS+1))
+else
+  red   "  FAIL  검증 단계 보호 파일 게이트 — exit=$got (기대 2)"; FAIL=$((FAIL+1))
+fi
+teardown
+
+echo
+echo "=== 재시도 루프 ==="
+# 테스트가 항상 실패하면 MAX_RETRY 만큼 돌고 죽어야 한다
+setup
+got=0
+env FAKE_SCENARIO=ok AUTO=1 MAX_RETRY=2 TEST_CMD="false" \
+  ./orchestrate.sh feat >/dev/null 2>&1 || got=$?
+attempts=$(grep -c '^## attempt' .pipeline/feat/FAIL_LOG.md 2>/dev/null | head -1)
+attempts=${attempts:-0}
+if [ "$got" -eq 2 ] && [ "$attempts" -eq 2 ]; then
+  green "  PASS  테스트 계속 실패 → 2회 기록 후 포기 (exit 2)"; PASS=$((PASS+1))
+else
+  red   "  FAIL  재시도 루프 — exit=$got, FAIL_LOG 기록=$attempts (기대: 2, 2)"; FAIL=$((FAIL+1))
+fi
+teardown
+
+echo
+echo "=== 설계 재사용 ==="
+# 이미 DONE 인 DESIGN.md 가 있으면 설계 단계를 아예 호출하지 않아야 한다
+setup
+mkdir -p .pipeline/feat
+printf 'STATUS: DONE\n\n(사람이 이미 검토한 설계)\n' > .pipeline/feat/DESIGN.md
+env FAKE_SCENARIO=ok AUTO=1 TEST_CMD="true" ./orchestrate.sh feat >/dev/null 2>&1
+if [ ! -f .pipeline/feat/design.result.json ] \
+   && grep -q '사람이 이미 검토한 설계' .pipeline/feat/DESIGN.md \
+   && [ -f .pipeline/feat/IMPL.md ]; then
+  green "  PASS  기존 DESIGN.md 는 재사용되고 덮어쓰이지 않는다"; PASS=$((PASS+1))
+else
+  red   "  FAIL  설계 재사용 실패 — design 단계가 다시 돌았거나 산출물이 덮어써짐"; FAIL=$((FAIL+1))
+fi
+teardown
+
+setup
+mkdir -p .pipeline/feat
+printf 'STATUS: DONE\n\n(사람이 이미 검토한 설계)\n' > .pipeline/feat/DESIGN.md
+env FAKE_SCENARIO=ok AUTO=1 FRESH_DESIGN=1 TEST_CMD="true" ./orchestrate.sh feat >/dev/null 2>&1
+if [ -f .pipeline/feat/design.result.json ]; then
+  green "  PASS  FRESH_DESIGN=1 이면 설계를 다시 뽑는다"; PASS=$((PASS+1))
+else
+  red   "  FAIL  FRESH_DESIGN=1 인데 설계 단계가 안 돌았다"; FAIL=$((FAIL+1))
+fi
+teardown
+
+echo
+echo "=== 진행 스트림 ==="
+# tee 가 원본 스트림을 보존해야 result 추출이 가능하다.
+# 스트림이 비면 진행 표시도 죽고 게이트 판정 근거도 사라진다.
+setup
+env FAKE_SCENARIO=ok AUTO=1 TEST_CMD="true" ./orchestrate.sh feat >/dev/null 2>&1
+if grep -q '"type":"assistant"' .pipeline/feat/design.stream.jsonl 2>/dev/null \
+   && [ "$(jq -r '.is_error' .pipeline/feat/design.result.json 2>/dev/null)" = "false" ]; then
+  green "  PASS  스트림이 보존되고 마지막 result 만 추출된다"; PASS=$((PASS+1))
+else
+  red   "  FAIL  스트림 보존/추출 실패"; FAIL=$((FAIL+1))
+fi
+teardown
+
+echo
+echo "=== 모델 교체 감시 ==="
+setup
+env FAKE_SCENARIO=model_swap AUTO=1 TEST_CMD="true" \
+  ./orchestrate.sh feat >/dev/null 2>&1
+if grep -q '요청 claude-fable-5 → 실제 claude-opus-4-8' .pipeline/feat/MODEL_LOG.md 2>/dev/null; then
+  green "  PASS  다른 모델이 돌면 MODEL_LOG 에 기록된다"; PASS=$((PASS+1))
+else
+  red   "  FAIL  모델 교체가 기록되지 않음"
+  echo "         MODEL_LOG 내용:"; sed 's/^/         /' .pipeline/feat/MODEL_LOG.md 2>/dev/null
+  FAIL=$((FAIL+1))
+fi
+teardown
+
+echo
+echo "=== 상담역 상태 창구 ==="
+setup
+env FAKE_SCENARIO=ok AUTO=1 TEST_CMD="true" ./orchestrate.sh feat >/dev/null 2>&1
+if grep -q 'phase: DONE' .pipeline/feat/STATE.md 2>/dev/null; then
+  green "  PASS  STATE.md 가 최종 상태를 반영한다"; PASS=$((PASS+1))
+else
+  red   "  FAIL  STATE.md 미갱신"; FAIL=$((FAIL+1))
+fi
+teardown
+
+echo
+echo "════════════════════════════"
+printf "  통과 %d / 실패 %d\n" "$PASS" "$FAIL"
+echo "════════════════════════════"
+[ "$FAIL" -eq 0 ]
