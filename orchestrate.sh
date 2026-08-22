@@ -32,9 +32,24 @@ FRESH_DESIGN="${FRESH_DESIGN:-0}"
 # `npm run build` 를 기본에 넣지 않은 이유: 빌드는 `.env`(zod 검증)와
 # `prisma generate` 산출물이 있어야 도는데, `.env` 는 gitignore 대상이라
 # 체크아웃에 따라 없을 수 있다. 게이트가 환경 탓으로 죽으면 재시도 루프가 헛돈다.
-# `.env` 를 채웠으면 타입 검사까지 걸어라:
+# 빌드는 `.env`(zod 검증)와 `prisma generate` 산출물에 의존한다. 그래서 무조건
+# 돌리지 않고, **프리플라이트에서 환경을 먼저 판정한 뒤** 켤지 정한다 (아래 preflight).
+# 환경 실패와 코드 실패를 구분하지 않으면, `.env` 없는 체크아웃에서 impl+verify
+# 사이클이 단계당 $5 예산을 태우며 3회 헛돈다.
+#
+# TEST_CMD 를 직접 주면 기본 검증 목록 대신 그것만 쓴다 (하위 호환):
 #   TEST_CMD="npm test && npm run build" ./orchestrate.sh <feature>
+TEST_CMD_OVERRIDE="${TEST_CMD:-}"
 TEST_CMD="${TEST_CMD:-npm test}"
+
+# ── 검증 게이트 상태 ─────────────────────────────────
+# state() 가 첫 호출부터 참조하므로 여기서 초기화한다 (set -u).
+BUILD_GATE=0                       # 1 = 기준선 빌드가 녹색이라 빌드를 검증에 포함
+BUILD_GATE_REASON="프리플라이트 전"
+VERIFY_LIST_DESC="(프리플라이트 전)"
+VERIFY_LAST=""
+VERIFY_PASSED=""
+VERIFY_FAILED=""
 
 # ── 모델 티어링 ──────────────────────────────────────
 # 별칭 대신 풀 ID를 박는다. 별칭은 어느 날 조용히 다른 모델을 가리킨다.
@@ -76,6 +91,15 @@ die() { state "DIED" "$*"; printf '\033[1;31m[FAIL]\033[0m %s\n' "$*" >&2; exit 
 # 셸은 대화를 못 한다. 대신 상태를 파일로 흘려서 상담역이 읽게 한다.
 state() {
   local phase=$1 note=${2:-}
+  local bg
+  if [ "${BUILD_GATE:-0}" = "1" ]; then
+    bg="켜짐"
+  elif [ -n "${TEST_CMD_OVERRIDE:-}" ]; then
+    # 오버라이드가 빌드를 포함할 수도 있다. 셸은 모르므로 단정하지 않는다.
+    bg="해당 없음 — ${BUILD_GATE_REASON:-TEST_CMD 오버라이드}"
+  else
+    bg="꺼짐 — ${BUILD_GATE_REASON:-사유 미기록}"
+  fi
   cat > "$STATE" <<EOF
 # 파이프라인 상태 (셸이 자동 생성 — 사람이 편집하지 말 것)
 
@@ -85,6 +109,14 @@ state() {
 - pid: $$
 - updated: $(date -Iseconds)
 - note: $note
+
+## 검증 게이트
+
+셸이 실제로 무엇을 돌렸는지. "DONE" 이 무엇을 뜻하는지는 여기를 봐야 안다.
+
+- 빌드 게이트(타입 검사): $bg
+- 검증 명령: $VERIFY_LIST_DESC
+- 마지막 결과: ${VERIFY_LAST:-(아직 실행 안 함)}
 
 ## 지금까지 생성된 산출물
 $(ls -1 "$WORK"/*.md 2>/dev/null | sed 's|.*/|- |' || echo "- (없음)")
@@ -216,11 +248,117 @@ EOF
   esac
 }
 
+# ─────────────────────────────────────────── 프리플라이트: 환경 기준선
+# 에이전트를 **띄우기 전에** 환경을 판정한다. 여기서 죽으면 비용이 $0 이다.
+#
+# 이 단계가 있는 이유: 이전 실행에서 phase:DONE 이 떴는데 타입 검사가 한 번도
+# 안 돌았다. 셸은 npm test 만 돌렸고, 에이전트들이 각자 시도한 npm run build 는
+# 전부 권한 거부됐다. 빌드를 검증에 넣으려면 **빌드 실패가 코드 탓임을 먼저
+# 보장**해야 한다 — 그게 기준선의 역할이다.
+preflight() {
+  # 사용자가 검증 명령을 명시했으면 기본 목록을 안 쓰므로 기준선도 의미가 없다.
+  # 여기서 빌드를 돌리면 .env 없는 CI 에서 쓸데없이 사람 게이트가 뜬다.
+  if [ -n "$TEST_CMD_OVERRIDE" ]; then
+    BUILD_GATE=0
+    BUILD_GATE_REASON="TEST_CMD 오버라이드 — 검증 명령을 사용자가 직접 지정함"
+    return 0
+  fi
+
+  local missing=""
+  [ -f "$ROOT/.env" ] || missing="$missing .env"
+  [ -d "$ROOT/src/generated/prisma" ] || missing="$missing src/generated/prisma"
+
+  if [ -n "$missing" ]; then
+    BUILD_GATE=0
+    BUILD_GATE_REASON="누락:$missing"
+    printf '\033[1;31m[orch]\033[0m ⚠ 타입 검사 OFF — 누락:%s\n' "$missing" >&2
+    log "  빌드 없이 진행하면 타입 오류가 검증을 그대로 통과한다."
+    log "  고치려면: cp .env.example .env 후 값 채우기 → npx prisma generate"
+    # AUTO=1 이면 gate_human 이 알아서 통과시킨다. 사람이 볼 때는 한 번 멈춘다 —
+    # "빌드가 안 돌았다"를 모르고 DONE 을 받는 것이 이번에 실제로 일어난 사고다.
+    gate_human "타입 검사 없이 진행한다 (누락:$missing). 알고 넘어가는 게 맞나?" "$STATE"
+    return 0
+  fi
+
+  log "▶ 프리플라이트: npm run build (기준선)"
+  if (cd "$ROOT" && npm run build) > "$WORK/preflight_build.txt" 2>&1; then
+    BUILD_GATE=1
+    BUILD_GATE_REASON=""
+    log "  ✔ 기준선 녹색 — 이후 빌드 실패는 에이전트가 만든 것이므로 재시도 대상이다"
+  else
+    tail -30 "$WORK/preflight_build.txt" >&2
+    # 원인을 환경으로 단정하지 않는다. 이 파이프라인은 더러운 워킹트리에서 시작하는
+    # 것을 전제하므로(check_protected 주석 참조), 이미 있던 미완성 코드가 원인일 수도
+    # 있다. 확실한 것 하나만 말한다 — **에이전트가 만든 것은 아니다**.
+    die "프리플라이트 빌드 실패 — 에이전트는 아직 한 번도 안 띄웠으므로(비용 \$0) **에이전트가 만든 문제가 아니다**. 환경(.env·prisma generate)이거나 이미 워킹트리에 있던 코드다. 고친 뒤 다시 실행해라 → $WORK/preflight_build.txt"
+  fi
+}
+
+# 검증 목록을 만든다. 단일 문자열 대신 순서 있는 목록인 이유: 어느 명령이 실패했는지
+# test_out.txt 를 읽지 않고도 알아야 FAIL_LOG 가 다음 시도에 쓸모가 있다.
+#
+# 순서 — 싼 것부터. npm test(~0.1s) → lint → build(~2.5s).
+# 린트를 빌드 앞에 둔 이유는 린트가 훨씬 싸기 때문이다.
+build_verify_list() {
+  if [ -n "$TEST_CMD_OVERRIDE" ]; then
+    VERIFY_CMDS=("$TEST_CMD_OVERRIDE")
+  else
+    VERIFY_CMDS=("npm test" "npm run lint")
+    [ "$BUILD_GATE" = "1" ] && VERIFY_CMDS+=("npm run build")
+    # 기능별 스모크 훅. 있으면 마지막에 돈다 — 오케스트레이터는 기능 중립이어야
+    # 하므로 라우트나 포트를 여기 하드코딩하지 않는다.
+    [ -f "$WORK/smoke.sh" ] && VERIFY_CMDS+=("bash '$WORK/smoke.sh'")
+  fi
+
+  # 표시용(쉼표)과 실행 가능한 형태(&&)를 나눈다. prompts/verify.md 가 본문에서
+  # $TEST_CMD 를 참조하는데, 쉼표로 이어붙인 문자열을 받은 에이전트가 그걸 복사해
+  # 재현하려 하면 셸 에러가 난다.
+  VERIFY_LIST_DESC="$(printf '%s, ' "${VERIFY_CMDS[@]}")"
+  VERIFY_LIST_DESC="${VERIFY_LIST_DESC%, }"
+  TEST_CMD="$(printf '%s && ' "${VERIFY_CMDS[@]}")"
+  TEST_CMD="${TEST_CMD% && }"
+}
+
+# 목록을 순서대로 돌리고 첫 실패에서 멈춘다.
+#
+# fail-fast 를 고른 근거: 이 목록은 의존 순서가 있다. 타입이 깨졌으면 린트 결과는
+# 대개 파생 잡음이고 빌드도 같은 이유로 죽는다. 재시도 루프에 넘길 정보는 "무엇을
+# 먼저 고쳐야 하는가" 하나면 충분하고, 실패 3개를 한꺼번에 주면 FAIL_LOG 가 길어져
+# 다음 구현 에이전트가 우선순위를 못 잡는다. 이미 실패한 뒤에 뒤 명령을 돌리는 것은
+# 재시도 횟수만큼 곱해지는 순수 낭비이기도 하다.
+run_verify() {
+  local cmd rc=0
+  VERIFY_PASSED=""
+  VERIFY_FAILED=""
+  : > "$WORK/test_out.txt"
+
+  for cmd in "${VERIFY_CMDS[@]}"; do
+    log "  ▸ $cmd"
+    echo "### \$ $cmd" >> "$WORK/test_out.txt"
+    if (cd "$ROOT" && eval "$cmd") >> "$WORK/test_out.txt" 2>&1; then
+      echo "→ 통과" >> "$WORK/test_out.txt"
+      echo >> "$WORK/test_out.txt"
+      VERIFY_PASSED="$VERIFY_PASSED${VERIFY_PASSED:+, }$cmd"
+    else
+      rc=$?
+      VERIFY_FAILED="$cmd"
+      echo "→ 실패 (exit $rc)" >> "$WORK/test_out.txt"
+      return 1
+    fi
+  done
+  return 0
+}
+
 # ─────────────────────────────────────────── 파이프라인
 ATTEMPT=0
 state "START"
 log "=== $FEATURE 시작 ==="
 log "상담역 띄우려면 다른 터미널에서: ./advisor.sh $FEATURE"
+
+preflight
+build_verify_list
+state "PREFLIGHT" "검증 명령: $VERIFY_LIST_DESC"
+log "검증 목록: $VERIFY_LIST_DESC"
 
 if [ "$FRESH_DESIGN" != "1" ] && [ -f "$WORK/DESIGN.md" ] \
    && [ "$(grep -m1 '^STATUS:' "$WORK/DESIGN.md" | awk '{print $2}')" = "DONE" ]; then
@@ -317,30 +455,45 @@ while :; do
   check_protected verify
 
   # ★ 최종 판정은 셸이 한다. 에이전트에게 안 맡긴다.
-  state "TESTING" "$TEST_CMD"
-  if (cd "$ROOT" && eval "$TEST_CMD") > "$WORK/test_out.txt" 2>&1; then
-    log "✅ 검증 통과 ($TEST_CMD)"
+  state "TESTING" "$VERIFY_LIST_DESC"
+  if run_verify; then
+    VERIFY_LAST="통과: $VERIFY_PASSED"
+    log "✅ 검증 통과 ($VERIFY_PASSED)"
     break
   fi
 
-  log "❌ 테스트 실패"
+  VERIFY_LAST="실패: $VERIFY_FAILED (그 앞까지 통과: ${VERIFY_PASSED:-없음})"
+  log "❌ 검증 실패 — $VERIFY_FAILED"
   tail -30 "$WORK/test_out.txt" >&2
-  state "TEST_FAILED" "attempt $ATTEMPT"
+  state "TEST_FAILED" "attempt $ATTEMPT — $VERIFY_FAILED 실패"
 
-  [ "$ATTEMPT" -gt "$MAX_RETRY" ] \
-    && die "검증 ${MAX_RETRY}회 재시도 후에도 실패 → $FAIL_LOG"
-
+  # 기록이 die 보다 먼저다. 예전엔 순서가 반대라 **마지막 시도의 실패가 FAIL_LOG 에
+  # 영영 안 남았다** — 정작 가장 알고 싶은 실패가 그것이고, 아래 die 메시지가
+  # 가리키는 파일도 이것이다.
+  #
+  # 첫 줄에 어느 명령이 실패했는지 둔다. 다음 구현 시도가 이걸 읽는데, 출력만 있고
+  # 명령 이름이 없으면 무엇을 고쳐야 하는지 추측하게 된다.
   {
     echo "## attempt $ATTEMPT — $(date -Iseconds)"
+    echo "실패한 명령: \`$VERIFY_FAILED\`"
+    echo "그 앞까지 통과: ${VERIFY_PASSED:-없음}"
     echo '```'
     tail -60 "$WORK/test_out.txt"
     echo '```'
     echo
   } >> "$FAIL_LOG"
 
+  [ "$ATTEMPT" -gt "$MAX_RETRY" ] \
+    && die "검증 ${MAX_RETRY}회 재시도 후에도 실패 (마지막: $VERIFY_FAILED) → $FAIL_LOG"
+
   gate_human "재시도 $((ATTEMPT + 1)) 진행? (상담역에게 FAIL_LOG 물어봐도 됨)" "$FAIL_LOG"
 done
 
-state "DONE"
+state "DONE" "통과: $VERIFY_PASSED"
 log "=== $FEATURE 완료 ==="
+log "검증 통과: $VERIFY_PASSED"
+# 오버라이드는 빌드를 포함할 수도 있어서 셸이 판단할 수 없다. 단정하지 않는다.
+if [ "$BUILD_GATE" != "1" ] && [ -z "$TEST_CMD_OVERRIDE" ]; then
+  log "⚠ 타입 검사는 돌지 않았다 ($BUILD_GATE_REASON)"
+fi
 log "산출물: $WORK/{DESIGN,JUDGE,IMPL,VERIFY}.md"

@@ -15,6 +15,12 @@ PASS=0; FAIL=0
 green() { printf '\033[32m%s\033[0m\n' "$*"; }
 red()   { printf '\033[31m%s\033[0m\n' "$*"; }
 
+# sandbox_scripts <test> <lint> <build> — package.json 의 세 스크립트 본문을 지정한다
+sandbox_scripts() {
+  printf '{\n  "name": "sandbox",\n  "scripts": {\n    "test": "%s",\n    "lint": "%s",\n    "build": "%s"\n  }\n}\n' \
+    "$1" "$2" "$3" > package.json
+}
+
 # ── 매 테스트마다 깨끗한 샌드박스 repo 를 만든다
 setup() {
   SANDBOX="$(mktemp -d)"
@@ -27,7 +33,9 @@ setup() {
   cp "$HERE/fake-claude" test/claude       # ← 이름이 'claude' 여야 가로챈다
   chmod +x orchestrate.sh test/claude
   # 보호 파일 게이트 검증용. 없으면 지문 비교가 '수정'이 아니라 '생성'을 보게 된다.
-  printf '{\n  "name": "sandbox"\n}\n' > package.json
+  # 기본 검증 목록(npm test → lint → build) 경로를 테스트하려면 스크립트가 있어야 한다.
+  # 개별 케이스에서 sandbox_scripts 로 덮어써 실패를 흉내낸다.
+  sandbox_scripts true true true
   echo 'export default {}' > vitest.config.mts
   echo x > x.txt; git add -A; git commit -qm init
   export PATH="$SANDBOX/test:$PATH"
@@ -220,18 +228,124 @@ fi
 teardown
 
 echo
+echo "=== 프리플라이트 / 빌드 게이트 ==="
+# 배경: 이전 실행에서 phase:DONE 이 떴는데 타입 검사가 한 번도 안 돌았다.
+# 셸은 npm test 만 돌렸고 아무도 그 사실을 몰랐다. 아래 셋이 그 재발을 막는다.
+
+# ① 환경이 갖춰져 있으면 기준선 빌드가 돌고 빌드가 검증 목록에 들어간다
+setup
+mkdir -p src/generated/prisma; touch .env
+got=0
+env FAKE_SCENARIO=ok AUTO=1 ./orchestrate.sh feat >/dev/null 2>&1 || got=$?
+if [ "$got" -eq 0 ] \
+   && grep -q '빌드 게이트(타입 검사): 켜짐' .pipeline/feat/STATE.md 2>/dev/null \
+   && grep -q 'npm run build' .pipeline/feat/STATE.md 2>/dev/null; then
+  green "  PASS  환경이 갖춰지면 빌드가 검증 목록에 포함된다"; PASS=$((PASS+1))
+else
+  red   "  FAIL  빌드 게이트가 안 켜짐 — exit=$got"
+  sed -n '/검증 게이트/,/산출물/p' .pipeline/feat/STATE.md 2>/dev/null | sed 's/^/         /'
+  FAIL=$((FAIL+1))
+fi
+teardown
+
+# ② 기준선 빌드가 실패하면 에이전트를 한 번도 안 띄우고 죽는다.
+#    이게 이 단계의 존재 이유다 — 환경 문제로 $5짜리 사이클을 3회 태우지 않는다.
+setup
+mkdir -p src/generated/prisma; touch .env
+sandbox_scripts true true false
+got=0
+env FAKE_SCENARIO=ok AUTO=1 ./orchestrate.sh feat >/dev/null 2>&1 || got=$?
+if [ "$got" -eq 2 ] && [ ! -f .pipeline/feat/design.result.json ] \
+   && [ ! -f .pipeline/feat/DESIGN.md ]; then
+  green "  PASS  기준선 빌드가 깨지면 에이전트를 띄우기 전에 죽는다 (비용 0)"; PASS=$((PASS+1))
+else
+  red   "  FAIL  프리플라이트가 에이전트를 막지 못함 — exit=$got, DESIGN.md=$([ -f .pipeline/feat/DESIGN.md ] && echo 생성됨 || echo 없음)"
+  FAIL=$((FAIL+1))
+fi
+teardown
+
+# ③ .env 가 없으면 빌드를 끄되 그 사실이 STATE.md 에 남는다 (조용히 넘어가지 않는다)
+setup
+got=0
+env FAKE_SCENARIO=ok AUTO=1 ./orchestrate.sh feat >/dev/null 2>&1 || got=$?
+if [ "$got" -eq 0 ] \
+   && grep -q '빌드 게이트(타입 검사): 꺼짐 — 누락:' .pipeline/feat/STATE.md 2>/dev/null; then
+  green "  PASS  .env 가 없으면 빌드 게이트가 꺼지고 사유가 STATE.md 에 남는다"; PASS=$((PASS+1))
+else
+  red   "  FAIL  빌드 게이트 OFF 사유가 기록되지 않음 — exit=$got"; FAIL=$((FAIL+1))
+fi
+teardown
+
+echo
+echo "=== 검증 목록 ==="
+# ④ 어느 명령이 실패했는지가 FAIL_LOG 한 줄로 보여야 한다.
+#    출력만 있고 명령 이름이 없으면 다음 구현 시도가 무엇을 고칠지 추측하게 된다.
+setup
+sandbox_scripts true false true
+got=0
+# MAX_RETRY=0 — 첫 실패가 곧 마지막이다. 그 마지막 실패도 기록돼야 한다.
+env FAKE_SCENARIO=ok AUTO=1 MAX_RETRY=0 ./orchestrate.sh feat >/dev/null 2>&1 || got=$?
+if [ "$got" -eq 2 ] \
+   && grep -q '실패한 명령: `npm run lint`' .pipeline/feat/FAIL_LOG.md 2>/dev/null \
+   && grep -q '그 앞까지 통과: npm test' .pipeline/feat/FAIL_LOG.md 2>/dev/null; then
+  green "  PASS  실패한 명령 이름이 FAIL_LOG 에 남는다"; PASS=$((PASS+1))
+else
+  red   "  FAIL  FAIL_LOG 에 실패 명령이 없음 — exit=$got"
+  sed -n '1,6p' .pipeline/feat/FAIL_LOG.md 2>/dev/null | sed 's/^/         /'
+  FAIL=$((FAIL+1))
+fi
+teardown
+
+# ⑤ DONE 이 무엇을 뜻하는지 STATE.md 만 읽어도 나와야 한다
+setup
+env FAKE_SCENARIO=ok AUTO=1 ./orchestrate.sh feat >/dev/null 2>&1
+if grep -q 'phase: DONE' .pipeline/feat/STATE.md 2>/dev/null \
+   && grep -q '마지막 결과: 통과: npm test, npm run lint' .pipeline/feat/STATE.md 2>/dev/null; then
+  green "  PASS  DONE 이면 무엇을 통과했는지가 STATE.md 에 남는다"; PASS=$((PASS+1))
+else
+  red   "  FAIL  DONE 에 검증 증거가 없음"
+  sed -n '/검증 게이트/,/산출물/p' .pipeline/feat/STATE.md 2>/dev/null | sed 's/^/         /'
+  FAIL=$((FAIL+1))
+fi
+teardown
+
+# ⑥ TEST_CMD 오버라이드는 그대로 동작하고, 그 사실이 STATE.md 에 보인다 (하위 호환)
+setup
+env FAKE_SCENARIO=ok AUTO=1 TEST_CMD="true" ./orchestrate.sh feat >/dev/null 2>&1
+if grep -q '검증 명령: true' .pipeline/feat/STATE.md 2>/dev/null \
+   && grep -q 'TEST_CMD 오버라이드' .pipeline/feat/STATE.md 2>/dev/null; then
+  green "  PASS  TEST_CMD 오버라이드가 STATE.md 에 드러난다"; PASS=$((PASS+1))
+else
+  red   "  FAIL  오버라이드가 STATE.md 에 안 보임"; FAIL=$((FAIL+1))
+fi
+teardown
+
+# ⑦ smoke.sh 가 있으면 검증 목록 마지막에 붙는다 (없으면 조용히 건너뜀은 위 케이스들이 커버)
+setup
+mkdir -p .pipeline/feat
+printf '#!/usr/bin/env bash\nexit 0\n' > .pipeline/feat/smoke.sh
+env FAKE_SCENARIO=ok AUTO=1 ./orchestrate.sh feat >/dev/null 2>&1
+if grep -q 'smoke.sh' .pipeline/feat/STATE.md 2>/dev/null; then
+  green "  PASS  기능 폴더의 smoke.sh 가 검증 목록에 붙는다"; PASS=$((PASS+1))
+else
+  red   "  FAIL  smoke.sh 훅이 안 붙음"; FAIL=$((FAIL+1))
+fi
+teardown
+
+echo
 echo "=== 재시도 루프 ==="
-# 테스트가 항상 실패하면 MAX_RETRY 만큼 돌고 죽어야 한다
+# 테스트가 항상 실패하면 MAX_RETRY 만큼 돌고 죽어야 한다.
+# 기록은 시도 횟수와 같다 — 마지막 시도도 die 전에 FAIL_LOG 에 남는다.
 setup
 got=0
 env FAKE_SCENARIO=ok AUTO=1 MAX_RETRY=2 TEST_CMD="false" \
   ./orchestrate.sh feat >/dev/null 2>&1 || got=$?
 attempts=$(grep -c '^## attempt' .pipeline/feat/FAIL_LOG.md 2>/dev/null | head -1)
 attempts=${attempts:-0}
-if [ "$got" -eq 2 ] && [ "$attempts" -eq 2 ]; then
-  green "  PASS  테스트 계속 실패 → 2회 기록 후 포기 (exit 2)"; PASS=$((PASS+1))
+if [ "$got" -eq 2 ] && [ "$attempts" -eq 3 ]; then
+  green "  PASS  테스트 계속 실패 → 3회 전부 기록 후 포기 (exit 2)"; PASS=$((PASS+1))
 else
-  red   "  FAIL  재시도 루프 — exit=$got, FAIL_LOG 기록=$attempts (기대: 2, 2)"; FAIL=$((FAIL+1))
+  red   "  FAIL  재시도 루프 — exit=$got, FAIL_LOG 기록=$attempts (기대: 2, 3)"; FAIL=$((FAIL+1))
 fi
 teardown
 
