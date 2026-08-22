@@ -1,13 +1,15 @@
 import { FileText, Download } from 'lucide-react'
 import { UploadDialog } from '@/components/upload-dialog'
+import { DocumentRowActions } from '@/components/document-row-actions'
 import { prisma } from '@/lib/prisma'
 import { formatBytes, formatRelative, fileLabel } from '@/lib/format'
+import { activeDocumentWhere } from '@/lib/trash'
 
 export const dynamic = 'force-dynamic'
 
 async function getDocuments() {
   return prisma.document.findMany({
-    where: { deletedAt: null },
+    where: activeDocumentWhere(),
     orderBy: { updatedAt: 'desc' },
     include: {
       folder: { select: { name: true } },
@@ -53,6 +55,7 @@ export default async function DocumentsPage() {
                 <th scope="col" className="hidden px-4 py-2.5 font-medium sm:table-cell">크기</th>
                 <th scope="col" className="px-4 py-2.5 font-medium">수정</th>
                 <th scope="col" className="w-12 px-4 py-2.5"><span className="sr-only">다운로드</span></th>
+                <th scope="col" className="w-12 px-4 py-2.5"><span className="sr-only">삭제</span></th>
               </tr>
             </thead>
             <tbody>
@@ -93,6 +96,10 @@ export default async function DocumentsPage() {
                       >
                         <Download className="h-4 w-4" />
                       </a>
+                    </td>
+                    <td className="px-4 py-3">
+                      {/* 상세 페이지가 아직 없어 삭제 진입점을 행에 둔다. M3에서 상세에도 붙인다. */}
+                      <DocumentRowActions id={doc.id} title={doc.title} />
                     </td>
                   </tr>
                 )

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
 import { presignDownload } from '@/lib/s3'
+import { activeDocumentWhere } from '@/lib/trash'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,7 +22,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const version = await prisma.documentVersion.findFirst({
     where: {
       documentId: id,
-      document: { deletedAt: null },
+      document: activeDocumentWhere(),
       ...(versionParam ? { versionNo: Number(versionParam) } : {}),
     },
     orderBy: { versionNo: 'desc' },
