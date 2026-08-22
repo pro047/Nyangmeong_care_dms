@@ -3,6 +3,7 @@ import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
 import { presignDownload } from '@/lib/s3'
 import { activeDocumentWhere } from '@/lib/trash'
+import { parseVersionParam } from '@/lib/version'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,11 +20,18 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const versionParam = req.nextUrl.searchParams.get('v')
   const inline = req.nextUrl.searchParams.get('inline') === '1'
 
+  // ?v=abc 나 ?v=1.5 를 그대로 Number() 하면 NaN 이 Int 필터로 들어가 쿼리가 터진다.
+  // 잘못된 버전 번호는 500 이 아니라 "그런 버전 없음"(404)이 맞다.
+  const versionNo = parseVersionParam(versionParam)
+  if (versionNo === 'invalid') {
+    return NextResponse.json({ error: '문서를 찾을 수 없습니다.' }, { status: 404 })
+  }
+
   const version = await prisma.documentVersion.findFirst({
     where: {
       documentId: id,
       document: activeDocumentWhere(),
-      ...(versionParam ? { versionNo: Number(versionParam) } : {}),
+      ...(versionNo !== null ? { versionNo } : {}),
     },
     orderBy: { versionNo: 'desc' },
     select: { s3Key: true, fileName: true },
