@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getSession } from '@/lib/session'
 import { buildS3Key, presignUpload, MAX_UPLOAD_BYTES } from '@/lib/s3'
+import { signUploadToken } from '@/lib/upload-token'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,7 +13,8 @@ const bodySchema = z.object({
 })
 
 export async function POST(req: NextRequest) {
-  if (!(await getSession())) {
+  const session = await getSession()
+  if (!session) {
     return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 })
   }
 
@@ -26,6 +28,8 @@ export async function POST(req: NextRequest) {
 
   const key = buildS3Key(parsed.data.fileName)
   const url = await presignUpload(key, parsed.data.contentType)
+  // 문서 생성 때 이 키가 우리가 발급한 것임을 증명하는 표. 자세한 이유는 upload-token.ts.
+  const keyToken = await signUploadToken(key, session.id)
 
-  return NextResponse.json({ key, url })
+  return NextResponse.json({ key, url, keyToken })
 }

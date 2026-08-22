@@ -17,10 +17,23 @@ type Item = {
 
 const MAX_PARALLEL = 3
 
-/** presigned PUT은 진행률이 필요해 fetch 대신 XHR을 쓴다. */
-function putToS3(url: string, file: File, contentType: string, onProgress: (pct: number) => void) {
+/**
+ * presigned PUT은 진행률이 필요해 fetch 대신 XHR을 쓴다.
+ *
+ * onStart 로 xhr 을 밖에 넘기는 이유: 멈춘 업로드를 취소할 수단이 필요하다.
+ * xhr.timeout 으로 숫자를 정하지 않은 것은 의도다 — 100MB를 느린 회선으로 올리면
+ * 멀쩡한 업로드가 그 숫자에 걸려 죽는다. 판단은 사람이 한다.
+ */
+function putToS3(
+  url: string,
+  file: File,
+  contentType: string,
+  onProgress: (pct: number) => void,
+  onStart: (xhr: XMLHttpRequest) => void,
+) {
   return new Promise<void>((resolve, reject) => {
     const xhr = new XMLHttpRequest()
+    onStart(xhr)
     xhr.open('PUT', url)
     xhr.setRequestHeader('Content-Type', contentType)
     xhr.upload.onprogress = (e) => {
@@ -31,6 +44,7 @@ function putToS3(url: string, file: File, contentType: string, onProgress: (pct:
         ? resolve()
         : reject(new Error(`S3 업로드 실패 (${xhr.status})`))
     xhr.onerror = () => reject(new Error('네트워크 오류'))
+    xhr.onabort = () => reject(new Error('업로드를 취소했습니다.'))
     xhr.send(file)
   })
 }
@@ -51,6 +65,11 @@ export function UploadDialog() {
   const [items, setItems] = useState<Item[]>([])
   const [dragging, setDragging] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  // 진행 중인 PUT. 모달을 닫을 때 전부 abort 한다.
+  const inFlight = useRef(new Set<XMLHttpRequest>())
+  // 진행 중인 배치. abort 만으로는 부족하다 — 이미 전송이 끝난 건의 문서 생성과
+  // 아직 시작도 안 한 대기 파일을 못 막는다. 배치 단위로 "그만둔다"를 표시한다.
+  const batches = useRef(new Set<{ cancelled: boolean }>())
 
   const uploading = items.some((i) => i.status === 'uploading' || i.status === 'pending')
   const finished = items.length > 0 && !uploading
@@ -60,7 +79,7 @@ export function UploadDialog() {
   }, [])
 
   const uploadOne = useCallback(
-    async (item: Item) => {
+    async (item: Item, batch: { cancelled: boolean }) => {
       const { file } = item
       const contentType = file.type || 'application/octet-stream'
       update(item.id, { status: 'uploading', progress: 0 })
@@ -72,9 +91,19 @@ export function UploadDialog() {
           body: JSON.stringify({ fileName: file.name, contentType, size: file.size }),
         })
         if (!presignRes.ok) throw new Error(await errorMessage(presignRes, '업로드 준비 실패'))
-        const { key, url } = await presignRes.json()
+        const { key, url, keyToken } = await presignRes.json()
 
-        await putToS3(url, file, contentType, (pct) => update(item.id, { progress: pct }))
+        await putToS3(
+          url,
+          file,
+          contentType,
+          (pct) => update(item.id, { progress: pct }),
+          (xhr) => inFlight.current.add(xhr),
+        )
+
+        // PUT 이 끝난 뒤 취소됐을 수 있다(100% 직후 취소). 사람이 그만두라고 했으면
+        // 문서를 만들지 않는다. S3 객체는 고아로 남는데, 정리 경로는 아직 없다.
+        if (batch.cancelled) return
 
         const createRes = await fetch('/api/documents', {
           method: 'POST',
@@ -82,9 +111,9 @@ export function UploadDialog() {
           body: JSON.stringify({
             title: titleFromFileName(file.name),
             s3Key: key,
+            keyToken,
             fileName: file.name,
             mimeType: contentType,
-            sizeBytes: file.size,
           }),
         })
         if (!createRes.ok) throw new Error(await errorMessage(createRes, '문서 저장 실패'))
@@ -112,23 +141,41 @@ export function UploadDialog() {
       setItems((prev) => [...prev, ...added])
 
       // 동시 업로드 수를 제한해 브라우저 커넥션과 S3 요청이 몰리지 않게 한다.
+      const batch = { cancelled: false }
+      batches.current.add(batch)
+
       let cursor = 0
       const worker = async () => {
-        while (cursor < added.length) {
-          await uploadOne(added[cursor++])
+        // 취소되면 남은 파일은 시작조차 하지 않는다. 예전엔 모달을 닫아도
+        // 대기 중이던 파일들이 계속 올라갔다.
+        while (!batch.cancelled && cursor < added.length) {
+          await uploadOne(added[cursor++], batch)
         }
       }
-      void Promise.all(Array.from({ length: MAX_PARALLEL }, worker))
+      void Promise.all(Array.from({ length: MAX_PARALLEL }, worker)).finally(() => {
+        batches.current.delete(batch)
+      })
     },
     [uploadOne],
   )
 
   const close = useCallback(() => {
-    if (uploading) return
+    // 예전엔 uploading 이면 그냥 return 해서 탈출구가 없었다. PUT 이 응답 없이 멈추면
+    // onload 도 onerror 도 안 와서 영영 uploading 이고, 새로고침 말고는 방법이 없었다.
+    if (uploading && !window.confirm('업로드가 진행 중입니다. 취소하고 닫을까요?')) return
+
+    // 순서가 중요하다. 먼저 배치를 접어야 abort 로 깨어난 흐름이 다음 단계로
+    // 넘어가지 않는다.
+    batches.current.forEach((b) => (b.cancelled = true))
+    batches.current.clear()
+    inFlight.current.forEach((xhr) => xhr.abort())
+    inFlight.current.clear()
+
     setOpen(false)
     setItems([])
-    if (finished) router.refresh()
-  }, [uploading, finished, router])
+    // 취소했더라도 그 전에 끝난 것이 있으면 목록에 반영해야 한다.
+    router.refresh()
+  }, [uploading, router])
 
   useEffect(() => {
     if (!open) return
@@ -173,9 +220,8 @@ export function UploadDialog() {
               <button
                 type="button"
                 onClick={close}
-                disabled={uploading}
-                aria-label="닫기"
-                className="rounded-lg p-1 text-ink-muted transition-colors hover:bg-canvas hover:text-ink disabled:opacity-40"
+                aria-label={uploading ? '업로드 취소하고 닫기' : '닫기'}
+                className="rounded-lg p-1 text-ink-muted transition-colors hover:bg-canvas hover:text-ink"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -267,10 +313,9 @@ export function UploadDialog() {
               <button
                 type="button"
                 onClick={close}
-                disabled={uploading}
-                className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-hover disabled:opacity-50"
+                className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-hover"
               >
-                {finished ? '완료' : '닫기'}
+                {uploading ? '취소' : finished ? '완료' : '닫기'}
               </button>
             </div>
           </div>

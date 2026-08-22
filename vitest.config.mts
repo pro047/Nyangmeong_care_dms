@@ -17,5 +17,22 @@ export default defineConfig({
     // 테스트 파일이 하나도 없으면 실패한다. 파이프라인 검증 단계가 테스트를
     // 안 쓰고 넘어간 것을 게이트가 통과시키면 안 된다.
     passWithNoTests: false,
+    // 더미 값을 여기 박아 테스트를 밀폐한다. src/lib/env.ts 가 import 시점에 zod 로
+    // 검증하며 throw 하므로 이게 없으면 env 를 거치는 모듈은 테스트가 아예 못 뜬다.
+    // 실제 .env 를 읽게 하면 "체크아웃에 따라 .env 가 없다"는 문제를 테스트로 옮기는
+    // 셈이고, CI 에서 값이 달라 결과가 흔들린다.
+    env: {
+      DATABASE_URL: 'postgresql://test:test@localhost:5432/test',
+      DISCORD_CLIENT_ID: 'test-client-id',
+      DISCORD_CLIENT_SECRET: 'test-client-secret',
+      DISCORD_GUILD_ID: 'test-guild-id',
+      AUTH_SECRET: 'test-auth-secret-at-least-32-characters',
+      APP_URL: 'http://localhost:3002',
+      AWS_REGION: 'ap-northeast-2',
+      AWS_ACCESS_KEY_ID: 'test-access-key-id',
+      AWS_SECRET_ACCESS_KEY: 'test-secret-access-key',
+      S3_BUCKET: 'test-bucket',
+      DISCORD_WEBHOOK_URL: '',
+    },
   },
 })
