@@ -72,6 +72,14 @@ export async function notifyUpload(params: {
 }) {
   if (!env.DISCORD_WEBHOOK_URL) return
 
+  // 로컬에서는 보내지 않는다. 개발하면서 올리는 테스트 파일이 팀 채널에 그대로
+  // 쌓이고, 임베드 링크가 가리키는 /documents/[id] 는 아직 없어서 404 가 공유된다.
+  // next dev 는 NODE_ENV=development, next start 는 production 이라 배포에서만 켜진다.
+  if (process.env.NODE_ENV !== 'production') {
+    console.info(`[개발] 디스코드 알림 생략: ${params.title} v${params.versionNo}`)
+    return
+  }
+
   const isNew = params.versionNo === 1
   const body = {
     embeds: [
