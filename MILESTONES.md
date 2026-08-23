@@ -110,6 +110,15 @@
 
 **완료 기준** — 폴더·태그·검색 세 경로 중 아무거나로 원하는 문서에 도달한다.
 
+> **자리만 잡아둔 UI 두 개를 여기서 같이 살린다.** 둘 다 지금은 `disabled` 다.
+> - 헤더 검색창 (`app-header.tsx`) — `/search` 라우트를 만들면서 `disabled` 를 푼다.
+>   원래 `<form action="/search">` 로 살아 있었는데 라우트가 없어 엔터 한 번에 404 였다
+>   (2026-08-23 `ee7f11d` 에서 막음).
+> - 사이드바 "새 폴더" 버튼 (`app-sidebar.tsx`) — 처음부터 `disabled` 였다.
+>
+> 폴더는 **읽기 경로가 이미 반쯤 있다**: `page.tsx` 가 `doc.folder?.name` 을 표시하고
+> `api/documents/route.ts` 가 `folderId` 를 받는다. 만들고 배정하는 UI 만 없어 항상 `—` 다.
+
 ## M5 — 미리보기 + 디스코드 알림 · 약 2시간
 
 - [ ] PDF·이미지 인라인 미리보기 (`canPreview` 활용)

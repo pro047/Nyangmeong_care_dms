@@ -154,6 +154,13 @@ aws ec2 describe-instances --region ap-northeast-2 \
 **진단 스크립트로 DB 시각을 읽을 때 주의.** `created_at` 은 `timestamp without time zone`
 이라 node-postgres 가 로컬 시간으로 해석해 9시간 어긋나 보인다. Prisma는 정상이다.
 
+**"자리만 잡아둔" UI 가 실제로는 살아 있을 수 있다.** 헤더 검색창이 주석에
+"M4에서 실제 검색으로 연결"이라 적힌 채 `<form action="/search">` 로 **동작하고 있었다** —
+그 라우트가 없어서 엔터 한 번에 Next 기본 404 였다. 사이드바 "새 폴더"는 `disabled` 로
+정직하게 막혀 있었는데 검색창만 빠진 것이다 (2026-08-23 `ee7f11d` 에서 맞춤).
+비슷한 자리표시 UI 를 새로 넣을 때는 **주석이 아니라 `disabled` 로 막을 것.**
+주석은 사용자를 막지 못한다.
+
 ---
 
 ## 아키텍처
