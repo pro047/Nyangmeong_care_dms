@@ -4,6 +4,7 @@ import { DocumentRowActions } from '@/components/document-row-actions'
 import { prisma } from '@/lib/prisma'
 import { formatBytes, formatRelative, fileLabel } from '@/lib/format'
 import { activeDocumentWhere } from '@/lib/trash'
+import { pageErrorMessage } from '@/lib/page-error'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,8 +24,15 @@ async function getDocuments() {
   })
 }
 
-export default async function DocumentsPage() {
+export default async function DocumentsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string | string[] }>
+}) {
   const documents = await getDocuments()
+  // 다운로드 라우트가 내비게이션 404 를 여기로 돌려보낸다. 아는 코드만 문구가 된다.
+  const { error } = await searchParams
+  const errorMessage = pageErrorMessage(error)
 
   return (
     <div className="mx-auto max-w-6xl">
@@ -37,6 +45,12 @@ export default async function DocumentsPage() {
         </div>
         <UploadDialog />
       </div>
+
+      {errorMessage && (
+        <p className="mb-5 rounded-lg border border-danger/20 bg-danger-soft px-3.5 py-2.5 text-sm text-danger">
+          {errorMessage}
+        </p>
+      )}
 
       {documents.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border-strong bg-surface py-20 text-center">
