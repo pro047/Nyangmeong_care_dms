@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Upload, X, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react'
 import { formatBytes } from '@/lib/format'
+import { runUploadFlow, type UploadBatch } from '@/lib/upload-flow'
 
 type ItemStatus = 'pending' | 'uploading' | 'done' | 'error'
 
@@ -30,6 +31,7 @@ function putToS3(
   contentType: string,
   onProgress: (pct: number) => void,
   onStart: (xhr: XMLHttpRequest) => void,
+  isCancelled: () => boolean,
 ) {
   return new Promise<void>((resolve, reject) => {
     const xhr = new XMLHttpRequest()
@@ -45,6 +47,9 @@ function putToS3(
         : reject(new Error(`S3 업로드 실패 (${xhr.status})`))
     xhr.onerror = () => reject(new Error('네트워크 오류'))
     xhr.onabort = () => reject(new Error('업로드를 취소했습니다.'))
+    // 마지막 문 직전의 동기 검사. runUploadFlow 도 put 직전에 보지만, 그 검사와 여기 사이에
+    // 언젠가 await 가 끼면 구멍이 조용히 다시 열린다. 그 전제에 기대지 않으려고 둔다.
+    if (isCancelled()) return reject(new Error('업로드를 취소했습니다.'))
     xhr.send(file)
   })
 }
@@ -69,7 +74,7 @@ export function UploadDialog() {
   const inFlight = useRef(new Set<XMLHttpRequest>())
   // 진행 중인 배치. abort 만으로는 부족하다 — 이미 전송이 끝난 건의 문서 생성과
   // 아직 시작도 안 한 대기 파일을 못 막는다. 배치 단위로 "그만둔다"를 표시한다.
-  const batches = useRef(new Set<{ cancelled: boolean }>())
+  const batches = useRef(new Set<UploadBatch>())
 
   const uploading = items.some((i) => i.status === 'uploading' || i.status === 'pending')
   const finished = items.length > 0 && !uploading
@@ -79,52 +84,50 @@ export function UploadDialog() {
   }, [])
 
   const uploadOne = useCallback(
-    async (item: Item, batch: { cancelled: boolean }) => {
+    async (item: Item, batch: UploadBatch) => {
       const { file } = item
       const contentType = file.type || 'application/octet-stream'
       update(item.id, { status: 'uploading', progress: 0 })
 
-      try {
-        const presignRes = await fetch('/api/documents/presign', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ fileName: file.name, contentType, size: file.size }),
-        })
-        if (!presignRes.ok) throw new Error(await errorMessage(presignRes, '업로드 준비 실패'))
-        const { key, url, keyToken } = await presignRes.json()
+      // 순서와 취소 지점은 lib/upload-flow 가 쥔다. 여기는 네트워크·XHR·화면 갱신만 붙인다.
+      const outcome = await runUploadFlow(batch, {
+        presign: async () => {
+          const res = await fetch('/api/documents/presign', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fileName: file.name, contentType, size: file.size }),
+          })
+          if (!res.ok) throw new Error(await errorMessage(res, '업로드 준비 실패'))
+          return res.json()
+        },
+        put: ({ url }) =>
+          putToS3(
+            url,
+            file,
+            contentType,
+            (pct) => update(item.id, { progress: pct }),
+            (xhr) => inFlight.current.add(xhr),
+            () => batch.cancelled,
+          ),
+        create: async ({ key, keyToken }) => {
+          const res = await fetch('/api/documents', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              title: titleFromFileName(file.name),
+              s3Key: key,
+              keyToken,
+              fileName: file.name,
+              mimeType: contentType,
+            }),
+          })
+          if (!res.ok) throw new Error(await errorMessage(res, '문서 저장 실패'))
+        },
+      })
 
-        await putToS3(
-          url,
-          file,
-          contentType,
-          (pct) => update(item.id, { progress: pct }),
-          (xhr) => inFlight.current.add(xhr),
-        )
-
-        // PUT 이 끝난 뒤 취소됐을 수 있다(100% 직후 취소). 사람이 그만두라고 했으면
-        // 문서를 만들지 않는다. S3 객체는 고아로 남는데, 정리 경로는 아직 없다.
-        if (batch.cancelled) return
-
-        const createRes = await fetch('/api/documents', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            title: titleFromFileName(file.name),
-            s3Key: key,
-            keyToken,
-            fileName: file.name,
-            mimeType: contentType,
-          }),
-        })
-        if (!createRes.ok) throw new Error(await errorMessage(createRes, '문서 저장 실패'))
-
-        update(item.id, { status: 'done', progress: 100 })
-      } catch (err) {
-        update(item.id, {
-          status: 'error',
-          error: err instanceof Error ? err.message : '알 수 없는 오류',
-        })
-      }
+      // cancelled 면 아무것도 하지 않는다 — close() 가 목록을 비운다.
+      if (outcome.kind === 'done') update(item.id, { status: 'done', progress: 100 })
+      if (outcome.kind === 'error') update(item.id, { status: 'error', error: outcome.message })
     },
     [update],
   )
