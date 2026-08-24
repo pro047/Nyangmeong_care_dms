@@ -1,0 +1,166 @@
+import Link from 'next/link'
+import { notFound } from 'next/navigation'
+import { ArrowLeft, Download } from 'lucide-react'
+import { DocumentMetaEditor } from '@/components/document-meta-editor'
+import { DocumentRowActions } from '@/components/document-row-actions'
+import { VersionUploadDialog } from '@/components/version-upload-dialog'
+import { prisma } from '@/lib/prisma'
+import { formatBytes, formatDateTime, fileLabel } from '@/lib/format'
+import { activeDocumentWhere } from '@/lib/trash'
+
+export const dynamic = 'force-dynamic'
+
+async function getDocument(id: string) {
+  return prisma.document.findFirst({
+    where: { id, ...activeDocumentWhere() },
+    include: {
+      folder: { select: { name: true } },
+      createdBy: { select: { username: true } },
+      // 타임라인은 전 버전을 보여준다. 최신은 versions[0] 이다 (versionNo desc).
+      versions: {
+        orderBy: { versionNo: 'desc' },
+        include: { uploadedBy: { select: { username: true } } },
+      },
+    },
+  })
+}
+
+export default async function DocumentDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
+  const document = await getDocument(id)
+  // 휴지통 문서도 여기로 온다. 보여줘 봐야 다운로드가 전부 404라 깨진 페이지가 된다.
+  if (!document) notFound()
+
+  const latest = document.versions[0]
+
+  return (
+    <div className="mx-auto max-w-4xl">
+      <Link
+        href="/"
+        className="mb-4 inline-flex items-center gap-1.5 text-sm text-ink-muted transition-colors hover:text-ink"
+      >
+        <ArrowLeft className="h-3.5 w-3.5" />
+        전체 문서
+      </Link>
+
+      <div className="rounded-xl border border-border bg-surface p-5">
+        <DocumentMetaEditor
+          id={document.id}
+          title={document.title}
+          description={document.description}
+        />
+
+        <dl className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border pt-4 text-xs text-ink-muted">
+          <div className="flex gap-1.5">
+            <dt>폴더</dt>
+            <dd className="text-ink">{document.folder?.name ?? '—'}</dd>
+          </div>
+          <div className="flex gap-1.5">
+            <dt>만든 사람</dt>
+            <dd className="text-ink">{document.createdBy.username}</dd>
+          </div>
+          <div className="flex gap-1.5">
+            <dt>만든 날짜</dt>
+            <dd className="text-ink">{formatDateTime(document.createdAt)}</dd>
+          </div>
+          {latest && (
+            <>
+              <div className="flex gap-1.5">
+                <dt>최신</dt>
+                <dd className="text-ink">v{latest.versionNo}</dd>
+              </div>
+              <div className="flex min-w-0 gap-1.5">
+                <dt>파일</dt>
+                <dd className="truncate-cell text-ink">{latest.fileName}</dd>
+              </div>
+              <div className="flex gap-1.5">
+                <dt>크기</dt>
+                <dd className="text-ink">{formatBytes(latest.sizeBytes)}</dd>
+              </div>
+            </>
+          )}
+        </dl>
+
+        <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border pt-4">
+          {latest && (
+            <a
+              href={`/api/documents/${document.id}/download`}
+              className="flex items-center gap-2 rounded-lg border border-border px-3.5 py-2 text-sm text-ink transition-colors hover:bg-canvas"
+            >
+              <Download className="h-4 w-4" />
+              다운로드
+            </a>
+          )}
+          <VersionUploadDialog
+            documentId={document.id}
+            title={document.title}
+            latestVersionNo={latest?.versionNo ?? 0}
+          />
+          <div className="ml-auto">
+            <DocumentRowActions id={document.id} title={document.title} redirectTo="/" />
+          </div>
+        </div>
+      </div>
+
+      <h2 className="mt-6 mb-2.5 text-sm font-bold text-ink">버전 이력</h2>
+      <div className="overflow-hidden rounded-xl border border-border bg-surface">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-border text-left text-xs text-ink-muted">
+              <th scope="col" className="w-20 px-4 py-2.5 font-medium">버전</th>
+              <th scope="col" className="px-4 py-2.5 font-medium">파일</th>
+              <th scope="col" className="hidden px-4 py-2.5 font-medium sm:table-cell">크기</th>
+              <th scope="col" className="hidden px-4 py-2.5 font-medium lg:table-cell">올린 사람</th>
+              <th scope="col" className="hidden px-4 py-2.5 font-medium md:table-cell">올린 시각</th>
+              <th scope="col" className="px-4 py-2.5 font-medium">변경 메모</th>
+              <th scope="col" className="w-12 px-4 py-2.5"><span className="sr-only">다운로드</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            {document.versions.map((version) => (
+              <tr key={version.id} className="border-b border-border last:border-0 hover:bg-canvas">
+                <td className="px-4 py-3 whitespace-nowrap">
+                  <span className="font-medium text-ink">v{version.versionNo}</span>
+                  {version.versionNo === latest?.versionNo && (
+                    <span className="ml-1.5 rounded bg-accent-soft px-1.5 py-0.5 text-[10px] font-medium text-accent">
+                      최신
+                    </span>
+                  )}
+                </td>
+                <td className="max-w-0 px-4 py-3">
+                  <span className="flex items-center gap-2.5">
+                    <span className="flex h-7 w-9 shrink-0 items-center justify-center rounded bg-canvas text-[10px] font-bold text-ink-muted">
+                      {fileLabel(version.fileName)}
+                    </span>
+                    <span className="truncate-cell block min-w-0 text-ink">{version.fileName}</span>
+                  </span>
+                </td>
+                <td className="hidden px-4 py-3 whitespace-nowrap text-ink-muted sm:table-cell">
+                  {formatBytes(version.sizeBytes)}
+                </td>
+                <td className="hidden px-4 py-3 text-ink-muted lg:table-cell">
+                  {version.uploadedBy.username}
+                </td>
+                <td className="hidden px-4 py-3 whitespace-nowrap text-ink-muted md:table-cell">
+                  {formatDateTime(version.createdAt)}
+                </td>
+                <td className="max-w-0 px-4 py-3 text-ink-muted">
+                  <span className="truncate-cell block">{version.changeNote ?? '—'}</span>
+                </td>
+                <td className="px-4 py-3">
+                  <a
+                    href={`/api/documents/${document.id}/download?v=${version.versionNo}`}
+                    aria-label={`v${version.versionNo} 다운로드`}
+                    className="flex h-7 w-7 items-center justify-center rounded-lg text-ink-subtle transition-colors hover:bg-accent-soft hover:text-accent"
+                  >
+                    <Download className="h-4 w-4" />
+                  </a>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}

@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { FileText, Download } from 'lucide-react'
 import { UploadDialog } from '@/components/upload-dialog'
 import { DocumentRowActions } from '@/components/document-row-actions'
@@ -78,7 +79,8 @@ export default async function DocumentsPage({
                 return (
                   <tr key={doc.id} className="border-b border-border last:border-0 hover:bg-canvas">
                     <td className="max-w-0 px-4 py-3">
-                      <a href={`/api/documents/${doc.id}/download`} className="flex items-center gap-2.5">
+                      {/* 제목은 상세로 간다. 바로 받고 싶으면 오른쪽 다운로드 아이콘. */}
+                      <Link href={`/documents/${doc.id}`} className="flex items-center gap-2.5">
                         <span className="flex h-7 w-9 shrink-0 items-center justify-center rounded bg-canvas text-[10px] font-bold text-ink-muted">
                           {latest ? fileLabel(latest.fileName) : '—'}
                         </span>
@@ -88,7 +90,7 @@ export default async function DocumentsPage({
                             <span className="text-xs text-ink-subtle">v{latest.versionNo}</span>
                           )}
                         </span>
-                      </a>
+                      </Link>
                     </td>
                     <td className="hidden px-4 py-3 text-ink-muted md:table-cell">
                       {doc.folder?.name ?? '—'}
@@ -112,7 +114,7 @@ export default async function DocumentsPage({
                       </a>
                     </td>
                     <td className="px-4 py-3">
-                      {/* 상세 페이지가 아직 없어 삭제 진입점을 행에 둔다. M3에서 상세에도 붙인다. */}
+                      {/* 상세 페이지에도 같은 버튼이 있다. 목록에서도 바로 지울 수 있게 둔다. */}
                       <DocumentRowActions id={doc.id} title={doc.title} />
                     </td>
                   </tr>

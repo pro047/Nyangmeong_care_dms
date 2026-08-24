@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { fileLabel, formatBytes, formatRelative } from '@/lib/format'
+import { fileLabel, formatBytes, formatDateTime, formatRelative } from '@/lib/format'
 
 describe('formatBytes', () => {
   it('1KB 미만은 바이트 그대로 보여준다', () => {
@@ -36,6 +36,18 @@ describe('formatRelative', () => {
 
   it('7일이 넘으면 날짜로 떨어진다', () => {
     expect(at('2026-08-20T12:00:00Z', 30 * 24 * 60)).toMatch(/2026년/)
+  })
+})
+
+describe('formatDateTime', () => {
+  it('서버 타임존과 무관하게 Asia/Seoul 24시간제로 나와야 한다', () => {
+    // UTC 10:27 = KST 19:27. hour12: false 가 빠지면 '오후 07:27' 이 되어 깨진다.
+    const text = formatDateTime(new Date('2026-08-23T10:27:00Z'))
+
+    expect(text).toContain('2026')
+    expect(text).toContain('8월')
+    expect(text).toContain('23')
+    expect(text).toContain('19:27')
   })
 })
 

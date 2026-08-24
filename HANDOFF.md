@@ -116,11 +116,11 @@ presign fetch 를 await 중이면 이후 `putToS3` 가 **새 XHR 을 만들어 �
 
 | 위치 | 내용 | 언제 |
 |---|---|---|
-| `discord.ts:88` | 임베드 `url` 이 없는 `/documents/[id]` 를 가리킴 | **M3 가 해소** |
-| `documents/route.ts:37` | `keyToken` 이 5분간 재사용 가능 → 같은 S3 객체에 Document N개 | **고아 객체 정리 때 같이** — 정리 배치가 붙는 순간 한 문서를 지우면 다른 문서 파일이 사라진다 |
+| ~~`discord.ts:88`~~ | 임베드 `url` 이 없는 `/documents/[id]` 를 가리킴 | **해소됨** — M3 가 그 라우트를 만들었다. 다만 알림은 `NODE_ENV=production` 에서만 나가므로 임베드 링크가 실제로 열리는지는 배포(M6) 후 확인 |
+| `documents/route.ts:37`<br>`[id]/versions/route.ts:35` | `keyToken` 이 5분간 재사용 가능 → 같은 S3 객체에 Document N개. **M3 에서 versions 라우트가 같은 구멍을 복제했다** (2026-08-24 리뷰). `verifyUploadToken`(`upload-token.ts:35`)은 검증만 하고 토큰을 소모하지 않아, TTL 300초 안에 같은 `(s3Key, keyToken)` 으로 **서로 다른 문서**의 `/versions` 에 반복 POST 가 된다 — 피해 범위가 한 문서 안에서 문서 **사이**로 넓어졌다 | **고아 객체 정리 때 같이** — 정리 배치가 붙는 순간 한 문서를 지우면 다른 문서 파일이 사라진다. **두 곳을 같이 막을 것.** 토큰 1회용화는 사용 기록 저장소가 필요해 스키마 변경을 부른다 |
 | `s3.ts:71` | `catch { return null }` 이 403·503 을 "파일 없음"으로 뭉갬 | 로그 추가로 충분 |
-| `upload-dialog.tsx:101` | `inFlight` 에서 완료된 XHR 을 제거하지 않음 | 누수는 다이얼로그 수명 한정 |
-| `page.tsx` 배너 (2차 리뷰) | `?error=notfound` 가 주소창에 눌러앉는다. 배너를 띄운 화면에서 업로드하면 `close()` 의 `router.refresh()` 가 **URL 을 안 바꿔서** 방금 성공한 업로드 옆에 낡은 에러가 남는다 | 닫기 버튼(`history.replaceState`)이나 렌더 후 파라미터 제거. **M3 상세 페이지가 배너를 하나 더 쓸 것이므로 그때 같이** |
+| `upload-dialog.tsx:39,74,139`<br>`version-upload-dialog.tsx:39,50,98` | `inFlight` 에서 완료된 XHR 을 제거하지 않음. 줄번호는 `putToS3` 를 `lib/upload-xhr.ts` 로 뺀 뒤 기준(2026-08-24). 같은 결함이 재업로드 다이얼로그에 복제됐다 | 누수는 다이얼로그 수명 한정 |
+| `page.tsx` 배너 (2차 리뷰) | `?error=notfound` 가 주소창에 눌러앉는다. 배너를 띄운 화면에서 업로드하면 `close()` 의 `router.refresh()` 가 **URL 을 안 바꿔서** 방금 성공한 업로드 옆에 낡은 에러가 남는다 | 닫기 버튼(`history.replaceState`)이나 렌더 후 파라미터 제거. ~~M3 상세 페이지가 배너를 하나 더 쓸 것이므로 그때 같이~~ — **그 전제가 깨졌다.** 상세 페이지는 배너 대신 `notFound()` + 세그먼트 `not-found.tsx` 를 쓴다(URL 에 에러가 눌러앉지 않는다). 배너를 쓰는 곳은 목록의 다운로드 링크뿐이라 이 항목은 계기 없이 남는다 |
 | `download/route.ts:36` (2차 리뷰) | 같은 핸들러의 401 만 여전히 내비게이션에 JSON 을 준다 | **의도된 것.** proxy 가 같은 쿠키를 같은 키로 먼저 검증하므로 도달 창은 프록시 통과와 라우트 도착 사이 수 ms 경합뿐이다. 이유를 `route.test.ts` 주석에 박아 뒀다 |
 
 ---
@@ -256,7 +256,9 @@ abort가 무효라 문서 생성으로 넘어가고, 아직 시작 안 한 대�
 src/
   app/
     (app)/                    로그인 필수 구간. layout.tsx가 세션 검사 + 헤더/사이드바
-      page.tsx                문서 목록 (최근 수정순)
+      page.tsx                문서 목록 (최근 수정순). 제목은 상세로 간다
+      documents/[id]/page.tsx 문서 상세 — 메타 수정 · 재업로드 · 버전 타임라인
+      documents/[id]/not-found.tsx  없는/휴지통 문서. 배너 리다이렉트가 아니라 이 자리에서 알린다
       trash/page.tsx          휴지통
       error.tsx               에러 바운더리. DB 연결 실패를 따로 안내 (터널 끊김 대비)
     login/                    비로그인 구간
@@ -264,11 +266,14 @@ src/
     api/documents/
       route.ts                POST 문서 생성 (keyToken 검증 + HeadObject)
       presign/route.ts        POST 서명 URL + keyToken 발급
-      [id]/route.ts           DELETE 소프트 삭제
+      [id]/route.ts           DELETE 소프트 삭제 · PATCH 제목·설명 수정
       [id]/restore/route.ts   POST 복구
+      [id]/versions/route.ts  POST 재업로드 (v2+ 누적, keyToken 검증 + HeadObject)
       [id]/download/route.ts  GET presigned URL로 리다이렉트
   components/                 app-header · app-sidebar · upload-dialog
-                              document-row-actions(삭제) · trash-row-actions(복구)
+                              document-row-actions(삭제, redirectTo 로 상세에서도 씀)
+                              trash-row-actions(복구) · document-meta-editor(제목·설명)
+                              version-upload-dialog(재업로드)
   lib/
     env.ts                    zod로 환경변수 검증. 누락 시 부팅 실패
     prisma.ts                 PrismaPg 어댑터(max:5) + HMR 커넥션 누수 방지 싱글턴
@@ -276,9 +281,12 @@ src/
     upload-token.ts           presign이 발급한 s3Key 서명 토큰
     discord.ts                OAuth 교환 · 길드 검증 · 웹훅 알림
     s3.ts                     presignUpload/Download · buildS3Key · headObjectSize · canPreview
-    trash.ts                  삭제 필터 where 절 (목록·다운로드·삭제 공유)
+    trash.ts                  삭제 필터 where 절 (목록·다운로드·삭제·수정 공유)
     version.ts                ?v= 파라미터 파싱
-    format.ts                 파일 크기 · 상대 시간 · 확장자 라벨
+    format.ts                 파일 크기 · 상대 시간 · 절대 시각 · 확장자 라벨
+    document-edit.ts          PATCH 본문 스키마 + 정규화 (description '' → null)
+    version-create.ts         재업로드 본문 스키마 · 다음 버전 번호 · Prisma 오류 → HTTP
+    upload-xhr.ts             putToS3 (진행률·취소). 클라이언트 전용 — env·s3.ts import 금지
   generated/prisma            Prisma 산출물 (gitignore, postinstall로 자동 생성)
   proxy.ts                    구 middleware.ts
 

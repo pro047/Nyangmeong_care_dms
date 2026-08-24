@@ -9,7 +9,16 @@ async function errorMessage(res: Response, fallback: string) {
   return body?.error ?? fallback
 }
 
-export function DocumentRowActions({ id, title }: { id: string; title: string }) {
+export function DocumentRowActions({
+  id,
+  title,
+  redirectTo,
+}: {
+  id: string
+  title: string
+  /** 방금 지운 문서의 화면에 남아 있으면 안 되는 곳(상세 페이지)에서 갈 곳을 준다. */
+  redirectTo?: string
+}) {
   const router = useRouter()
   const [busy, setBusy] = useState(false)
 
@@ -24,8 +33,10 @@ export function DocumentRowActions({ id, title }: { id: string; title: string })
       if (!res.ok && res.status !== 404) {
         throw new Error(await errorMessage(res, '삭제하지 못했습니다.'))
       }
+      // 상세에서 refresh 만 하면 방금 지운 문서의 not-found 화면이 뜬다. 목록으로 보낸다.
       // 목록은 서버 컴포넌트라 다시 렌더해야 행이 사라진다.
-      router.refresh()
+      if (redirectTo) router.push(redirectTo)
+      else router.refresh()
       // 성공 경로에서 busy 를 풀지 않는다. refresh 는 fire-and-forget 이라 여기서
       // 풀면 아직 남아 있는 행의 버튼이 다시 눌린다. 행이 사라지면 언마운트된다.
     } catch (err) {

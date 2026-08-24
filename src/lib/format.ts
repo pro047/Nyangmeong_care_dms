@@ -23,6 +23,22 @@ export function formatRelative(date: Date) {
   return date.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })
 }
 
+/**
+ * 버전 타임라인용 절대 시각. 서버 TZ(EC2 는 UTC 일 수 있다)에 흔들리지 않도록 Asia/Seoul 을 박는다.
+ * hour12: false 가 필수다 — ko-KR 기본 hourCycle 이 12시간제라 빼면 "오후 07:27" 이 된다.
+ */
+export function formatDateTime(date: Date) {
+  return date.toLocaleString('ko-KR', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+}
+
 const EXT_LABEL: Record<string, string> = {
   pdf: 'PDF',
   doc: 'DOC',

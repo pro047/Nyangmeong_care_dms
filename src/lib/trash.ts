@@ -2,6 +2,9 @@ import type { Prisma } from '@/generated/prisma/client'
 
 export const TRASH_NOT_FOUND = '문서를 찾을 수 없거나 이미 휴지통에 있습니다.'
 export const RESTORE_NOT_FOUND = '휴지통에 없는 문서입니다.'
+// 활성 문서를 고쳐 쓰는 쪽(제목 수정·재업로드)이 공유한다. "없는 문서"와 "휴지통 문서"를
+// 구분하지 않는 이유는 outcomeFromCount 와 같다 — 둘 다 사용자에겐 404다.
+export const ACTIVE_DOCUMENT_NOT_FOUND = '문서를 찾을 수 없거나 휴지통에 있습니다.'
 
 // 목록·다운로드·삭제가 같은 조건을 봐야 한다. 한 곳에 두어 필터 누락을 막는다.
 // 호출마다 새 객체를 만드는 이유: 공유 상수를 spread로 변형하다 오염되는 사고를 막는다.
