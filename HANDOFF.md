@@ -20,9 +20,9 @@
 
 ---
 
-## 현재 위치 (2026-08-22)
+## 현재 위치 (2026-08-24)
 
-**M0 · M1 · M2 완료. M3는 소프트 삭제만 완료.** 아직 배포 전이라 개발자 로컬에서만 돈다.
+**M0 · M1 · M2 · M3 완료.** 아직 배포 전이라 개발자 로컬에서만 돈다.
 
 실제로 돌려서 확인된 것 (전부 브라우저 실측):
 
@@ -42,6 +42,15 @@
   위 `?v=` 경로는 DB 조회 **전**, 이쪽은 조회 **후** 로 분기가 다른데 둘 다 같은 배너다.
 - **`/?error=<임의 문장>` 으로는 배너가 뜨지 않는다** (2026-08-23, 대조 확인).
   `?error=notfound` 는 배너, `?error=보안 점검으로 재인증이 필요합니다` 는 아무것도 안 뜬다.
+- **M3 상세 페이지 9항목 전부 통과** (2026-08-24, Playwright 자동화 · `npm run test:e2e`).
+  `DESIGN.md` §7.2 의 B1·B3·B4·B5·B6·B7·B8·B9 + V3. 스크린샷은 `test/e2e/shots/`(gitignore).
+  이 중 셋은 **판단검증이 미확인으로 남긴 주장의 첫 실측**이었다:
+  - **V3 — 부모 `@updatedAt` 은 중첩 create 로도 갱신된다.** 재업로드 직후 목록 최상단에 왔다.
+    설계가 준비해 둔 폴백(`data.updatedAt: new Date()`)은 **필요 없다**. (`JUDGE.md` #27)
+  - **`hour12: false` 가 실제로 필요했다.** 화면에 `2026년 8월 24일 21:52` — 12시간제였다면
+    `오후 09:52` 였다. (`JUDGE.md` #30)
+  - **P2025 → 404 경로가 실동작한다.** 탭에서 상세를 연 채 다른 경로로 삭제한 뒤 재업로드하면
+    `문서를 찾을 수 없거나 휴지통에 있습니다.` 가 모달에 뜬다. (`JUDGE.md` #26)
 
 **미검증** — 다음 세션이 확인할 것:
 
@@ -49,6 +58,8 @@
 |---|---|
 | 길드 비멤버 거부 | 다른 디스코드 계정 필요 |
 | 다중 파일 동시 업로드 | 파일 여러 개를 한 번에 끌어다 놓기 |
+| 재업로드 진행 중 취소 (B10) | e2e 가 안 덮는다 — 타이밍 의존이라 수동. presign 라우트에 지연을 임시로 넣어 창을 만든다 |
+| 디스코드 임베드 링크 (B11) | `NODE_ENV=production` 에서만 발송되므로 M6 배포 후 |
 
 ### 코드 리뷰 결과 (2026-08-22, `690aeeb`~`3948ea5` 4개 커밋) — 수정·검증 완료
 
@@ -150,6 +161,20 @@ aws ec2 describe-instances --region ap-northeast-2 \
 
 **S3 고아 객체가 쌓인다.** 업로드를 취소하거나 문서를 소프트 삭제해도 객체는 남는다.
 `src/lib/s3.ts` 의 `deleteObject` 는 정의만 되고 호출처가 0건이다. 정리 경로가 없다.
+
+**그리고 앱 자격증명으로는 고아를 찾을 수 없다** (2026-08-24 실측). IAM 사용자 `dms-app` 에
+`s3:ListBucket` 이 없어서 `ListObjectsV2` 가 403 으로 막힌다:
+
+```
+AccessDenied: User: arn:aws:iam::989785488374:user/dms-app is not authorized to
+perform: s3:ListBucket on resource: "arn:aws:s3:::nm-care-...-an"
+```
+
+**"버킷을 훑어 DB 에 없는 키를 지운다"는 정리 배치는 이 권한으로는 못 만든다.** 선택지는
+(a) `infra/iam-dms-app.json` 에 `s3:ListBucket` 을 추가하거나, (b) 애초에 고아를 안 만드는
+쪽 — 업로드 취소·문서 생성 실패 시 **그 자리에서** `deleteObject` 를 부르는 것이다.
+`test/e2e/document-detail.mjs` 가 (b) 를 쓴다: presign 응답의 키를 들고 있다가 teardown 에서
+지운다. 만든 쪽이 그 자리에서 지우는 것이 유일하게 확실한 방법이다.
 
 **진단 스크립트로 DB 시각을 읽을 때 주의.** `created_at` 은 `timestamp without time zone`
 이라 node-postgres 가 로컬 시간으로 해석해 9시간 어긋나 보인다. Prisma는 정상이다.
@@ -291,7 +316,9 @@ src/
   proxy.ts                    구 middleware.ts
 
 infra/                        AWS 콘솔 설정 기록 (CORS · IAM 정책). 테라폼 안 씀
-prompts/ orchestrate.sh advisor.sh test/   직렬 에이전트 파이프라인
+prompts/ orchestrate.sh advisor.sh test/run-tests.sh test/fake-claude   직렬 에이전트 파이프라인
+test/e2e/                     M3 브라우저 검증 (Playwright). helpers.mjs 가 세션 쿠키를
+                              직접 서명해 디스코드 OAuth 를 우회한다. shots/ 는 gitignore
 ```
 
 테스트는 소스 옆에 `*.test.ts`. vitest 4, node 환경, `src/**/*.test.ts` 만 수집.
@@ -311,6 +338,7 @@ npm run build        # 타입 검사 포함
 npm run db:push      # 스키마를 DB에 반영 (개발용)
 npm run db:studio    # DB GUI
 bash test/run-tests.sh   # 파이프라인 게이트 검증 (API 호출 0회)
+npm run test:e2e     # M3 브라우저 검증 (터널 + dev 서버 + 실제 .env 필요)
 ```
 
 터널이 없으면 DB 접근 코드는 전부 실패하지만 `/login` 과 앱 셸은 정상 렌더되므로,
@@ -325,15 +353,28 @@ UI 작업은 터널 없이도 진행할 수 있다.
 
 ## 다음 작업
 
-우선순위 순. 앞의 둘은 배포 전에 하는 것이 순서상 맞다.
+우선순위 순. M3 는 2026-08-24 에 끝났다 (브라우저 실측 포함).
 
-1. **M3 상세 페이지 (`/documents/[id]`)** — 디스코드 임베드 링크가 이 라우트를 가리키므로
-   배포 전에 있어야 알림이 유효하다. 재업로드(v2 누적)·버전 타임라인·제목 수정도 여기 붙는다.
-2. **S3 고아 객체 정리** — 업로드 취소와 소프트 삭제 경로에 `deleteObject` 연결.
+1. **S3 고아 객체 정리** — 업로드 취소와 소프트 삭제 경로에 `deleteObject` 연결.
    "휴지통 비우기"는 `MILESTONES.md` 에 없는 기능이므로 범위를 넓히지 말 것.
-3. **배포 (M6)** — 탄력적 IP 할당이 첫 항목. `NODE_ENV=production` 이 PM2에서 실제로
+   **먼저 위 지뢰의 `s3:ListBucket` 항목을 읽을 것** — 사후에 훑어서 지우는 방식은 지금 권한으로
+   불가능하고, 만든 쪽이 그 자리에서 지우는 형태로 설계해야 한다. `keyToken` 재사용 구멍
+   (`documents/route.ts:37` · `[id]/versions/route.ts:35`)도 이때 **두 곳을 같이** 막는다 —
+   정리 배치가 붙는 순간 한 문서를 지우면 다른 문서 파일이 사라진다.
+2. **배포 (M6)** — 탄력적 IP 할당이 첫 항목. `NODE_ENV=production` 이 PM2에서 실제로
    서는지 확인해야 알림이 나간다. 운영 `.env` 의 `uselibpqcompat=true` 는 개발용 터널
    때문에 필요한 것이므로 그대로 가져가지 말 것 (`SETUP.md` M6 절 참조).
 
 작업은 직렬 에이전트 파이프라인으로 돌릴 수 있다 — `./orchestrate.sh <feature>`.
-게이트에서 `y` 를 누를 사람이 필요하므로 사람 터미널에서 띄운다.
+게이트에서 `y` 를 누를 사람이 필요한데 **클로드 세션의 `!` 셸에는 tty 가 없다** (2026-08-24 실측:
+`/dev/tty: Device not configured`). 그래서 진짜 터미널에서 띄우거나, 런처 모드(exit 4)로 멈춘 뒤
+진짜 터미널에서 `./approve.sh <feature> <산출물>` 로 승인해야 한다. `approve.sh` 주석이 전제하는
+"`!` 프리픽스로 승인" 은 이 환경에서 동작하지 않는다.
+
+**파이프라인 자체에 남은 결함 3건** (2026-08-24 하루에 세 번 죽으며 드러났다). 고칠 내용은
+스크래치패드의 `pipeline-fix-prompt.md` 에 정리해 두었고 별도 세션에 넘긴다:
+- `orchestrate.sh:172` 가 사인을 읽기 **전에** 죽는다 — 사인은 `*.stream.jsonl` 의 result
+  이벤트(`subtype`·`errors`·`terminal_reason`)에 항상 있는데 exit code 만 보고 버린다
+- `FAIL_LOG.md` 는 **검증 실패에만** 쓰인다(`:515` 한 곳). 프로세스 사망은 한 줄도 안 남아
+  다음 재시도가 이전 실패를 모른다
+- 재시도가 이전 시도의 `stream.jsonl` 을 덮어써 증거가 사라진다

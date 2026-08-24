@@ -46,3 +46,6 @@ next-env.d.ts
 
 # serial-agent-pipeline 산출물
 .pipeline/
+
+# e2e 스크린샷·임시 파일 (증거용, 리포에는 안 넣는다)
+test/e2e/shots/
