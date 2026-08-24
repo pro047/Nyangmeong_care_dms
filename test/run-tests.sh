@@ -319,6 +319,39 @@ else
 fi
 teardown
 
+# ③-a 런처 모드에서 이 게이트를 **통과할 수 있어야** 한다.
+#     승인 대상이 STATE.md 였을 때는 state() 가 매 호출마다 updated:·pid: 를 새로 찍어
+#     마커가 즉시 낡았고, 승인해도 재실행이 계속 exit 4 였다 (2026-08-24 재현 확정).
+#     .env 는 gitignore 대상이라 새 체크아웃·worktree 에서 바로 밟히는 경로다.
+if command -v python3 >/dev/null 2>&1; then
+  detach_pf() { python3 -c 'import os,sys; os.setsid(); os.execvp(sys.argv[1], sys.argv[1:])' "$@"; }
+  setup   # .env 없음 → 프리플라이트가 빌드를 끄고 게이트를 띄운다
+  # 단언은 "exit 0" 이 아니라 "**프리플라이트를 지나갔는가**" 여야 한다. 그 뒤에도
+  # 설계 검토 게이트가 있어서 AUTO=0 런은 어차피 거기서 다시 멈춘다 — exit 코드로
+  # 단언하면 어느 게이트에서 멈췄는지 구분하지 못하고 통과·실패가 뒤바뀐다.
+  # 수정 전 코드로 대조 확인함: 승인 후에도 같은 프리플라이트 게이트에 멈추고
+  # DESIGN.md 가 끝내 안 생겼다 (2026-08-24).
+  got=0
+  detach_pf env FAKE_SCENARIO=ok AUTO=0 ./orchestrate.sh feat >/dev/null 2>&1 || got=$?
+  first=$got
+  first_stopped_at_preflight=1
+  grep -q '타입 검사 없이 진행' .pipeline/feat/STATE.md 2>/dev/null || first_stopped_at_preflight=0
+  [ -f .pipeline/feat/DESIGN.md ] && first_stopped_at_preflight=0
+  ./approve.sh --hash .pipeline/feat/PREFLIGHT.md > .pipeline/feat/PREFLIGHT.md.approved 2>/dev/null
+  detach_pf env FAKE_SCENARIO=ok AUTO=0 ./orchestrate.sh feat >/dev/null 2>&1 || true
+  if [ "$first" -eq 4 ] && [ "$first_stopped_at_preflight" -eq 1 ] \
+     && [ -f .pipeline/feat/DESIGN.md ] \
+     && ! grep -q '타입 검사 없이 진행' .pipeline/feat/STATE.md 2>/dev/null; then
+    green "  PASS  프리플라이트 게이트는 승인 마커로 통과한다 (런처 모드)"; PASS=$((PASS+1))
+  else
+    red   "  FAIL  프리플라이트 승인이 안 먹음 — 1차=$first (기대 4, 프리플라이트에서 멈춤=$first_stopped_at_preflight), 2차 DESIGN.md=$([ -f .pipeline/feat/DESIGN.md ] && echo 생성 || echo 없음)"
+    FAIL=$((FAIL+1))
+  fi
+  teardown
+else
+  red "  SKIP  프리플라이트 승인 케이스 — python3 없음"
+fi
+
 # ③ .env 가 없으면 빌드를 끄되 그 사실이 STATE.md 에 남는다 (조용히 넘어가지 않는다)
 setup
 got=0
@@ -460,13 +493,192 @@ fi
 teardown
 
 echo
-echo "=== 상담역 상태 창구 ==="
+echo "=== 상담역·런처 상태 창구 ==="
 setup
 env FAKE_SCENARIO=ok AUTO=1 TEST_CMD="true" ./orchestrate.sh feat >/dev/null 2>&1
 if grep -q 'phase: DONE' .pipeline/feat/STATE.md 2>/dev/null; then
   green "  PASS  STATE.md 가 최종 상태를 반영한다"; PASS=$((PASS+1))
 else
   red   "  FAIL  STATE.md 미갱신"; FAIL=$((FAIL+1))
+fi
+# 런처 계약은 문서가 아니라 런처가 실제로 읽는 파일에 있어야 한다.
+# 문서에만 적힌 계약은 안 지켜졌다 (2026-08-24 실전 2회).
+if grep -q '## 다음 행동' .pipeline/feat/STATE.md 2>/dev/null \
+   && grep -q '완주다' .pipeline/feat/STATE.md 2>/dev/null; then
+  green "  PASS  DONE 상태에 런처용 다음 행동 블록이 있다"; PASS=$((PASS+1))
+else
+  red   "  FAIL  다음 행동 블록 없음"
+  sed -n '/다음 행동/,+3p' .pipeline/feat/STATE.md 2>/dev/null | sed 's/^/         /'
+  FAIL=$((FAIL+1))
+fi
+teardown
+
+echo
+echo "=== 단계별 상한 ==="
+# 하나의 세트(40턴/$5)를 전 단계에 쓰던 것이 틀렸다 — 병목 축이 단계마다 다르다.
+# 확인할 것은 "단계마다 다른 값이 실제로 CLI 에 전달되는가"다.
+setup
+env FAKE_SCENARIO=ok AUTO=1 TEST_CMD="true" ./orchestrate.sh feat >/dev/null 2>&1
+d="$(cat .pipeline/feat/DESIGN.args 2>/dev/null)"
+i="$(cat .pipeline/feat/IMPL.args 2>/dev/null)"
+if [[ "$d" == *"turns=40 budget=5"* ]] && [[ "$i" == *"turns=80 budget=8"* ]]; then
+  green "  PASS  단계마다 다른 상한이 CLI 로 전달된다"; PASS=$((PASS+1))
+else
+  red   "  FAIL  단계별 상한 — design=[$d] impl=[$i]"; FAIL=$((FAIL+1))
+fi
+teardown
+
+setup
+env FAKE_SCENARIO=ok AUTO=1 TURNS_IMPL=7 BUDGET_IMPL=2 TEST_CMD="true" \
+  ./orchestrate.sh feat >/dev/null 2>&1
+if grep -q 'turns=7 budget=2' .pipeline/feat/IMPL.args 2>/dev/null; then
+  green "  PASS  TURNS_IMPL/BUDGET_IMPL 이 기본값을 덮는다"; PASS=$((PASS+1))
+else
+  red   "  FAIL  상한 오버라이드가 안 먹음 — $(cat .pipeline/feat/IMPL.args 2>/dev/null)"; FAIL=$((FAIL+1))
+fi
+teardown
+
+echo
+echo "=== 죽은 단계 부검 ==="
+# 2026-08-24 하루에 세 번 죽었는데 세 번 다 로그에 사인이 한 줄도 안 남았다.
+# 사람이 매번 *.stream.jsonl 을 jq 로 파서 원인을 알아냈다. 그게 이 절이 막는 것이다.
+
+# ① 사인이 없어도 "없다"를 정직하게 남긴다 (침묵 금지)
+setup
+got=0
+env FAKE_SCENARIO_DESIGN=crash_no_result AUTO=1 TEST_CMD="true" \
+  ./orchestrate.sh feat >/dev/null 2>&1 || got=$?
+if [ "$got" -eq 2 ] && grep -q '사인 확인 불가' .pipeline/feat/FAIL_LOG.md 2>/dev/null; then
+  green "  PASS  result 이벤트가 없으면 그 사실을 FAIL_LOG 에 남기고 죽는다"; PASS=$((PASS+1))
+else
+  red   "  FAIL  사인 부재가 기록되지 않음 — exit=$got"
+  sed 's/^/         /' .pipeline/feat/FAIL_LOG.md 2>/dev/null | head -6
+  FAIL=$((FAIL+1))
+fi
+teardown
+
+if command -v python3 >/dev/null 2>&1; then
+  detach_pm() { python3 -c 'import os,sys; os.setsid(); os.execvp(sys.argv[1], sys.argv[1:])' "$@"; }
+
+  # ② 산출물이 온전해도 자동 통과는 없다. 사인은 FAIL_LOG 로, 산출물은 파킹으로.
+  #    AUTO=1 인데도 멈추는 것이 핵심이다 (gate_human force=1).
+  setup
+  got=0
+  detach_pm env FAKE_SCENARIO_DESIGN=crash_with_artifact AUTO=1 TEST_CMD=true \
+    ./orchestrate.sh feat >/dev/null 2>&1 || got=$?
+  if [ "$got" -eq 4 ] \
+     && grep -q 'error_max_turns' .pipeline/feat/FAIL_LOG.md 2>/dev/null \
+     && grep -q 'turns_exhausted' .pipeline/feat/FAIL_LOG.md 2>/dev/null \
+     && [ -f .pipeline/feat/DESIGN.md.crashed ] && [ ! -f .pipeline/feat/DESIGN.md ] \
+     && [ ! -f .pipeline/feat/IMPL.md ]; then
+    green "  PASS  죽었는데 산출물이 온전하면 AUTO=1 이어도 멈추고 사인·파킹을 남긴다"; PASS=$((PASS+1))
+  else
+    red   "  FAIL  부검 게이트 — exit=$got (기대 4), 파킹=$([ -f .pipeline/feat/DESIGN.md.crashed ] && echo O || echo X)"
+    sed 's/^/         /' .pipeline/feat/FAIL_LOG.md 2>/dev/null | head -6
+    FAIL=$((FAIL+1))
+  fi
+  # ③ 그 정지 지점에도 런처용 안내가 붙어야 한다
+  if grep -q 'phase: AWAITING_APPROVAL' .pipeline/feat/STATE.md 2>/dev/null \
+     && grep -q 'mv ' .pipeline/feat/STATE.md 2>/dev/null; then
+    green "  PASS  exit 4 정지 지점에 살리는 방법(mv)이 STATE.md 에 찍힌다"; PASS=$((PASS+1))
+  else
+    red   "  FAIL  파킹 승인 안내가 STATE.md 에 없음"
+    sed -n '/다음 행동/,+3p' .pipeline/feat/STATE.md 2>/dev/null | sed 's/^/         /'
+    FAIL=$((FAIL+1))
+  fi
+
+  # ④ 미승인 산출물이 재사용 로직에 걸리면 안 된다.
+  #    제자리에 둔 채 게이트만 띄우면 다음 실행이 **게이트 없이** 되살린다.
+  #    (2026-08-24 document-detail 의 JUDGE.md 가 정확히 그 상태였다)
+  env FAKE_SCENARIO=ok AUTO=1 TEST_CMD=true ./orchestrate.sh feat >/dev/null 2>&1
+  if [ -f .pipeline/feat/design.result.json ] \
+     && [ -f .pipeline/feat/DESIGN.md.crashed ] \
+     && ! grep -q 'crash_with_artifact' .pipeline/feat/DESIGN.md 2>/dev/null; then
+    green "  PASS  파킹된 산출물은 다음 실행의 재사용 로직에 안 걸린다"; PASS=$((PASS+1))
+  else
+    red   "  FAIL  미승인 산출물이 게이트 없이 되살아났다"; FAIL=$((FAIL+1))
+  fi
+  teardown
+
+  # ⑤ 이전 주행이 남긴 산출물을 "이번 주행 것"으로 오인하면 안 된다.
+  #    FRESH_DESIGN=1 은 사람이 그 설계를 **버리라고 명시한** 것인데, 파일 존재만 보면
+  #    셸이 그걸 되살리라고 게이트에 내민다 (2026-08-24 코드리뷰 발견 · 재현 확정).
+  setup
+  env FAKE_SCENARIO=ok AUTO=1 TEST_CMD=true ./orchestrate.sh feat >/dev/null 2>&1
+  got=0
+  detach_pm env FRESH_DESIGN=1 FAKE_SCENARIO_DESIGN=crash_no_result AUTO=1 TEST_CMD=true \
+    ./orchestrate.sh feat >/dev/null 2>&1 || got=$?
+  if [ "$got" -eq 2 ] && [ ! -e .pipeline/feat/DESIGN.md.crashed ] \
+     && grep -q '이전 주행 것' .pipeline/feat/FAIL_LOG.md 2>/dev/null; then
+    green "  PASS  이번 주행이 안 쓴 산출물은 살리지 않는다 (die, 파킹 없음)"; PASS=$((PASS+1))
+  else
+    red   "  FAIL  이전 주행 산출물이 승격됨 — exit=$got (기대 2), 파킹=$([ -e .pipeline/feat/DESIGN.md.crashed ] && echo O || echo X)"
+    FAIL=$((FAIL+1))
+  fi
+  teardown
+
+  # ⑥ 파킹본도 덮어쓰지 않는다. 스트림을 attempt 번호로 보존하면서 정작 가장 비싼
+  #    산출물만 덮어쓰는 것은 앞뒤가 안 맞는다.
+  setup
+  detach_pm env FAKE_SCENARIO_DESIGN=crash_with_artifact AUTO=1 TEST_CMD=true \
+    ./orchestrate.sh feat >/dev/null 2>&1 || true
+  detach_pm env FAKE_SCENARIO_DESIGN=crash_with_artifact AUTO=1 TEST_CMD=true \
+    ./orchestrate.sh feat >/dev/null 2>&1 || true
+  if [ -f .pipeline/feat/DESIGN.md.crashed ] && [ -f .pipeline/feat/DESIGN.md.crashed2 ]; then
+    green "  PASS  두 번째 파킹본이 첫 번째를 덮지 않는다"; PASS=$((PASS+1))
+  else
+    red   "  FAIL  파킹본이 덮어써짐"; ls -1 .pipeline/feat/ | sed 's/^/         /'; FAIL=$((FAIL+1))
+  fi
+  teardown
+
+  # ⑦ 죽은 경로에서도 모델 교체가 기록돼야 한다. 다른 모델이 돌다 상한에 닿은 것이라면
+  #    사람이 "산출물을 신뢰할까"를 판단할 때 그 사실을 알아야 한다.
+  setup
+  detach_pm env FAKE_SCENARIO_DESIGN=crash_swapped AUTO=1 TEST_CMD=true \
+    ./orchestrate.sh feat >/dev/null 2>&1 || true
+  if grep -q '요청 claude-fable-5 → 실제 claude-opus-4-8' .pipeline/feat/MODEL_LOG.md 2>/dev/null; then
+    green "  PASS  크래시 경로에서도 모델 교체가 MODEL_LOG 에 남는다"; PASS=$((PASS+1))
+  else
+    red   "  FAIL  크래시 시 모델 교체 미기록"; sed 's/^/         /' .pipeline/feat/MODEL_LOG.md 2>/dev/null; FAIL=$((FAIL+1))
+  fi
+  teardown
+else
+  red "  SKIP  부검 게이트 케이스 — python3 없음 (setsid 대체 불가)"
+fi
+
+# ⑧ 크래시했는데 산출물이 BLOCKED 면 "그냥 죽었다"가 아니라 막힌 이유를 넘긴다.
+#    예산 상한 직전에 BLOCKED 를 쓰고 죽는 것은 흔한 조합이다.
+setup
+got=0
+# stderr 를 잡는다. STATE.md 의 안내 문구에도 'BLOCKED_NEEDS' 라는 낱말이 들어 있어서
+# 그걸로 단언하면 실제 사유가 안 나와도 통과하는 공허한 검사가 된다.
+env FAKE_SCENARIO_DESIGN=crash_blocked AUTO=1 TEST_CMD="true" \
+  ./orchestrate.sh feat >/dev/null 2>blocked_err.txt || got=$?
+if [ "$got" -eq 3 ] && grep -q 'phase: BLOCKED:design' .pipeline/feat/STATE.md 2>/dev/null \
+   && grep -q '예산 상한 직전에 막힘' blocked_err.txt 2>/dev/null \
+   && grep -q '스키마를 바꿔도 되는지' blocked_err.txt 2>/dev/null; then
+  green "  PASS  BLOCKED 를 쓰고 죽으면 exit 3 으로 막힌 이유가 간다"; PASS=$((PASS+1))
+else
+  red   "  FAIL  크래시+BLOCKED — exit=$got (기대 3), phase=$(grep -m1 'phase:' .pipeline/feat/STATE.md 2>/dev/null)"
+  sed 's/^/         /' blocked_err.txt 2>/dev/null | tail -6
+  FAIL=$((FAIL+1))
+fi
+teardown
+
+echo
+echo "=== 증거 보존 ==="
+# 재시도 루프의 사인은 "1차가 왜 죽었나"인데 그 파일이 2차에 덮였다 (2026-08-24 실측).
+setup
+env FAKE_SCENARIO=ok AUTO=1 TEST_CMD="true" ./orchestrate.sh feat >/dev/null 2>&1
+env FAKE_SCENARIO=ok AUTO=1 TEST_CMD="true" ./orchestrate.sh feat >/dev/null 2>&1
+if [ -f .pipeline/feat/impl.attempt1.stream.jsonl ] \
+   && [ -f .pipeline/feat/impl.attempt1.result.json ] \
+   && [ -f .pipeline/feat/impl.stream.jsonl ]; then
+  green "  PASS  다시 도는 단계는 이전 증거를 attempt 번호로 보관한다"; PASS=$((PASS+1))
+else
+  red   "  FAIL  이전 스트림이 덮어써짐"
+  ls -1 .pipeline/feat/ 2>/dev/null | sed 's/^/         /'
+  FAIL=$((FAIL+1))
 fi
 teardown
 
