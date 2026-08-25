@@ -6,6 +6,8 @@ import {
   TRASH_NOT_FOUND,
   trashOrderBy,
   trashedDocumentWhere,
+  purgeCandidateKeys,
+  PURGE_NOT_FOUND,
 } from '@/lib/trash'
 
 describe('activeDocumentWhere', () => {
@@ -85,5 +87,38 @@ describe('outcomeFromCount', () => {
     expect(outcomeFromCount(0, TRASH_NOT_FOUND)).toMatchObject({ error: TRASH_NOT_FOUND })
     expect(outcomeFromCount(0, RESTORE_NOT_FOUND)).toMatchObject({ error: RESTORE_NOT_FOUND })
     expect(TRASH_NOT_FOUND).not.toBe(RESTORE_NOT_FOUND)
+  })
+})
+
+describe('purgeCandidateKeys', () => {
+  it('버전들의 s3Key 를 그대로 돌려줘야 한다', () => {
+    expect(purgeCandidateKeys([{ s3Key: 'documents/a.pdf' }, { s3Key: 'documents/b.pdf' }])).toEqual([
+      'documents/a.pdf',
+      'documents/b.pdf',
+    ])
+  })
+
+  it('같은 키가 여러 버전에 걸리면 한 번만 남겨야 한다 (keyToken 재사용으로 실제로 생긴다)', () => {
+    expect(
+      purgeCandidateKeys([
+        { s3Key: 'documents/same.pdf' },
+        { s3Key: 'documents/same.pdf' },
+        { s3Key: 'documents/other.pdf' },
+      ]),
+    ).toEqual(['documents/same.pdf', 'documents/other.pdf'])
+  })
+
+  it('버전이 없으면 빈 배열이어야 한다 (지울 객체가 없다)', () => {
+    expect(purgeCandidateKeys([])).toEqual([])
+  })
+
+  it('처음 나온 순서를 지켜야 한다', () => {
+    expect(purgeCandidateKeys([{ s3Key: 'b' }, { s3Key: 'a' }, { s3Key: 'b' }])).toEqual(['b', 'a'])
+  })
+})
+
+describe('PURGE_NOT_FOUND', () => {
+  it('휴지통에 없는 문서를 가리키는 문구여야 한다 (활성 문서는 영구삭제 대상이 아니다)', () => {
+    expect(PURGE_NOT_FOUND).toContain('휴지통')
   })
 })

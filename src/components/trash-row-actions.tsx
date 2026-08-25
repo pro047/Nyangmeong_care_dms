@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { RotateCcw } from 'lucide-react'
+import { RotateCcw, Trash2 } from 'lucide-react'
 
 async function errorMessage(res: Response, fallback: string) {
   const body = await res.json().catch(() => null)
@@ -32,17 +32,51 @@ export function TrashRowActions({ id, title }: { id: string; title: string }) {
     }
   }
 
+  const handlePurge = async () => {
+    // 되돌릴 수 없으므로 문구에 그 사실을 넣는다. 삭제 확인이 window.confirm 인 것은
+    // document-row-actions 와 같은 관례다.
+    if (!window.confirm(`"${title}" 문서를 영구삭제할까요?
+파일까지 지워지며 되돌릴 수 없습니다.`)) return
+
+    setBusy(true)
+    try {
+      const res = await fetch(`/api/documents/${id}/purge`, { method: 'DELETE' })
+      // 404 는 "이미 지워짐"과 구분되지 않는다. 복구와 같은 이유로 실패로 알리지 않는다.
+      if (!res.ok && res.status !== 404) {
+        throw new Error(await errorMessage(res, '영구삭제하지 못했습니다.'))
+      }
+      router.refresh()
+      // 복구와 같은 이유로 성공 경로에서 busy 를 풀지 않는다.
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : '알 수 없는 오류')
+      setBusy(false)
+    }
+  }
+
   return (
-    <button
-      type="button"
-      onClick={handleRestore}
-      disabled={busy}
-      aria-busy={busy}
-      aria-label={`${title} 복구`}
-      className="rounded-lg px-2.5 py-1 text-sm text-ink-muted transition-colors hover:bg-accent-soft hover:text-accent disabled:opacity-40"
-    >
-      <RotateCcw className="mr-1.5 inline h-3.5 w-3.5 align-[-2px]" />
-      복구
-    </button>
+    <span className="flex items-center justify-end gap-1">
+      <button
+        type="button"
+        onClick={handleRestore}
+        disabled={busy}
+        aria-busy={busy}
+        aria-label={`${title} 복구`}
+        className="rounded-lg px-2.5 py-1 text-sm text-ink-muted transition-colors hover:bg-accent-soft hover:text-accent disabled:opacity-40"
+      >
+        <RotateCcw className="mr-1.5 inline h-3.5 w-3.5 align-[-2px]" />
+        복구
+      </button>
+      <button
+        type="button"
+        onClick={handlePurge}
+        disabled={busy}
+        aria-busy={busy}
+        aria-label={`${title} 영구삭제`}
+        className="rounded-lg px-2.5 py-1 text-sm text-ink-muted transition-colors hover:bg-danger-soft hover:text-danger disabled:opacity-40"
+      >
+        <Trash2 className="mr-1.5 inline h-3.5 w-3.5 align-[-2px]" />
+        영구삭제
+      </button>
+    </span>
   )
 }

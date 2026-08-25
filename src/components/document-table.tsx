@@ -24,11 +24,15 @@ export function DocumentTable({ documents }: { documents: DocumentListItem[] }) 
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-border text-left text-xs text-ink-muted">
+            {/* 제목 칸에 폭을 주지 않는 것이 핵심이다 — 나머지를 고정하면 남는 폭이 전부
+                제목으로 간다. 제목이 이 제품에서 가장 정보량이 큰 칸이고, 파일명이
+                "01_요구사항 정의서_v0.3_2026_08_17" 처럼 뒤쪽(버전·날짜)에 구별점이 몰려 있어
+                잘리면 앞부분만 남아 서로 구분이 안 된다. */}
             <th scope="col" className="px-4 py-2.5 font-medium">문서</th>
-            <th scope="col" className="hidden px-4 py-2.5 font-medium md:table-cell">폴더</th>
-            <th scope="col" className="hidden px-4 py-2.5 font-medium lg:table-cell">올린 사람</th>
-            <th scope="col" className="hidden px-4 py-2.5 font-medium sm:table-cell">크기</th>
-            <th scope="col" className="px-4 py-2.5 font-medium">수정</th>
+            <th scope="col" className="hidden w-28 px-3 py-2.5 font-medium md:table-cell">폴더</th>
+            <th scope="col" className="hidden w-28 px-3 py-2.5 font-medium lg:table-cell">올린 사람</th>
+            <th scope="col" className="hidden w-20 px-3 py-2.5 font-medium sm:table-cell">크기</th>
+            <th scope="col" className="w-24 px-3 py-2.5 font-medium">수정</th>
             <th scope="col" className="w-12 px-4 py-2.5"><span className="sr-only">다운로드</span></th>
             <th scope="col" className="w-12 px-4 py-2.5"><span className="sr-only">삭제</span></th>
           </tr>
@@ -66,16 +70,16 @@ export function DocumentTable({ documents }: { documents: DocumentListItem[] }) 
                     </span>
                   )}
                 </td>
-                <td className="hidden px-4 py-3 text-ink-muted md:table-cell">
+                <td className="truncate-cell hidden w-28 px-3 py-3 text-ink-muted md:table-cell">
                   {doc.folder?.name ?? '—'}
                 </td>
-                <td className="hidden px-4 py-3 text-ink-muted lg:table-cell">
+                <td className="truncate-cell hidden w-28 px-3 py-3 text-ink-muted lg:table-cell">
                   {latest?.uploadedBy.username ?? '—'}
                 </td>
-                <td className="hidden px-4 py-3 whitespace-nowrap text-ink-muted sm:table-cell">
+                <td className="hidden w-20 px-3 py-3 whitespace-nowrap text-ink-muted sm:table-cell">
                   {latest ? formatBytes(latest.sizeBytes) : '—'}
                 </td>
-                <td className="px-4 py-3 whitespace-nowrap text-ink-muted">
+                <td className="w-24 px-3 py-3 whitespace-nowrap text-ink-muted">
                   {formatRelative(doc.updatedAt)}
                 </td>
                 <td className="px-4 py-3">
