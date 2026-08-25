@@ -29,7 +29,11 @@ openssl rand -base64 32     # 출력을 AUTH_SECRET에 넣는다
 
 ---
 
-## 1. 개발용 DB — 기존 RDS에 SSH 터널로 직결
+## 1. 개발용 DB — 기존 RDS에 SSH 터널로 직결 (지금은 안 씀)
+
+> **먼저 읽을 것: 이 절은 현재 경로가 아니다.** `hymn.pem` 이 개발 PC 에 없어 터널을 못 연다.
+> 지금 쓰는 것은 아래 **"★ 현재 쓰는 것: Neon"** 이다. 이 절은 키가 확보돼 RDS 로 돌아갈
+> 때를 위해 남겨 둔다 (2026-08-25).
 
 로컬에 Docker/PostgreSQL이 없으므로, 기존 EC2를 경유해 RDS에 붙는다.
 RDS를 인터넷에 노출하지 않고, 배포할 때 DB를 갈아끼울 필요도 없다.
@@ -119,11 +123,25 @@ docker inspect app-backend-1 --format '{{range .Config.Env}}{{println .}}{{end}}
 
 > 비밀번호에 `@ : / ?` 등이 있으면 URL 인코딩할 것 (`@` → `%40`).
 
-### 대안: Neon 무료 티어
+### ★ 현재 쓰는 것: Neon (2026-08-25 ~)
 
-터널 유지가 번거로우면 https://neon.tech 에서 무료 PostgreSQL을 만들어
-`DATABASE_URL`에 넣어도 된다. 단, 배포(M6) 때 RDS로 전환하며 마이그레이션을
-다시 적용해야 한다. RDS 직결은 그 단계가 아예 없다.
+**위 1번(RDS + SSH 터널)은 지금 안 쓴다.** `hymn.pem` 이 개발 PC 에 없어 터널을 못 열었고,
+https://neon.tech 무료 PostgreSQL 로 갈아탔다. 위 절은 키가 확보됐을 때를 위해 남겨 둔다.
+
+Neon 연결 문자열을 그대로 `DATABASE_URL` 에 넣되 **`uselibpqcompat=true` 는 빼야 한다** —
+그건 터널 때문에 호스트가 `localhost` 라 인증서 검증이 원리상 불가능해서 넣었던 우회책이다.
+Neon 은 실제 도메인이라 `sslmode=require` 로 검증이 정상 통과한다 (2026-08-25 실측).
+
+```
+DATABASE_URL="postgresql://유저:비번@ep-....neon.tech/neondb?sslmode=require&connection_limit=5"
+```
+
+**개발에는 direct 엔드포인트를 쓴다.** 대시보드의 "Pooled connection" 토글을 끈 쪽이다 —
+pooled 로는 `db push` 같은 스키마 변경이 어긋난다. **배포(Vercel)에서는 반대로 pooled 를
+쓴다** (`MILESTONES.md` M6 참조).
+
+> **배포 때 RDS 로 전환하지 않는다.** 배포처가 EC2 에서 Vercel 로 바뀌면서 개발도 운영도
+> 같은 Neon 을 쓰기로 했다 (근거는 `MILESTONES.md` "확정된 설계 결정" 표).
 
 ## 2. 디스코드 OAuth 앱 — 5분
 
@@ -167,7 +185,7 @@ URL 복사 → `.env`의 `DISCORD_WEBHOOK_URL`
 ```bash
 npm install
 npx prisma generate   # src/generated/prisma 생성
-npm run db:push       # 스키마를 DB에 반영 (터널이 열려 있어야 함)
+npm run db:push       # 스키마를 DB에 반영 (Neon direct 엔드포인트로)
 npm run dev           # http://localhost:3002
 ```
 
@@ -221,9 +239,12 @@ Prisma 7 은 드라이버 어댑터가 필수라(`@prisma/adapter-pg`) **같은 
 - **커넥션 수** — `src/lib/prisma.ts` 에서 `new PrismaPg({ ..., max: 5 })` 로 막는다.
   URL 의 `connection_limit` 은 CLI 만 읽는다.
 
-### M6 에서 다시 볼 것
+### 이 절은 RDS + 터널일 때의 이야기다
 
-운영에서는 앱이 EC2 안에서 RDS 에 **직접** 붙으므로 호스트명이 실제 도메인이고,
-인증서 검증을 제대로 켤 수 있다. `uselibpqcompat=true` 는 **개발용 터널 때문에
-필요한 것**이지 운영에 그대로 가져갈 설정이 아니다. 서버 `.env` 에서는 RDS CA 번들을
-받아 `sslmode=verify-full&sslrootcert=...` 로 바꾸는 것을 검토한다.
+**Neon 을 쓰는 지금은 해당 없다.** 호스트가 실제 도메인이라 `sslmode=require` 만으로
+검증이 통과하고, `uselibpqcompat=true` 도 필요 없다 (2026-08-25 실측). 위 표는 `hymn.pem`
+을 확보해 RDS 터널로 돌아갈 때 다시 필요하다.
+
+배포(Vercel)에서도 같은 Neon 을 쓰므로 운영용으로 따로 손볼 것은 없다. 다만
+**`DATABASE_URL` 은 pooled 엔드포인트로 넣는다** — 서버리스는 함수 인스턴스가 여러 개 뜨고
+`src/lib/prisma.ts` 의 `max: 5` 는 인스턴스당이라 곱해진다.
