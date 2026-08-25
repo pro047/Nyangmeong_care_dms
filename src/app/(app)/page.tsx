@@ -72,7 +72,13 @@ export default async function DocumentsPage({
             {documents.length > 0 ? `${documents.length}개 문서` : '최근 수정순으로 표시됩니다'}
           </p>
         </div>
-        <UploadDialog />
+        {/* 폴더를 열어 둔 채 업로드하면 그 폴더에 넣는다. activeFolder 로 가드하는 이유는
+            위에서 없는 폴더면 필터를 안 걸기 때문이다 — 죽은 링크에서 올린 문서가
+            존재하지 않는 폴더를 참조해 FK 위반이 나면 안 된다. */}
+        <UploadDialog
+          folderId={activeFolder ? folderId : null}
+          folderName={activeFolder?.name ?? null}
+        />
       </div>
 
       {errorMessage && (

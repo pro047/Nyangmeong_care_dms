@@ -29,7 +29,13 @@ async function errorMessage(res: Response, fallback: string) {
   return body?.error ?? fallback
 }
 
-export function UploadDialog() {
+export function UploadDialog({
+  folderId,
+  folderName,
+}: {
+  folderId: string | null
+  folderName: string | null
+}) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [items, setItems] = useState<Item[]>([])
@@ -80,6 +86,8 @@ export function UploadDialog() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               title: titleFromFileName(file.name),
+              // 서버 스키마는 처음부터 folderId 를 받았다. 폴더 UI 가 없어 안 보냈을 뿐이다.
+              ...(folderId ? { folderId } : {}),
               s3Key: key,
               keyToken,
               fileName: file.name,
@@ -94,7 +102,7 @@ export function UploadDialog() {
       if (outcome.kind === 'done') update(item.id, { status: 'done', progress: 100 })
       if (outcome.kind === 'error') update(item.id, { status: 'error', error: outcome.message })
     },
-    [update],
+    [update, folderId],
   )
 
   const addFiles = useCallback(
@@ -196,6 +204,13 @@ export function UploadDialog() {
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto p-5">
+              {/* 조용히 배정하면 "왜 여기 올라갔지"가 된다. 올라갈 곳을 먼저 보여준다. */}
+              {folderName && (
+                <p className="mb-3 rounded-lg border border-border bg-canvas px-3.5 py-2 text-xs text-ink-muted">
+                  <span className="font-medium text-ink">{folderName}</span> 폴더에 업로드됩니다.
+                </p>
+              )}
+
               <div
                 onDragOver={(e) => {
                   e.preventDefault()
