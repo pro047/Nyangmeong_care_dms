@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Noto_Sans_KR } from 'next/font/google'
 import { GeistSans } from 'geist/font/sans'
+import { Toaster } from '@/components/ui/sonner'
 import './globals.css'
 
 const notoSansKr = Noto_Sans_KR({
@@ -17,7 +18,11 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: LayoutProps<'/'>) {
   return (
     <html lang="ko" className={`${GeistSans.variable} ${notoSansKr.variable} h-full antialiased`}>
-      <body className="min-h-full font-sans">{children}</body>
+      <body className="min-h-full font-sans">
+        {children}
+        {/* 실패 알림은 전부 여기로 모인다. window.alert 은 흐름을 끊고 aria-live 도 없었다. */}
+        <Toaster position="bottom-right" />
+      </body>
     </html>
   )
 }

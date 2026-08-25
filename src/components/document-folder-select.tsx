@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
 
 async function errorMessage(res: Response, fallback: string) {
   const body = await res.json().catch(() => null)
@@ -38,7 +39,7 @@ export function DocumentFolderSelect({
     } catch (err) {
       // 실패했는데 셀렉트만 바뀐 채로 두면 옮겨진 것으로 오해한다.
       setValue(previous)
-      window.alert(err instanceof Error ? err.message : '알 수 없는 오류')
+      toast.error(err instanceof Error ? err.message : '알 수 없는 오류')
     } finally {
       setBusy(false)
     }

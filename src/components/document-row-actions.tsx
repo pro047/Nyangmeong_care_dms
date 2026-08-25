@@ -3,6 +3,18 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Trash2 } from 'lucide-react'
+import { toast } from 'sonner'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
 
 async function errorMessage(res: Response, fallback: string) {
   const body = await res.json().catch(() => null)
@@ -23,8 +35,6 @@ export function DocumentRowActions({
   const [busy, setBusy] = useState(false)
 
   const handleDelete = async () => {
-    if (!window.confirm(`"${title}" 문서를 휴지통으로 보낼까요?`)) return
-
     setBusy(true)
     try {
       const res = await fetch(`/api/documents/${id}`, { method: 'DELETE' })
@@ -40,21 +50,37 @@ export function DocumentRowActions({
       // 성공 경로에서 busy 를 풀지 않는다. refresh 는 fire-and-forget 이라 여기서
       // 풀면 아직 남아 있는 행의 버튼이 다시 눌린다. 행이 사라지면 언마운트된다.
     } catch (err) {
-      window.alert(err instanceof Error ? err.message : '알 수 없는 오류')
+      toast.error(err instanceof Error ? err.message : '알 수 없는 오류')
       setBusy(false)
     }
   }
 
   return (
-    <button
-      type="button"
-      onClick={handleDelete}
-      disabled={busy}
-      aria-busy={busy}
-      aria-label={`${title} 휴지통으로 이동`}
-      className="flex h-7 w-7 items-center justify-center rounded-lg text-ink-subtle transition-colors hover:bg-danger-soft hover:text-danger disabled:opacity-40"
-    >
-      <Trash2 className="h-4 w-4" />
-    </button>
+    <AlertDialog>
+      <AlertDialogTrigger asChild>
+        <button
+          type="button"
+          disabled={busy}
+          aria-busy={busy}
+          aria-label={`${title} 휴지통으로 이동`}
+          className="flex h-7 w-7 items-center justify-center rounded-lg text-ink-subtle transition-colors hover:bg-danger-soft hover:text-danger disabled:opacity-40"
+        >
+          <Trash2 className="h-4 w-4" />
+        </button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>휴지통으로 보낼까요?</AlertDialogTitle>
+          {/* 제목을 본문에 두는 이유: 목록에서 어느 행을 눌렀는지가 헷갈리는 자리다. */}
+          <AlertDialogDescription>
+            &ldquo;{title}&rdquo; 문서를 휴지통으로 보냅니다. 휴지통에서 되돌릴 수 있습니다.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>취소</AlertDialogCancel>
+          <AlertDialogAction onClick={handleDelete}>휴지통으로 이동</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   )
 }
