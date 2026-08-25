@@ -30,15 +30,17 @@ async function errorMessage(res: Response, fallback: string) {
 }
 
 export function UploadDialog({
-  folderId,
-  folderName,
+  defaultFolderId,
+  folderOptions,
 }: {
-  folderId: string | null
-  folderName: string | null
+  defaultFolderId: string | null
+  folderOptions: { id: string; name: string; depth: number }[]
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [items, setItems] = useState<Item[]>([])
+  // '' 는 미분류. 지금 열어 둔 폴더가 기본값이고 모달 안에서 바꿀 수 있다.
+  const [folderId, setFolderId] = useState(defaultFolderId ?? '')
   const [dragging, setDragging] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   // 진행 중인 PUT. 모달을 닫을 때 전부 abort 한다.
@@ -86,7 +88,7 @@ export function UploadDialog({
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               title: titleFromFileName(file.name),
-              // 서버 스키마는 처음부터 folderId 를 받았다. 폴더 UI 가 없어 안 보냈을 뿐이다.
+              // 서버 스키마는 처음부터 folderId 를 받았다. '' 는 미분류라 키 자체를 뺀다.
               ...(folderId ? { folderId } : {}),
               s3Key: key,
               keyToken,
@@ -149,9 +151,11 @@ export function UploadDialog({
 
     setOpen(false)
     setItems([])
+    // 다음에 열 때는 지금 보고 있는 폴더가 다시 기본값이어야 한다.
+    setFolderId(defaultFolderId ?? '')
     // 취소했더라도 그 전에 끝난 것이 있으면 목록에 반영해야 한다.
     router.refresh()
-  }, [uploading, router])
+  }, [uploading, router, defaultFolderId])
 
   useEffect(() => {
     if (!open) return
@@ -204,12 +208,30 @@ export function UploadDialog({
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto p-5">
-              {/* 조용히 배정하면 "왜 여기 올라갔지"가 된다. 올라갈 곳을 먼저 보여준다. */}
-              {folderName && (
-                <p className="mb-3 rounded-lg border border-border bg-canvas px-3.5 py-2 text-xs text-ink-muted">
-                  <span className="font-medium text-ink">{folderName}</span> 폴더에 업로드됩니다.
-                </p>
-              )}
+              {/* 조용히 배정하면 "왜 여기 올라갔지"가 된다. 올라갈 곳을 보여주고 고르게 한다.
+                  파일을 담은 뒤에는 잠근다 — 이미 올라간 건이 따라 옮겨지지 않아 한 배치가
+                  두 폴더로 갈라진다. 바꾸려면 닫고 다시 연다. */}
+              <div className="mb-3">
+                <label htmlFor="upload-folder" className="text-xs font-medium text-ink">
+                  저장할 폴더
+                </label>
+                <select
+                  id="upload-folder"
+                  value={folderId}
+                  disabled={items.length > 0}
+                  onChange={(e) => setFolderId(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-border bg-surface py-2 pr-8 pl-3 text-sm text-ink outline-none focus:border-accent disabled:opacity-60"
+                >
+                  <option value="">— (미분류)</option>
+                  {folderOptions.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {/* 전각 공백으로 깊이를 표시한다 — option 안에서는 CSS 들여쓰기가 먹지 않는다. */}
+                      {'　'.repeat(option.depth)}
+                      {option.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
               <div
                 onDragOver={(e) => {

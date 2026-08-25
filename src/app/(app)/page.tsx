@@ -4,6 +4,7 @@ import { DocumentTable } from '@/components/document-table'
 import { prisma } from '@/lib/prisma'
 import { activeDocumentWhere } from '@/lib/trash'
 import { folderFilterWhere, tagFilterWhere } from '@/lib/search'
+import { buildFolderTree, flattenFolderTree } from '@/lib/folder'
 import { pageErrorMessage } from '@/lib/page-error'
 import type { Prisma } from '@/generated/prisma/client'
 
@@ -43,9 +44,17 @@ export default async function DocumentsPage({
   // 제목에 폴더 이름이 필요하고, 없는 폴더면 필터 자체를 걸지 않는다 — 죽은 링크가
   // 빈 화면이 아니라 전체 목록으로 떨어지는 쪽이 덜 놀랍다.
   const folderId = typeof folder === 'string' && folder !== '' ? folder : null
-  const activeFolder = folderId
-    ? await prisma.folder.findUnique({ where: { id: folderId }, select: { name: true } })
-    : null
+
+  // 업로드 모달의 폴더 셀렉트에 넘길 목록이다. activeFolder 조회와 서로 의존하지 않으므로
+  // 같이 띄운다 — 순차로 두면 DB 왕복 깊이가 하나 늘고, 함수 리전이 서울이라 그 한 번이
+  // 95ms 다 (`HANDOFF.md` "배포 성능 실측").
+  const [activeFolder, folderRows] = await Promise.all([
+    folderId
+      ? prisma.folder.findUnique({ where: { id: folderId }, select: { name: true } })
+      : Promise.resolve(null),
+    prisma.folder.findMany({ select: { id: true, name: true, parentId: true } }),
+  ])
+  const folderOptions = flattenFolderTree(buildFolderTree(folderRows))
 
   const documents = await getDocuments({
     AND: [
@@ -72,12 +81,12 @@ export default async function DocumentsPage({
             {documents.length > 0 ? `${documents.length}개 문서` : '최근 수정순으로 표시됩니다'}
           </p>
         </div>
-        {/* 폴더를 열어 둔 채 업로드하면 그 폴더에 넣는다. activeFolder 로 가드하는 이유는
-            위에서 없는 폴더면 필터를 안 걸기 때문이다 — 죽은 링크에서 올린 문서가
+        {/* 폴더를 열어 둔 채 업로드하면 그 폴더가 기본값이 된다. activeFolder 로 가드하는
+            이유는 위에서 없는 폴더면 필터를 안 걸기 때문이다 — 죽은 링크에서 올린 문서가
             존재하지 않는 폴더를 참조해 FK 위반이 나면 안 된다. */}
         <UploadDialog
-          folderId={activeFolder ? folderId : null}
-          folderName={activeFolder?.name ?? null}
+          defaultFolderId={activeFolder ? folderId : null}
+          folderOptions={folderOptions}
         />
       </div>
 
