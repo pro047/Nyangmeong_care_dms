@@ -6,6 +6,21 @@
 
 ---
 
+## 0-0. git 신원 맞추기 — 새 체크아웃에서 **먼저** 할 것
+
+```bash
+git config --local user.name  pro047
+git config --local user.email pro047@naver.com
+```
+
+**커밋 작성자가 `pro047` 이 아니면 Vercel 배포가 조용히 블락된다.** Vercel 이 head 커밋의
+작성자 이메일을 GitHub 계정으로 역매핑해 권한을 보는데, private 리포 + Hobby 플랜은
+제3자 배포를 허용하지 않는다. **사이트는 200 으로 멀쩡해서 `curl` 로는 안 잡힌다** —
+이전 배포가 계속 서빙되기 때문이다. 2026-08-25 맥에서 실제로 겪었다
+(`HANDOFF.md` 지뢰 절). 로컬 설정이라 다른 프로젝트의 신원은 안 건드린다.
+
+---
+
 ## 0. `.env` 만들기
 
 `.env.example`을 복사하되 **값이 빈 문자열(`""`)인 항목을 그냥 두면 안 된다.**

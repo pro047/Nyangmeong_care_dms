@@ -306,6 +306,33 @@ PowerShell·sandbox 해제), `npx tsc --noEmit`, `./node_modules/.bin/tsc`,
 
 `CLAUDE.md` 의 "함정" 절과 별개로, 운영하다 부딪히는 것들.
 
+**커밋 작성자가 `pro047` 이 아니면 Vercel 배포가 블락된다** (2026-08-25, 맥에서 겪음).
+
+에러 문구: `The deployment was blocked because the commit author did not have
+contributing access to the project on Vercel. The Hobby Plan does not support
+collaboration for private repositories.`
+
+Vercel 은 head 커밋의 **작성자 이메일**을 GitHub 계정으로 역매핑해 프로젝트 접근 권한을
+본다. GitHub 리포와 Vercel 프로젝트의 소유 계정이 `pro047` 인데 다른 이메일로 커밋하면
+**제3자로 판정**되고, private 리포의 제3자 배포는 Pro 플랜 기능이라 차단된다.
+
+**맥의 git 전역 설정이 회사 신원(`viajinseong <jinseong@viasofts.com>`)이라 걸렸다.**
+윈도우 PC 는 `pro047 <pro047@naver.com>` 이라 여태 문제가 없었다. 리포 로컬 설정으로 막았다:
+
+```bash
+git config --local user.name  pro047
+git config --local user.email pro047@naver.com
+```
+
+**로컬 설정이라 이 리포에서만 적용된다** — 다른 프로젝트의 회사 신원은 그대로다.
+새로 클론하면 로컬 설정이 없으니 **다시 걸린다. 클론 직후 위 두 줄을 먼저 실행할 것.**
+
+증상 구분: 사이트는 200 으로 멀쩡하다 — **빌드가 실패한 게 아니라 배포가 시작조차 안 되고
+이전 배포가 계속 서빙**되기 때문이다. `curl` 로는 구분이 안 되고 Deployments 탭을 봐야 한다.
+
+> **`Co-Authored-By` 트레일러는 원인이 아니다.** 배포에 성공한 `d909c87`·`7586a7c`·
+> `008b7da` 에도 똑같이 붙어 있다. 처음에 그쪽을 의심했다가 커밋 로그 대조로 걸러냈다.
+
 **SSH 터널이 조용히 죽는다.** `ServerAliveInterval 30` / `CountMax 3` 이라 90초 무응답이면
 스스로 끊는다. 맥이 절전에 들어가면 그렇게 된다. 증상은 `PrismaClientKnownRequestError` +
 `code: 'ECONNREFUSED'` 인데, **에러가 `findMany` 줄을 가리켜서 쿼리 문제로 보인다.**
