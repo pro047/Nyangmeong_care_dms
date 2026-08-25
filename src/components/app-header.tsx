@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import type { SessionUser } from '@/lib/session'
+import { MAX_SEARCH_LENGTH } from '@/lib/search'
 import { Search, LogOut } from 'lucide-react'
 
 export function AppHeader({ user }: { user: SessionUser }) {
@@ -12,9 +13,8 @@ export function AppHeader({ user }: { user: SessionUser }) {
         <span className="hidden text-sm font-bold text-ink sm:inline">팀 문서 관리</span>
       </Link>
 
-      {/* M4에서 /search 라우트와 함께 살린다. 그때까지 disabled 인 이유: form 이 살아
-          있으면 엔터 한 번에 없는 라우트로 가서 Next 기본 404 가 뜬다. */}
-      <div className="relative mx-auto w-full max-w-md">
+      {/* GET 폼이라 제출하면 ?q= 가 붙은 채 /search 로 이동한다 — 별도 핸들러가 필요 없다. */}
+      <form action="/search" className="relative mx-auto w-full max-w-md">
         <Search
           className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-ink-subtle"
           aria-hidden
@@ -22,13 +22,12 @@ export function AppHeader({ user }: { user: SessionUser }) {
         <input
           type="search"
           name="q"
-          disabled
+          maxLength={MAX_SEARCH_LENGTH}
           placeholder="문서 검색"
           aria-label="문서 검색"
-          title="검색 기능은 준비 중입니다"
-          className="w-full rounded-lg border border-border bg-canvas py-2 pr-3 pl-9 text-sm text-ink placeholder:text-ink-subtle focus:border-accent focus:bg-surface focus:ring-2 focus:ring-accent/15 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+          className="w-full rounded-lg border border-border bg-canvas py-2 pr-3 pl-9 text-sm text-ink placeholder:text-ink-subtle focus:border-accent focus:bg-surface focus:ring-2 focus:ring-accent/15 focus:outline-none"
         />
-      </div>
+      </form>
 
       <div className="flex shrink-0 items-center gap-3">
         <div className="flex items-center gap-2">

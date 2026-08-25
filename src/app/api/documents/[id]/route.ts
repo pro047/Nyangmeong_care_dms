@@ -7,12 +7,16 @@ import {
   outcomeFromCount,
   TRASH_NOT_FOUND,
 } from '@/lib/trash'
-import { documentPatchSchema, toDocumentPatchData } from '@/lib/document-edit'
+import {
+  documentPatchFailure,
+  documentPatchSchema,
+  toDocumentPatchData,
+} from '@/lib/document-edit'
 
 export const dynamic = 'force-dynamic'
 
 /**
- * 제목·설명 수정. 삭제와 같은 이유로 작성자를 보지 않고, 같은 updateMany + count 패턴을 쓴다.
+ * 제목·설명·폴더 수정. 삭제와 같은 이유로 작성자를 보지 않고, 같은 updateMany + count 패턴을 쓴다.
  * @updatedAt 이 함께 갱신돼 목록(최근 수정순) 위로 올라온다 — "수정"이므로 의도한 동작이다.
  */
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -27,10 +31,20 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const { id } = await params
 
-  const { count } = await prisma.document.updateMany({
-    where: { id, ...activeDocumentWhere() },
-    data: toDocumentPatchData(parsed.data),
-  })
+  let count: number
+  try {
+    // 지정한 폴더가 없으면(또는 그 사이에 지워졌으면) folder FK 가 P2003 으로 막는다.
+    // 존재 확인을 미리 하지 않는 이유는 updateMany + count 와 같다 — 확인과 쓰기 사이가 비어 있다.
+    const result = await prisma.document.updateMany({
+      where: { id, ...activeDocumentWhere() },
+      data: toDocumentPatchData(parsed.data),
+    })
+    count = result.count
+  } catch (err) {
+    const failure = documentPatchFailure(err)
+    if (!failure) throw err
+    return NextResponse.json({ error: failure.error }, { status: failure.status })
+  }
 
   const outcome = outcomeFromCount(count, ACTIVE_DOCUMENT_NOT_FOUND)
   if (!outcome.ok) {

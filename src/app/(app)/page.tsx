@@ -1,20 +1,22 @@
-import Link from 'next/link'
-import { FileText, Download } from 'lucide-react'
+import { FileText } from 'lucide-react'
 import { UploadDialog } from '@/components/upload-dialog'
-import { DocumentRowActions } from '@/components/document-row-actions'
+import { DocumentTable } from '@/components/document-table'
 import { prisma } from '@/lib/prisma'
-import { formatBytes, formatRelative, fileLabel } from '@/lib/format'
 import { activeDocumentWhere } from '@/lib/trash'
+import { folderFilterWhere, tagFilterWhere } from '@/lib/search'
 import { pageErrorMessage } from '@/lib/page-error'
+import type { Prisma } from '@/generated/prisma/client'
 
 export const dynamic = 'force-dynamic'
 
-async function getDocuments() {
+async function getDocuments(where: Prisma.DocumentWhereInput) {
   return prisma.document.findMany({
-    where: activeDocumentWhere(),
+    where,
     orderBy: { updatedAt: 'desc' },
     include: {
       folder: { select: { name: true } },
+      // 순서를 정해 두지 않으면 같은 문서의 칩 순서가 요청마다 흔들린다.
+      tags: { include: { tag: true }, orderBy: { tag: { name: 'asc' } } },
       // 목록에는 최신 버전 정보만 필요하다.
       versions: {
         orderBy: { versionNo: 'desc' },
@@ -28,23 +30,55 @@ async function getDocuments() {
 export default async function DocumentsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string | string[] }>
+  searchParams: Promise<{
+    error?: string | string[]
+    folder?: string | string[]
+    tag?: string | string[]
+  }>
 }) {
-  const documents = await getDocuments()
   // 다운로드 라우트가 내비게이션 404 를 여기로 돌려보낸다. 아는 코드만 문구가 된다.
-  const { error } = await searchParams
+  const { error, folder, tag } = await searchParams
   const errorMessage = pageErrorMessage(error)
+
+  // 제목에 폴더 이름이 필요하고, 없는 폴더면 필터 자체를 걸지 않는다 — 죽은 링크가
+  // 빈 화면이 아니라 전체 목록으로 떨어지는 쪽이 덜 놀랍다.
+  const folderId = typeof folder === 'string' && folder !== '' ? folder : null
+  const activeFolder = folderId
+    ? await prisma.folder.findUnique({ where: { id: folderId }, select: { name: true } })
+    : null
+
+  const documents = await getDocuments({
+    AND: [
+      activeDocumentWhere(),
+      activeFolder ? folderFilterWhere(folder) : {},
+      tagFilterWhere(tag),
+    ],
+  })
+
+  const activeTag = typeof tag === 'string' && tag !== '' ? tag : null
+  const filtered = activeFolder !== null || activeTag !== null
+  const heading = activeFolder
+    ? `폴더: ${activeFolder.name}`
+    : activeTag
+      ? `태그: ${activeTag}`
+      : '전체 문서'
 
   return (
     <div className="mx-auto max-w-6xl">
       <div className="mb-5 flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-lg font-bold text-ink">전체 문서</h1>
+          <h1 className="text-lg font-bold text-ink">{heading}</h1>
           <p className="mt-0.5 text-sm text-ink-muted">
             {documents.length > 0 ? `${documents.length}개 문서` : '최근 수정순으로 표시됩니다'}
           </p>
         </div>
-        <UploadDialog />
+        {/* 폴더를 열어 둔 채 업로드하면 그 폴더에 넣는다. activeFolder 로 가드하는 이유는
+            위에서 없는 폴더면 필터를 안 걸기 때문이다 — 죽은 링크에서 올린 문서가
+            존재하지 않는 폴더를 참조해 FK 위반이 나면 안 된다. */}
+        <UploadDialog
+          folderId={activeFolder ? folderId : null}
+          folderName={activeFolder?.name ?? null}
+        />
       </div>
 
       {errorMessage && (
@@ -56,73 +90,24 @@ export default async function DocumentsPage({
       {documents.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border-strong bg-surface py-20 text-center">
           <FileText className="mx-auto mb-3 h-8 w-8 text-ink-subtle" aria-hidden />
-          <p className="text-sm font-medium text-ink">아직 문서가 없습니다</p>
-          <p className="mt-1 text-sm text-ink-muted">오른쪽 위 업로드 버튼으로 첫 문서를 올려보세요.</p>
+          {filtered ? (
+            <>
+              <p className="text-sm font-medium text-ink">조건에 맞는 문서가 없습니다</p>
+              <p className="mt-1 text-sm text-ink-muted">
+                상세 페이지에서 문서의 폴더와 태그를 지정할 수 있습니다.
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="text-sm font-medium text-ink">아직 문서가 없습니다</p>
+              <p className="mt-1 text-sm text-ink-muted">
+                오른쪽 위 업로드 버튼으로 첫 문서를 올려보세요.
+              </p>
+            </>
+          )}
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-border bg-surface">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border text-left text-xs text-ink-muted">
-                <th scope="col" className="px-4 py-2.5 font-medium">문서</th>
-                <th scope="col" className="hidden px-4 py-2.5 font-medium md:table-cell">폴더</th>
-                <th scope="col" className="hidden px-4 py-2.5 font-medium lg:table-cell">올린 사람</th>
-                <th scope="col" className="hidden px-4 py-2.5 font-medium sm:table-cell">크기</th>
-                <th scope="col" className="px-4 py-2.5 font-medium">수정</th>
-                <th scope="col" className="w-12 px-4 py-2.5"><span className="sr-only">다운로드</span></th>
-                <th scope="col" className="w-12 px-4 py-2.5"><span className="sr-only">삭제</span></th>
-              </tr>
-            </thead>
-            <tbody>
-              {documents.map((doc) => {
-                const latest = doc.versions[0]
-                return (
-                  <tr key={doc.id} className="border-b border-border last:border-0 hover:bg-canvas">
-                    <td className="max-w-0 px-4 py-3">
-                      {/* 제목은 상세로 간다. 바로 받고 싶으면 오른쪽 다운로드 아이콘. */}
-                      <Link href={`/documents/${doc.id}`} className="flex items-center gap-2.5">
-                        <span className="flex h-7 w-9 shrink-0 items-center justify-center rounded bg-canvas text-[10px] font-bold text-ink-muted">
-                          {latest ? fileLabel(latest.fileName) : '—'}
-                        </span>
-                        <span className="min-w-0">
-                          <span className="truncate-cell block font-medium text-ink">{doc.title}</span>
-                          {latest && latest.versionNo > 1 && (
-                            <span className="text-xs text-ink-subtle">v{latest.versionNo}</span>
-                          )}
-                        </span>
-                      </Link>
-                    </td>
-                    <td className="hidden px-4 py-3 text-ink-muted md:table-cell">
-                      {doc.folder?.name ?? '—'}
-                    </td>
-                    <td className="hidden px-4 py-3 text-ink-muted lg:table-cell">
-                      {latest?.uploadedBy.username ?? '—'}
-                    </td>
-                    <td className="hidden px-4 py-3 whitespace-nowrap text-ink-muted sm:table-cell">
-                      {latest ? formatBytes(latest.sizeBytes) : '—'}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-ink-muted">
-                      {formatRelative(doc.updatedAt)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <a
-                        href={`/api/documents/${doc.id}/download`}
-                        aria-label={`${doc.title} 다운로드`}
-                        className="flex h-7 w-7 items-center justify-center rounded-lg text-ink-subtle transition-colors hover:bg-accent-soft hover:text-accent"
-                      >
-                        <Download className="h-4 w-4" />
-                      </a>
-                    </td>
-                    <td className="px-4 py-3">
-                      {/* 상세 페이지에도 같은 버튼이 있다. 목록에서도 바로 지울 수 있게 둔다. */}
-                      <DocumentRowActions id={doc.id} title={doc.title} />
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
+        <DocumentTable documents={documents} />
       )}
     </div>
   )
