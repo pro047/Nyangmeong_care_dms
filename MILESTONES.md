@@ -181,17 +181,34 @@
 
 **완료 기준** — PDF를 클릭하면 내려받지 않고 바로 열리고, 누가 올리면 디스코드 채널에 뜬다.
 
-## M6 — 배포 (Vercel) · 약 1시간
+## M6 — 배포 (Vercel) · 🔶 거의 완료 (2026-08-25)
 
-- [ ] Vercel 프로젝트 생성 + GitHub 저장소 연결
-- [ ] 환경변수 11개 입력. **`APP_URL` 은 배포 주소(끝 슬래시 금지)**,
+- [x] Vercel 프로젝트 생성 + GitHub 저장소 연결
+- [x] 환경변수 11개 입력. **`APP_URL` 은 배포 주소(끝 슬래시 금지)**,
       **`DATABASE_URL` 은 Neon pooled 엔드포인트**(`-pooler`)
-- [ ] 디스코드 OAuth 콜백에 `https://<배포주소>/api/auth/callback` 추가 (localhost 것은 남긴다)
-- [ ] `infra/s3-cors.json` 의 `AllowedOrigins` 에 배포 주소 추가 → S3 콘솔에 반영
-- [ ] **길드 비멤버 거부 확인** — 다른 디스코드 계정 필요
+- [x] 디스코드 OAuth 콜백에 `https://<배포주소>/api/auth/callback` 추가 (localhost 것은 남긴다)
+- [x] `infra/s3-cors.json` 의 `AllowedOrigins` 에 배포 주소 추가 → S3 콘솔에 반영
+- [ ] **길드 비멤버 거부 확인** — 다른 디스코드 계정 필요 (**계정이 없어 아직 못 함**)
 
 **완료 기준** — 팀원 6명이 각자 접속해 로그인한다.
 
+**배포 주소** — https://nyangmeong-care-dms.vercel.app
+
+> **2026-08-25 배포 + 실측.** 위 5개 중 4개 완료. 리전은 Neon(`ap-southeast-1`)에 맞춰
+> 싱가포르로 뒀다 — 기본값(미국 동부)이면 서버 컴포넌트가 DB 를 칠 때마다 태평양을 왕복한다.
+>
+> **배포 환경에서 전 경로가 확인됐다.** 디스코드 로그인 → JWT 세션 → presign 서명 →
+> 브라우저 → S3 직접 PUT → DB 기록. 업로드 5건의 **DB `size_bytes` 와 S3 `ContentLength` 가
+> 바이트 단위로 일치**하는 것까지 대조했다. presigned PUT 이 통했다는 것 자체가 S3 CORS 가
+> 실제로 먹었다는 증거다 — origin 이 어긋났으면 preflight 에서 막힌다.
+>
+> **남은 하나: 길드 비멤버 거부.** 다른 디스코드 계정이 없어 못 했다. M1 부터 미검증인
+> 항목이고 **접근 제어가 길드 멤버십 하나뿐이라 이게 유일한 방어선이다.**
+> 팀에 URL 을 뿌리기 전에 확인할 것 — 뿌리고 나면 그 URL 은 어디로든 샌다.
+>
+> **디스코드 알림은 아직 끄고 있다.** `DISCORD_WEBHOOK_URL` 을 빈 값으로 두고 배포했다.
+> 테스트 업로드가 팀 채널에 쏟아지지 않게 한 것이고, 값을 채워 재배포하면 켜진다
+> (`discord.ts:78` 게이트는 Vercel 이 production 이라 이미 열려 있다).
 > **EC2 에서 Vercel 로 바꿨다** (2026-08-25). 근거는 위 "확정된 설계 결정" 표.
 > 없어진 항목: 탄력적 IP, 로컬 빌드 후 전송 + PM2, Nginx + Let's Encrypt.
 > `DATABASE_URL` 을 RDS 로 되돌리는 항목도 없어졌다 — 개발도 운영도 같은 Neon 을 쓴다.
