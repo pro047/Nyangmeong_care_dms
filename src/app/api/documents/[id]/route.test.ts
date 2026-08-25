@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 import { PATCH } from './route'
 import { ACTIVE_DOCUMENT_NOT_FOUND } from '@/lib/trash'
+import { MOVE_FOLDER_NOT_FOUND } from '@/lib/document-edit'
 
 // DB·쿠키는 테스트 환경에 없다. 라우트가 "무엇을 어떤 인자로 부르고
 // 무엇을 돌려주는가"만 본다 (download/route.test.ts 와 같은 패턴).
@@ -63,5 +64,38 @@ describe('PATCH /api/documents/[id]', () => {
     expect(args.data).toEqual({ title: '제목', description: null })
     expect(res.status).toBe(200)
     expect(await res.json()).toEqual({ id: 'doc_1' })
+  })
+
+  it('folderId 만 보내도 활성 문서만 겨눠 이동해야 한다', async () => {
+    const res = await PATCH(patch({ folderId: 'folder_1' }), PARAMS)
+
+    const args = updateMany.mock.calls[0][0]
+    expect(args.where).toEqual({ id: 'doc_1', deletedAt: null })
+    expect(args.data).toEqual({ folderId: 'folder_1' })
+    expect(res.status).toBe(200)
+  })
+
+  it('folderId null 은 미분류로 꺼내는 요청으로 통과해야 한다', async () => {
+    const res = await PATCH(patch({ folderId: null }), PARAMS)
+
+    expect(updateMany.mock.calls[0][0].data).toEqual({ folderId: null })
+    expect(res.status).toBe(200)
+  })
+
+  it('없는 폴더로 이동(P2003)이면 404 문구여야 한다', async () => {
+    // 조회와 수정 사이에 남이 폴더를 지운 경우 — FK 위반을 사용자 문구로 바꿔야 한다.
+    updateMany.mockRejectedValue(Object.assign(new Error('fk'), { code: 'P2003' }))
+
+    const res = await PATCH(patch({ folderId: 'ghost' }), PARAMS)
+
+    expect(res.status).toBe(404)
+    expect(await res.json()).toEqual({ error: MOVE_FOLDER_NOT_FOUND })
+  })
+
+  it('매핑에 없는 오류는 삼키지 않고 던져야 한다', async () => {
+    const boom = new Error('연결 끊김')
+    updateMany.mockRejectedValue(boom)
+
+    await expect(PATCH(patch({ title: '제목' }), PARAMS)).rejects.toBe(boom)
   })
 })

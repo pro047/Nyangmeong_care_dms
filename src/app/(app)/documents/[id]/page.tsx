@@ -3,10 +3,13 @@ import { notFound } from 'next/navigation'
 import { ArrowLeft, Download } from 'lucide-react'
 import { DocumentMetaEditor } from '@/components/document-meta-editor'
 import { DocumentRowActions } from '@/components/document-row-actions'
+import { DocumentFolderSelect } from '@/components/document-folder-select'
+import { TagEditor } from '@/components/tag-editor'
 import { VersionUploadDialog } from '@/components/version-upload-dialog'
 import { prisma } from '@/lib/prisma'
 import { formatBytes, formatDateTime, fileLabel } from '@/lib/format'
 import { activeDocumentWhere } from '@/lib/trash'
+import { buildFolderTree, flattenFolderTree } from '@/lib/folder'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,6 +19,7 @@ async function getDocument(id: string) {
     include: {
       folder: { select: { name: true } },
       createdBy: { select: { username: true } },
+      tags: { include: { tag: true }, orderBy: { tag: { name: 'asc' } } },
       // 타임라인은 전 버전을 보여준다. 최신은 versions[0] 이다 (versionNo desc).
       versions: {
         orderBy: { versionNo: 'desc' },
@@ -27,11 +31,16 @@ async function getDocument(id: string) {
 
 export default async function DocumentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const document = await getDocument(id)
+  // 폴더 목록은 이동 셀렉트의 선택지다. 문서 조회와 서로 기다릴 이유가 없다.
+  const [document, folders] = await Promise.all([
+    getDocument(id),
+    prisma.folder.findMany({ select: { id: true, name: true, parentId: true } }),
+  ])
   // 휴지통 문서도 여기로 온다. 보여줘 봐야 다운로드가 전부 404라 깨진 페이지가 된다.
   if (!document) notFound()
 
   const latest = document.versions[0]
+  const folderOptions = flattenFolderTree(buildFolderTree(folders))
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -50,10 +59,18 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
           description={document.description}
         />
 
+        <TagEditor documentId={document.id} tags={document.tags.map(({ tag }) => tag.name)} />
+
         <dl className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border pt-4 text-xs text-ink-muted">
-          <div className="flex gap-1.5">
+          <div className="flex items-center gap-1.5">
             <dt>폴더</dt>
-            <dd className="text-ink">{document.folder?.name ?? '—'}</dd>
+            <dd>
+              <DocumentFolderSelect
+                documentId={document.id}
+                currentFolderId={document.folderId}
+                options={folderOptions}
+              />
+            </dd>
           </div>
           <div className="flex gap-1.5">
             <dt>만든 사람</dt>
