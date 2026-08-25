@@ -2,24 +2,33 @@
 
 @theme {
   /* 팀 내부 도구라 라이트 모드 단일. 목록 밀도가 높아 대비를 또렷하게 잡는다. */
-  --color-canvas: #f7f8fa;
+
+  /* 회색은 순중립으로 간다. 이전 값(#101828·#667085)은 파란기가 섞인 slate 계열이었는데,
+     Vercel 계열의 무채색 인상은 그 파란기를 빼는 데서 나온다. */
+  --color-canvas: #fafafa;
   --color-surface: #ffffff;
-  --color-border: #e4e7ec;
-  --color-border-strong: #d0d5dd;
+  --color-border: #ebebeb;
+  --color-border-strong: #d4d4d4;
 
-  --color-ink: #101828;
-  --color-ink-muted: #667085;
-  --color-ink-subtle: #98a2b3;
+  --color-ink: #171717;
+  --color-ink-muted: #666666;
+  --color-ink-subtle: #8f8f8f;
 
-  --color-accent: #4338ca;
-  --color-accent-hover: #3730a3;
-  --color-accent-soft: #eef2ff;
+  /* 주 액션색이 검정이다. 컬러는 상태 표시에만 쓰고 버튼·포커스는 무채색으로 둔다.
+     활성 사이드바 항목은 ink 와 같은 값이 되지만, 비활성이 ink-muted 라 대비는 남는다. */
+  --color-accent: #171717;
+  --color-accent-hover: #383838;
+  --color-accent-soft: #f5f5f5;
 
-  --color-danger: #d92d20;
-  --color-danger-soft: #fef3f2;
+  /* Vercel 의 base error 는 #ee0000 이지만 soft 배경 위에서 4.09:1 로 본문 기준(4.5)에
+     못 미친다. 같은 팔레트의 error-deep 을 base 로 올려 5.62:1 을 만든다. */
+  --color-danger: #c50000;
+  --color-danger-soft: #fff0f0;
   --color-success: #067647;
 
-  --font-sans: var(--font-noto-sans-kr), system-ui, sans-serif;
+  /* Geist 에는 한글 글리프가 없다. 브라우저가 글자 단위로 폴백하므로 한글은 Noto Sans KR
+     그대로 나오고 숫자·영문·파일명만 Geist 로 바뀐다. */
+  --font-sans: var(--font-geist-sans), var(--font-noto-sans-kr), system-ui, sans-serif;
 }
 
 body {

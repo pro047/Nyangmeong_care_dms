@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { Noto_Sans_KR } from 'next/font/google'
+import { GeistSans } from 'geist/font/sans'
 import './globals.css'
 
 const notoSansKr = Noto_Sans_KR({
@@ -15,7 +16,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<'/'>) {
   return (
-    <html lang="ko" className={`${notoSansKr.variable} h-full antialiased`}>
+    <html lang="ko" className={`${GeistSans.variable} ${notoSansKr.variable} h-full antialiased`}>
       <body className="min-h-full font-sans">{children}</body>
     </html>
   )
