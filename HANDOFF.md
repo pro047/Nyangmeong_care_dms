@@ -20,7 +20,7 @@
 
 ---
 
-## 현재 위치 (2026-08-25)
+## 현재 위치 (2026-08-26)
 
 **M0 · M1 · M2 · M3 · M4 완료. M6(배포) 은 체크박스 5/5.**
 **배포됨 — https://nyangmeong-care-dms.vercel.app** (2026-08-25, Vercel).
@@ -35,6 +35,18 @@ URL 은 이미 팀에 배포했고, 실제로 몇 명이 로그인했는지는 `
 **함수 리전을 `icn1`(서울)로 옮겼다** (2026-08-25, `vercel.json` 에 고정). 배포 직후에는
 `iad1`(미국 동부)에서 돌고 있었다. `/login` TTFB 가 웜 315ms → 172ms 로 떨어졌지만
 **같은 페이지의 편차가 260ms 라 리전 이득이 콜드 스타트에 묻힌다** — "배포 성능 실측" 절.
+
+**UI 정비를 한 번 했다** (2026-08-26, 마일스톤 밖). shadcn/ui 를 들이고 브라우저 기본
+다이얼로그를 걷었다 — `window.alert` 7곳 → sonner 토스트, 파괴적 확인 3곳 → AlertDialog,
+`window.prompt` 2곳 → Dialog 폼. 색 토큰을 무채색으로 바꾸고 Geist 를 폴백 체인으로 붙였고,
+업로드 다이얼로그에 폴더 셀렉트를 넣었다. **`MILESTONES.md` 의 확정된 설계 결정 3건이
+여기서 바뀌었다** — 컴포넌트("라이브러리 없이 직접 작성" → shadcn/ui) · 시각 언어 ·
+확인·알림 UI. 근거는 그 표와 `MILESTONES.md` 의 "UI 정비" 절.
+**색이 깨져 있었고 고쳤다** (2026-08-26). `@theme` 과 shadcn 의 `@theme inline` 이
+`--color-border`·`--color-accent` 를 서로 다른 뜻으로 정의해 테두리는 순환 참조로 무효가
+되고 주 버튼은 흰 배경에 흰 글씨가 됐다. **배포본에도 나가 있었다.** 근거와 고친 방법은
+`MILESTONES.md` "UI 정비" 절, 재발 방지는 아래 "지뢰" 절.
+**토스트·AlertDialog·Dialog 폼의 동작은 아직 안 봤다.**
 
 **다음은 M5(미리보기)다.** 근거는 "다음 작업"에 있다.
 
@@ -70,6 +82,15 @@ URL 은 이미 팀에 배포했고, 실제로 몇 명이 로그인했는지는 `
   안 된다. 그 문구를 `?error=` 로 실어 보내는 코드 경로는 `callback/route.ts:24` 하나뿐이고,
   그 줄은 `isGuildMember` 가 false 일 때만 도달한다. **M1 부터 미검증으로 끌려온 항목이었다.**
   안 한 것: 길드 가입 후 같은 계정이 통과하는지(대조), `users` 행이 안 생겼는지(DB 확인)
+- **다중 파일 동시 업로드** (2026-08-26). 3개를 한 번에 끌어다 놓아 확인했다.
+  M2 부터 미검증으로 끌려온 항목이었다.
+- **재업로드 진행 중 취소 (B10)** (2026-08-26). e2e 가 안 덮는 타이밍 의존 항목이라
+  수동으로 했다. **취소 창은 두 가지를 겹쳐 만들었다** — DevTools 의 Slow 4G 스로틀링 +
+  업로드 지연을 10초로 늘린 임시 코드. 둘 중 하나만으로는 창이 안 열린다.
+  M3 부터 미검증으로 끌려온 항목이었다.
+- **디스코드 임베드 링크 (B11)** (2026-08-26). `DISCORD_WEBHOOK_URL` 을 채워 재배포했고
+  **지금도 업로드할 때마다 알림이 온다.** `discord.ts:78` 의 `NODE_ENV !== 'production'`
+  게이트가 Vercel 에서 열려 있다는 것이 이걸로 확정됐다 — **M5 의 알림 항목이 여기서 끝났다.**
 - **M3 상세 페이지 9항목 전부 통과** (2026-08-24, Playwright 자동화 · `npm run test:e2e`).
   `DESIGN.md` §7.2 의 B1·B3·B4·B5·B6·B7·B8·B9 + V3. 스크린샷은 `test/e2e/shots/`(gitignore).
   이 중 셋은 **판단검증이 미확인으로 남긴 주장의 첫 실측**이었다:
@@ -84,9 +105,10 @@ URL 은 이미 팀에 배포했고, 실제로 몇 명이 로그인했는지는 `
 
 | 항목 | 방법 |
 |---|---|
-| 다중 파일 동시 업로드 | 파일 여러 개를 한 번에 끌어다 놓기 |
-| 재업로드 진행 중 취소 (B10) | e2e 가 안 덮는다 — 타이밍 의존이라 수동. presign 라우트에 지연을 임시로 넣어 창을 만든다 |
-| 디스코드 임베드 링크 (B11) | `NODE_ENV=production` 에서만 발송되므로 M6 배포 후 |
+| M6 완료 기준 — 팀원 6명 로그인 | `select count(*), max(created_at) from users;` **2026-08-26 시점 6행이지만 가장 최근 행이 08-24 21:53 로 배포(08-25)보다 앞선다.** 즉 이 6행은 팀원 로그인이 아니라 개발·e2e 중 생긴 것일 수 있다. 배포 후 생긴 행으로 세야 한다 |
+| 100MB 상한 근처의 큰 파일 | M2 부터 미검증 |
+| 토스트·AlertDialog·Dialog 폼 동작 | UI 정비(2026-08-26)의 색 문제는 고쳤지만 동작은 안 봤다. 토스트 7곳 · AlertDialog 3곳 · Dialog 폼 2곳 · 업로드 폴더 셀렉트(**파일을 담은 뒤 잠기는지**가 핵심) |
+| 영문 태그 대소문자 정책 | 한 문서 안에서는 합쳐지는데 필터는 완전일치라 문서 간에는 갈린다 (`DESIGN.md` §4, 의도한 수용) |
 
 ### 파이프라인 부검 (2026-08-24, `f315622`·`256c567`) — 완료
 
@@ -314,6 +336,24 @@ PowerShell·sandbox 해제), `npx tsc --noEmit`, `./node_modules/.bin/tsc`,
 
 ## 지뢰 (겪은 것들)
 
+**Tailwind 4 의 `@theme` 과 shadcn 의 `@theme inline` 은 같은 이름공간을 쓴다.**
+`shadcn init` 이 넣는 `@theme inline` 블록은 `--color-*` 를 **재정의**한다. 우리가 이미
+쓰던 이름과 겹치면 나중 것이 이긴다. 2026-08-26 에 `--color-border`(순환 참조로 화면 전체
+테두리가 잉크색) 와 `--color-accent`(주 버튼이 흰 배경에 흰 글씨) 두 개가 이렇게 깨졌다.
+
+**빌드·린트·타입검사가 전부 통과한다.** CSS 변수 충돌은 어느 검사도 안 잡고 배포까지 나간다.
+확인하려면 **빌드 산출 CSS 를 직접 봐야 한다**:
+
+```bash
+npm run build
+grep -o -- "--color-accent:[^;}]*" .next/static/chunks/*.css   # 리터럴이어야 정상
+```
+
+`var(...)` 가 나오면 `@theme inline` 이 덮은 것이다. 배포본은 `/login` HTML 의
+`.css` 링크를 받아 같은 grep 을 건다. **`shadcn add` 로 컴포넌트를 새로 받을 때마다
+`@theme inline` 블록을 대조할 것** — 그 두 줄이 다시 들어오고 `bg-accent` 를 쓰는 코드도
+딸려 온다.
+
 `CLAUDE.md` 의 "함정" 절과 별개로, 운영하다 부딪히는 것들.
 
 **커밋 작성자가 `pro047` 이 아니면 Vercel 배포가 블락된다** (2026-08-25, 맥에서 겪음).
@@ -498,6 +538,7 @@ src/
       documents/[id]/page.tsx 문서 상세 — 메타 수정 · 재업로드 · 버전 타임라인
       documents/[id]/not-found.tsx  없는/휴지통 문서. 배너 리다이렉트가 아니라 이 자리에서 알린다
       trash/page.tsx          휴지통
+      search/page.tsx         검색 결과 (헤더 검색창의 대상)
       error.tsx               에러 바운더리. DB 연결 실패를 따로 안내 (터널 끊김 대비)
     login/                    비로그인 구간
     api/auth/                 login · callback · logout
@@ -508,10 +549,19 @@ src/
       [id]/restore/route.ts   POST 복구
       [id]/versions/route.ts  POST 재업로드 (v2+ 누적, keyToken 검증 + HeadObject)
       [id]/download/route.ts  GET presigned URL로 리다이렉트
-  components/                 app-header · app-sidebar · upload-dialog
-                              document-row-actions(삭제, redirectTo 로 상세에서도 씀)
-                              trash-row-actions(복구) · document-meta-editor(제목·설명)
-                              version-upload-dialog(재업로드)
+      [id]/purge/route.ts     DELETE 영구삭제 (휴지통 문서만)
+      [id]/tags/route.ts      PUT 태그 교체
+    api/folders/
+      route.ts                POST 폴더 생성
+      [id]/route.ts           PATCH 이름변경 · DELETE 삭제
+  components/                 app-header · app-sidebar · upload-dialog(폴더 셀렉트 포함)
+                              document-table · document-row-actions(삭제, redirectTo 로 상세에서도 씀)
+                              trash-row-actions(복구·영구삭제) · document-meta-editor(제목·설명)
+                              version-upload-dialog(재업로드) · folder-tree(생성·이름변경·삭제)
+                              document-folder-select(문서 이동) · tag-editor
+    ui/                       shadcn/ui 산출물. **손으로 고친 자리가 있다** —
+                              sonner.tsx 의 useTheme 을 걷고 theme 을 light 로 고정했다
+                              (ThemeProvider 가 없어 OS 다크에서 토스트만 검게 뜬다)
   lib/
     env.ts                    zod로 환경변수 검증. 누락 시 부팅 실패
     prisma.ts                 PrismaPg 어댑터(max:5) + HMR 커넥션 누수 방지 싱글턴
@@ -525,6 +575,13 @@ src/
     document-edit.ts          PATCH 본문 스키마 + 정규화 (description '' → null)
     version-create.ts         재업로드 본문 스키마 · 다음 버전 번호 · Prisma 오류 → HTTP
     upload-xhr.ts             putToS3 (진행률·취소). 클라이언트 전용 — env·s3.ts import 금지
+    upload-flow.ts            업로드 한 건의 흐름 (presign → PUT → 생성) · 취소 처리
+    folder.ts                 폴더 이름 검증·정규화 · 트리 조립
+    tag.ts                    태그 정규화(대소문자·중복) · 파싱
+    search.ts                 검색어 파싱 → where 절 (제목·설명·태그)
+    page-error.ts             `?error=` 화이트리스트 (임의 문장은 배너로 안 뜬다)
+    request-kind.ts           내비게이션 요청 판별 — JSON 대신 배너로 돌려보낼지 가른다
+    utils.ts                  shadcn 의 cn() — clsx + tailwind-merge
   generated/prisma            Prisma 산출물 (gitignore, postinstall로 자동 생성)
   proxy.ts                    구 middleware.ts
 
@@ -593,9 +650,12 @@ UI 작업은 터널 없이도 진행할 수 있다.
 > - **`vercel.json` 의 `regions`** — 대시보드보다 파일이 우선이다 (`icn1` 서울)
 > - **커밋 작성자가 `pro047` 이어야 한다** — 아니면 배포가 블락된다 (아래 "지뢰" 절)
 
-1. **`DISCORD_WEBHOOK_URL` 을 채워 재배포.** 알림이 켜지고 **M5 의 알림 항목도 같이 끝난다**
-   (`discord.ts:78` 게이트는 Vercel 이 production 이라 이미 열려 있다). 배포 직후
-   테스트 업로드가 팀 채널에 쏟아지지 않게 조용한 시간대에 할 것.
+0. **UI 정비 브라우저 실측** (2026-08-26 추가). shadcn 전환은 `build` 만 통과했고 클릭해
+   본 적이 없다. **M5 에 손대기 전에 이걸 먼저 본다** — M5 가 같은 화면을 또 건드리므로,
+   깨진 채로 쌓으면 어느 쪽이 깼는지 못 가른다. 위 "미검증" 표의 마지막 줄이 목록이다.
+
+1. ~~**`DISCORD_WEBHOOK_URL` 을 채워 재배포.**~~ **끝났다** (2026-08-26). 지금도 업로드할
+   때마다 알림이 온다. **M5 의 알림 항목이 이걸로 닫혔다** — M5 에 남은 것은 미리보기뿐이다.
 
 2. **M5 — 미리보기 + 디스코드 알림** (추정 2h). **알림 쪽은 코드 작업이 거의 없다** —
    `notifyUpload` 는 이미 `api/documents/route.ts:75` 와
