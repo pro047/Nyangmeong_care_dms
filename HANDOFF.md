@@ -49,7 +49,17 @@
 `MILESTONES.md` "UI 정비" 절, 재발 방지는 아래 "지뢰" 절.
 **토스트·AlertDialog·Dialog 폼의 동작은 아직 안 봤다.**
 
-**다음은 M5(미리보기)다.** 근거는 "다음 작업"에 있다.
+**업로드 자동 분류를 구현했다** (2026-08-26, 파이프라인 `auto-classify` 3차 주행,
+브랜치 `feature/auto-classify` 커밋 `a32259c`). 파일명으로 폴더를 정하고 올라가기 전에
+미리보기로 확인받는다. `npm test` 169 → **224**, `lint`·`build` 통과. **브라우저 실측은
+아직 안 했고 머지도 안 했다.** 사양·설계 결정은 `MILESTONES.md` "업로드 자동 분류" 절,
+실측 항목 9종은 그 worktree 의 `.pipeline/auto-classify/DESIGN.md` §4.2.
+
+**개발 DB 와 운영 DB 를 나눴다** (2026-08-26). 같은 Neon 프로젝트의 다른 브랜치다 —
+운영 `production`(Vercel), 개발 `dev`(로컬 `.env`). **`db push` 가 팀이 쓰는 DB 로
+직행하던 것이 계기다.** 절차와 대가(스키마를 두 번 민다)는 `SETUP.md` 1-2 절.
+
+**다음은 브라우저 실측이고, 그다음이 M5(미리보기)다.** 근거는 "다음 작업"에 있다.
 
 > **개발 DB 가 RDS 가 아니라 Neon 이다** (2026-08-25 전환). 이 PC 에 `hymn.pem` 이 없어
 > SSH 터널을 못 열었고, `SETUP.md` 가 대안으로 적어 둔 Neon 무료 티어로 갈아탔다.
@@ -113,6 +123,8 @@
 |---|---|
 | 100MB 상한 근처의 큰 파일 | M2 부터 미검증 |
 | 토스트·AlertDialog·Dialog 폼 동작 | UI 정비(2026-08-26)의 색 문제는 고쳤지만 동작은 안 봤다. 토스트 7곳 · AlertDialog 3곳 · Dialog 폼 2곳 · 업로드 폴더 셀렉트(**파일을 담은 뒤 잠기는지**가 핵심) |
+| 자동 분류 전체 (9종) | 2026-08-26 구현했고 `test`·`lint`·`build` 만 통과했다. 브라우저는 한 번도 안 봤다. 목록은 `feature/auto-classify` 의 `.pipeline/auto-classify/DESIGN.md` §4.2 |
+| 맥 NFD 파일명 실분류 | 테스트로는 덮었지만(`classify.test.ts`) **실기가 필요하다** — 맥 팀원이 올린 한글 파일명 1건 |
 | 영문 태그 대소문자 정책 | 한 문서 안에서는 합쳐지는데 필터는 완전일치라 문서 간에는 갈린다 (`DESIGN.md` §4, 의도한 수용) |
 
 ### 파이프라인 부검 (2026-08-24, `f315622`·`256c567`) — 완료
@@ -204,6 +216,10 @@ M4 주행에서 새로 드러난 것 둘. **둘 다 아직 안 고쳤다.**
 
 **2. `impl` 단계의 `npm run build` 권한 거부가 재발했다** (`256c567` 이후에도).
 
+> **원인이 밝혀졌다 (2026-08-26, 3차 주행).** 규칙이 안 듣는 게 아니라 **에이전트가
+> `PowerShell` 도구로 불렀고 allow 는 전부 `Bash(...)` 였다.** 아래 "파이프라인 3차 주행
+> 실측" 절 참조. 고치는 법도 거기 있다 — 아직 안 고쳤다.
+
 `IMPL.md` 가 6가지 경로를 시도했고 전부 거부됐다고 신고했다 — `npm run build`(Bash·
 PowerShell·sandbox 해제), `npx tsc --noEmit`, `./node_modules/.bin/tsc`,
 `node node_modules/typescript/bin/tsc`. `.claude/settings.json` 의 allow 에
@@ -226,6 +242,46 @@ PowerShell·sandbox 해제), `npx tsc --noEmit`, `./node_modules/.bin/tsc`,
 > ($4.72 통과 / $5.08 사망 / $5.27 — $5 였으면 사망) 세 번 중 두 번이 $5 를 넘었다.
 > `BUDGET_VERIFY` 도 같다 — 이번 사망이 그것이다. M3 보다 범위가 넓은 기능에서는
 > 40턴/$5 가 `judge`·`verify` 양쪽에 모자란다.
+
+### 파이프라인 3차 주행 실측 (2026-08-26, `auto-classify`)
+
+**한 번에 완주했다** — 재시도 0회, 게이트 승인 2회(JUDGE·DESIGN), 예산 초과 없음.
+
+| 단계 | 턴 | 비용 | 권한 거부 |
+|---|---|---|---|
+| design | 17 | $4.61 | 0 |
+| judge | 33 | $4.08 | 2 |
+| impl | 54 | $4.18 | 5 |
+| verify | 24 | $4.70 | 1 |
+
+합계 **$17.57**. `BUDGET_*=8`, `TURNS_JUDGE=60 TURNS_VERIFY=50` 으로 돌렸는데
+**넷 다 $5 아래였다** — M4 주행(judge $5.27 · verify $5.12)보다 오히려 쌌다.
+범위가 넓다고 항상 비싼 것은 아니다. **다만 올려 둔 덕에 죽지 않았는지는 알 수 없다** —
+상한에 안 닿았으므로 이 주행은 $5 유지 여부에 대한 증거가 못 된다.
+
+**빌드 게이트를 켜고 돌린 첫 주행이다.** worktree 에 `.env` 복사 + `npm install` +
+`prisma generate` 를 미리 해서 프리플라이트를 녹색으로 만들었다. 검증 명령이
+`npm test, npm run lint, npm run build` 셋이 됐다.
+
+#### 권한 거부 16 → 8, 그런데 원인이 `.claude/settings.json` 에 있다
+
+기준선(`document-detail` 주행)은 design 1 · impl 5 · judge 7 · verify 3 = **16건**이었다.
+이번엔 design 0 · judge 2 · impl 5 · verify 1 = **8건**. 절반이다.
+
+**하지만 남은 8건 중 4건이 `PowerShell(...)` 이다** — `npm run build` 2회(impl),
+`npm test` 2회(judge·verify). `.claude/settings.json` 의 allow 는 **전부 `Bash(...)`** 라
+같은 명령이라도 도구 이름이 다르면 안 걸린다.
+
+**이것이 "결함 2번(`impl` 의 `npm run build` 권한 거부가 재발한다)"의 진짜 원인이다.**
+M4 주행 기록은 "`Bash(npm run build)` 가 있는데도 거부됐다"고 적었는데, 정확히는
+**에이전트가 `PowerShell` 도구로 불렀기 때문**이다. 규칙이 안 듣는 게 아니라 다른
+도구를 막은 것이다. 윈도우 환경이라 에이전트가 PowerShell 을 자연스럽게 고른다.
+
+고치는 법: allow 에 `PowerShell(npm test:*)` · `PowerShell(npm run build:*)` ·
+`PowerShell(npm run lint:*)` 를 나란히 추가한다. **아직 안 했다.**
+
+> 치명적이진 않다 — 판정권은 셸에 있고 `run_verify()` 가 별도로 돌린다. 이번에도
+> 거부된 뒤 다른 도구로 재시도해 결국 돌았다. 하지만 **거부 한 건이 턴을 태운다.**
 
 ### 배포 성능 실측 (2026-08-25) — 리전 조치 완료
 
@@ -624,6 +680,9 @@ src/
     page-error.ts             `?error=` 화이트리스트 (임의 문장은 배너로 안 뜬다)
     request-kind.ts           내비게이션 요청 판별 — JSON 대신 배너로 돌려보낼지 가른다
     utils.ts                  shadcn 의 cn() — clsx + tailwind-merge
+    classify.ts               파일명 → 폴더 판정. 정규화(NFC·소문자·문자/숫자만) ·
+                              노이즈 제거(버전·날짜·중복접미사·숫자prefix) · 점수(키 길이)
+    classify-plan.ts          목적지 계획 · 폴더 선생성 · 빈 폴더 정리 (의존성 주입)
   generated/prisma            Prisma 산출물 (gitignore, postinstall로 자동 생성)
   proxy.ts                    구 middleware.ts
 
@@ -693,9 +752,19 @@ UI 작업은 터널 없이도 진행할 수 있다.
 > - **`vercel.json` 의 `regions`** — 대시보드보다 파일이 우선이다 (`icn1` 서울)
 > - **커밋 작성자가 `pro047` 이어야 한다** — 아니면 배포가 블락된다 (아래 "지뢰" 절)
 
-0. **UI 정비 브라우저 실측** (2026-08-26 추가). shadcn 전환은 `build` 만 통과했고 클릭해
-   본 적이 없다. **M5 에 손대기 전에 이걸 먼저 본다** — M5 가 같은 화면을 또 건드리므로,
-   깨진 채로 쌓으면 어느 쪽이 깼는지 못 가른다. 위 "미검증" 표의 마지막 줄이 목록이다.
+0. **브라우저 실측 — 자동 분류 + UI 정비를 한 번에.** 둘 다 같은 화면(업로드 다이얼로그·
+   폴더 트리)이라 따로 볼 이유가 없다. **M5 에 손대기 전에 먼저 본다** — M5 가 또 같은
+   화면을 건드리므로 깨진 채로 쌓으면 어느 쪽이 깼는지 못 가른다.
+   - 자동 분류 9종: `feature/auto-classify` worktree 의 `.pipeline/auto-classify/DESIGN.md` §4.2.
+     핵심은 기준선 7건 드롭 → 미리보기 3그룹·근거 줄 / "만들지 않음" 체크 / 미리보기에서
+     닫으면 폴더 0·문서 0 / 업로드 직후 취소 시 빈 폴더만 삭제 / 별칭 `와이어프레임` 실증
+   - UI 정비: 토스트 7곳 · AlertDialog 3곳 · Dialog 폼 2곳 · 업로드 폴더 셀렉트
+   - **`dev` 브랜치를 보므로 마음껏 해도 팀 문서에 안 닿는다** (2026-08-26 분리)
+   - 통과하면 `main` 머지 → 푸시 → 배포. **스키마는 이미 운영에 있어 추가 작업 없다**
+
+0-1. **`.claude/settings.json` 에 `PowerShell(...)` 규칙 추가.** allow 가 전부 `Bash(...)` 라
+   에이전트가 PowerShell 로 부르면 안 걸린다 — 3차 주행 권한 거부 8건 중 4건이 이것이다.
+   근거는 위 "파이프라인 3차 주행 실측".
 
 1. ~~**`DISCORD_WEBHOOK_URL` 을 채워 재배포.**~~ **끝났다** (2026-08-26). 지금도 업로드할
    때마다 알림이 온다. **M5 의 알림 항목이 이걸로 닫혔다** — M5 에 남은 것은 미리보기뿐이다.
@@ -746,8 +815,9 @@ UI 작업은 터널 없이도 진행할 수 있다.
 `mv <파일>.crashed <파일>` 하고 재실행한다 — **mv 라는 사람의 행위 자체가 승인이다**
 (design·judge 는 재사용 로직이 집고, impl·verify 는 단계가 다시 돈다).
 
-**아직 측정 안 된 것**: `.claude/settings.json` 의 권한 규칙이 실제로 거부를 줄이는지.
-기준선은 `document-detail` 주행의 `permission_denials` 실측 — design 1 · impl 5 · judge 7 ·
-verify 3 = 16건, 전부 Bash. 그중 7건이 검증 명령(`npm test` 3 · `npm run lint` 2 ·
-`npx tsc` 1 · `npx vitest` 1)이었고 verify 는 세 번 다 거부돼 테스트를 한 번도 못 돌렸다.
-**다음 주행 스트림에서 이 숫자를 다시 세고 여기 적을 것.**
+**측정했다 (2026-08-26, `auto-classify` 주행).** 기준선(`document-detail`)은 design 1 ·
+impl 5 · judge 7 · verify 3 = **16건**이었고, 이번엔 design 0 · judge 2 · impl 5 ·
+verify 1 = **8건**으로 절반이 됐다. **규칙은 듣는다.**
+
+**다만 남은 8건 중 4건은 규칙으로 막을 수 없는 것이었다** — 에이전트가 `PowerShell`
+도구로 불렀는데 allow 가 전부 `Bash(...)` 다. 상세와 조치는 "파이프라인 3차 주행 실측" 절.
