@@ -712,7 +712,10 @@ src/
                               document-folder-select(문서 이동) · tag-editor
     ui/                       shadcn/ui 산출물. **손으로 고친 자리가 있다** —
                               sonner.tsx 의 useTheme 을 걷고 theme 을 light 로 고정했다
-                              (ThemeProvider 가 없어 OS 다크에서 토스트만 검게 뜬다)
+                              (ThemeProvider 가 없어 OS 다크에서 토스트만 검게 뜬다).
+                              **select.tsx 는 받아만 두고 안 붙였다(사용처 0곳).**
+                              <select> 3곳은 네이티브 그대로 — 모바일 OS 피커와
+                              키보드 조작이 공짜라 바꾸면 그걸 잃는다
   lib/
     env.ts                    zod로 환경변수 검증. 누락 시 부팅 실패
     prisma.ts                 PrismaPg 어댑터(max:5) + HMR 커넥션 누수 방지 싱글턴
