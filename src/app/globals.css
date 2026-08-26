@@ -66,10 +66,21 @@ body {
   --color-chart-1: var(--chart-1);
   --color-ring: var(--ring);
   --color-input: var(--input);
-  --color-border: var(--border);
   --color-destructive: var(--destructive);
   --color-accent-foreground: var(--accent-foreground);
-  --color-accent: var(--accent);
+  /* shadcn 이 여기에 `--color-border: var(--border)` 와 `--color-accent: var(--accent)` 도
+     넣는다. 둘 다 지웠다 — 위 @theme 이 이미 같은 이름을 쓰고 있어서 뜻이 갈린다.
+
+     --color-border: :root 가 `--border: var(--color-border)` 라 서로를 가리켜 **순환**이
+       된다. 순환 var 은 무효값이라 `border-border` 가 currentColor 로 떨어지고
+       @layer base 의 `* { @apply border-border }` 때문에 **화면 전체 테두리가 잉크색**이 된다.
+     --color-accent: 두 시스템이 이 이름을 정반대로 쓴다. shadcn 은 "연한 hover 배경",
+       이 프로젝트는 "주 액션색(검정)"이다. 덮이면 `--primary: var(--color-accent)` 까지
+       #f5f5f5 가 돼 **버튼이 흰 배경에 흰 글씨**가 된다.
+
+     그래서 이름은 @theme 것이 이긴다. shadcn 쪽 의미가 필요한 자리(select.tsx)는
+     값이 똑같은 secondary 로 옮겼다. **`shadcn add` 로 컴포넌트를 새로 받으면 이 두 줄이
+     다시 들어오고 `bg-accent` 를 쓰는 코드도 딸려 온다 — 받을 때마다 확인할 것.** */
   --color-muted-foreground: var(--muted-foreground);
   --color-muted: var(--muted);
   --color-secondary-foreground: var(--secondary-foreground);
