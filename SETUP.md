@@ -202,6 +202,11 @@ DATABASE_URL="<운영의 direct URL>" npx prisma db push
 `prisma migrate` 를 도입하면 이 절차가 자동화되지만 7명 규모에 범위를 넓히는 일이라
 지금은 안 한다. 두 번 미는 것으로 충분하다.
 
+> **`Folder.aliases` 는 두 브랜치에 다 들어가 있다** (2026-08-26 확인). 분리하기 **전에**
+> 운영으로 한 번 밀렸고 dev 는 그 이후 복제라 양쪽이 같다. 무해한 변경이었지만
+> (`String[] @default([])` — 기존 15건에 영향 없음) **이것이 분리한 이유 그 자체다.**
+> 스키마 푸시가 팀이 쓰는 DB 에 닿았고, 이번엔 마침 안전한 변경이었을 뿐이다.
+
 ## 2. 디스코드 OAuth 앱 — 5분
 
 1. https://discord.com/developers/applications → `New Application` (이름: DMS)
