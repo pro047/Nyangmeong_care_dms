@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Files, Trash2 } from 'lucide-react'
 import { FolderTree } from '@/components/folder-tree'
-import type { FolderRow } from '@/lib/folder'
+import type { FolderAliasRow } from '@/lib/folder'
 
 const NAV = [
   { href: '/', label: '전체 문서', icon: Files },
@@ -12,7 +12,7 @@ const NAV = [
 ]
 
 /** folders 가 null 이면 레이아웃의 폴더 조회가 실패한 것이다 (layout.tsx 의 try/catch). */
-export function AppSidebar({ folders }: { folders: FolderRow[] | null }) {
+export function AppSidebar({ folders }: { folders: FolderAliasRow[] | null }) {
   const pathname = usePathname()
 
   return (

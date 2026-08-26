@@ -97,6 +97,26 @@ describe('PATCH /api/folders/[id]', () => {
     expect(res.status).toBe(200)
     expect(await res.json()).toEqual({ id: 'folder_1' })
   })
+
+  it('aliases 를 안 보내면 update data 에 aliases 키가 없어야 한다 (별칭 불변)', async () => {
+    // 이름만 바꾸던 기존 호출이 별칭을 지우면 안 된다.
+    await PATCH(patch({ name: '새 이름' }), PARAMS)
+
+    expect(update.mock.calls[0][0].data).toEqual({ name: '새 이름' })
+  })
+
+  it('aliases 를 보내면 정규화되어 update data 에 들어가야 한다', async () => {
+    const res = await PATCH(
+      patch({ name: '화면설계서', aliases: [' 와이어프레임 ', ''] }),
+      PARAMS,
+    )
+
+    expect(update.mock.calls[0][0].data).toEqual({
+      name: '화면설계서',
+      aliases: ['와이어프레임'],
+    })
+    expect(res.status).toBe(200)
+  })
 })
 
 describe('DELETE /api/folders/[id]', () => {

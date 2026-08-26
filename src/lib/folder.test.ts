@@ -7,6 +7,9 @@ import {
   folderPatchSchema,
   FOLDER_NAME_CONFLICT,
   FOLDER_NOT_FOUND,
+  MAX_ALIAS_LENGTH,
+  MAX_ALIASES_PER_FOLDER,
+  normalizeAliases,
   PARENT_FOLDER_NOT_FOUND,
   type FolderRow,
 } from '@/lib/folder'
@@ -97,6 +100,74 @@ describe('folderPatchSchema', () => {
     expect(folderPatchSchema.parse({ name: ' 새 이름 ' }).name).toBe('새 이름')
     expect(folderPatchSchema.safeParse({ name: '  ' }).success).toBe(false)
     expect(folderPatchSchema.safeParse({ name: 'a'.repeat(101) }).success).toBe(false)
+  })
+})
+
+describe('normalizeAliases', () => {
+  it('앞뒤 공백을 자르고 빈 항목을 버려야 한다', () => {
+    expect(normalizeAliases([' 와이어프레임 ', '', '   ', 'WF'])).toEqual(['와이어프레임', 'WF'])
+  })
+
+  it('대소문자 무시 중복은 먼저 온 표기를 남겨야 한다', () => {
+    expect(normalizeAliases(['Wireframe', 'wireframe', 'WIREFRAME', '기획'])).toEqual([
+      'Wireframe',
+      '기획',
+    ])
+  })
+})
+
+describe('folderCreateSchema — aliases', () => {
+  it('생략하면 undefined 여야 한다', () => {
+    expect(folderCreateSchema.parse({ name: '화면설계서' }).aliases).toBeUndefined()
+  })
+
+  it('보내면 정규화되어 통과해야 한다', () => {
+    const parsed = folderCreateSchema.parse({
+      name: '화면설계서',
+      aliases: [' 와이어프레임 ', '와이어프레임', 'WF'],
+    })
+    expect(parsed.aliases).toEqual(['와이어프레임', 'WF'])
+  })
+
+  it('11개는 거부하고 10개는 통과해야 한다', () => {
+    const eleven = Array.from({ length: MAX_ALIASES_PER_FOLDER + 1 }, (_, i) => `별칭${i}`)
+    expect(folderCreateSchema.safeParse({ name: '기획', aliases: eleven }).success).toBe(false)
+    expect(
+      folderCreateSchema.safeParse({ name: '기획', aliases: eleven.slice(0, 10) }).success,
+    ).toBe(true)
+  })
+
+  it('31자는 거부하고 30자는 통과해야 한다', () => {
+    expect(
+      folderCreateSchema.safeParse({ name: '기획', aliases: ['a'.repeat(MAX_ALIAS_LENGTH + 1)] })
+        .success,
+    ).toBe(false)
+    expect(
+      folderCreateSchema.safeParse({ name: '기획', aliases: ['a'.repeat(MAX_ALIAS_LENGTH)] })
+        .success,
+    ).toBe(true)
+  })
+
+  it('개수 검사는 정규화 뒤에 해야 한다 — 중복 때문에 11개가 된 요청은 통과', () => {
+    const raw = [...Array.from({ length: 10 }, (_, i) => `별칭${i}`), ' 별칭0 ']
+    expect(raw).toHaveLength(11)
+    const parsed = folderCreateSchema.parse({ name: '기획', aliases: raw })
+    expect(parsed.aliases).toHaveLength(10)
+  })
+})
+
+describe('folderPatchSchema — aliases', () => {
+  it('생략하면 undefined 여야 한다 (별칭을 건드리지 않는다는 의미)', () => {
+    expect(folderPatchSchema.parse({ name: '새 이름' }).aliases).toBeUndefined()
+  })
+
+  it('보내면 정규화되어 통과하고, 11개는 거부해야 한다', () => {
+    expect(
+      folderPatchSchema.parse({ name: '새 이름', aliases: [' 와이어프레임 '] }).aliases,
+    ).toEqual(['와이어프레임'])
+
+    const eleven = Array.from({ length: MAX_ALIASES_PER_FOLDER + 1 }, (_, i) => `별칭${i}`)
+    expect(folderPatchSchema.safeParse({ name: '새 이름', aliases: eleven }).success).toBe(false)
   })
 })
 

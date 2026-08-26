@@ -18,6 +18,8 @@ export async function POST(req: NextRequest) {
 
   const { name } = parsed.data
   const parentId = parsed.data.parentId ?? null
+  // 안 보냈으면 아예 넘기지 않는다 — 스키마의 @default([]) 가 빈 배열을 넣는다.
+  const { aliases } = parsed.data
 
   // @@unique([parentId, name]) 는 parentId 가 null 인 최상위 폴더끼리는 못 막는다
   // (Postgres 는 NULL 끼리 서로 다른 값으로 본다). 루트 중복을 막는 것은 이 사전 확인뿐이다.
@@ -29,7 +31,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const folder = await prisma.folder.create({
-      data: { name, parentId },
+      data: aliases === undefined ? { name, parentId } : { name, parentId, aliases },
       select: { id: true, name: true },
     })
     return NextResponse.json(folder, { status: 201 })

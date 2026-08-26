@@ -4,7 +4,14 @@ import Link from 'next/link'
 import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Folder, FolderPlus, Pencil, Trash2 } from 'lucide-react'
-import { buildFolderTree, type FolderNode, type FolderRow } from '@/lib/folder'
+import {
+  buildFolderTree,
+  normalizeAliases,
+  MAX_ALIASES_PER_FOLDER,
+  MAX_ALIAS_LENGTH,
+  type FolderAliasRow,
+  type FolderNode,
+} from '@/lib/folder'
 import { toast } from 'sonner'
 import {
   AlertDialog,
@@ -39,17 +46,24 @@ async function errorMessage(res: Response, fallback: string) {
   return body?.error ?? fallback
 }
 
-export function FolderTree({ folders }: { folders: FolderRow[] }) {
+function sameAliases(a: string[], b: string[]) {
+  return a.length === b.length && a.every((alias, i) => alias === b[i])
+}
+
+export function FolderTree({ folders }: { folders: FolderAliasRow[] }) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [busy, setBusy] = useState(false)
   const [nameDialog, setNameDialog] = useState<NameDialog | null>(null)
   const [name, setName] = useState('')
+  const [aliasText, setAliasText] = useState('')
   const [deleting, setDeleting] = useState<FolderNode | null>(null)
 
   // (app) 전 구간이 force-dynamic 이라 Suspense 경계 없이도 서버 렌더에서 값이 온다.
   const activeId = searchParams.get('folder')
   const tree = buildFolderTree(folders)
+  // FolderNode 는 별칭을 안 들고 있다 — 이름변경 창을 채울 때만 원시 행에서 찾는다.
+  const aliasesById = new Map(folders.map((folder) => [folder.id, folder.aliases]))
 
   /** 성공 여부를 돌려준다 — 호출부가 입력 창을 닫을지 남길지 정한다. */
   const send = async (fallback: string, request: () => Promise<Response>) => {
@@ -71,11 +85,13 @@ export function FolderTree({ folders }: { folders: FolderRow[] }) {
   const openCreate = (parentId: string | null) => {
     setNameDialog({ mode: 'create', parentId })
     setName('')
+    setAliasText('')
   }
 
   const openRename = (folder: FolderNode) => {
     setNameDialog({ mode: 'rename', folder })
     setName(folder.name)
+    setAliasText((aliasesById.get(folder.id) ?? []).join(', '))
   }
 
   // 생성과 이름변경은 입력이 같아서 창 하나를 돌려 쓴다. 노드마다 Dialog 를 두면
@@ -86,8 +102,25 @@ export function FolderTree({ folders }: { folders: FolderRow[] }) {
 
     const trimmed = name.trim()
     if (trimmed === '') return
-    // 이름이 그대로면 요청을 아낀다. 서버는 같은 이름도 성공으로 처리한다.
-    if (nameDialog.mode === 'rename' && trimmed === nameDialog.folder.name) {
+
+    // 서버가 400 으로 튕기면 "요청 형식이 올바르지 않습니다"밖에 못 보여준다. 어느 규칙을
+    // 어겼는지는 여기서만 알 수 있으므로 보내기 전에 본다.
+    const aliases = normalizeAliases(aliasText.split(','))
+    if (aliases.length > MAX_ALIASES_PER_FOLDER) {
+      toast.error(`별칭은 최대 ${MAX_ALIASES_PER_FOLDER}개까지 넣을 수 있습니다.`)
+      return
+    }
+    if (aliases.some((alias) => alias.length > MAX_ALIAS_LENGTH)) {
+      toast.error(`별칭 하나는 최대 ${MAX_ALIAS_LENGTH}자입니다.`)
+      return
+    }
+
+    // 이름도 별칭도 그대로면 요청을 아낀다. 서버는 같은 이름도 성공으로 처리한다.
+    if (
+      nameDialog.mode === 'rename' &&
+      trimmed === nameDialog.folder.name &&
+      sameAliases(aliasesById.get(nameDialog.folder.id) ?? [], aliases)
+    ) {
       setNameDialog(null)
       return
     }
@@ -100,15 +133,15 @@ export function FolderTree({ folders }: { folders: FolderRow[] }) {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(
                 nameDialog.parentId === null
-                  ? { name: trimmed }
-                  : { name: trimmed, parentId: nameDialog.parentId },
+                  ? { name: trimmed, aliases }
+                  : { name: trimmed, parentId: nameDialog.parentId, aliases },
               ),
             })
         : () =>
             fetch(`/api/folders/${nameDialog.folder.id}`, {
               method: 'PATCH',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ name: trimmed }),
+              body: JSON.stringify({ name: trimmed, aliases }),
             })
 
     const fallback =
@@ -236,8 +269,28 @@ export function FolderTree({ folders }: { folders: FolderRow[] }) {
               onChange={(e) => setName(e.target.value)}
               placeholder="폴더 이름"
               aria-label="폴더 이름"
-              className="my-4 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink outline-none focus:border-accent"
+              className="mt-4 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink outline-none focus:border-accent"
             />
+
+            <div className="mt-3 mb-4">
+              <label htmlFor="folder-aliases" className="text-xs font-medium text-ink">
+                별칭 (선택)
+              </label>
+              <input
+                id="folder-aliases"
+                value={aliasText}
+                onChange={(e) => setAliasText(e.target.value)}
+                placeholder="와이어프레임, 프로토타입"
+                className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink outline-none focus:border-accent"
+              />
+              {/* 별칭은 "이름이 다른데 같은 것"만 위한 것이다. 공백·밑줄 같은 표기 차이는
+                  업로드 분류가 정규화로 이미 흡수하므로 넣어도 얻는 게 없다. */}
+              <p className="mt-1.5 text-xs leading-relaxed text-ink-muted">
+                업로드 자동 분류에 쓰입니다. 쉼표로 구분하고, 최대 {MAX_ALIASES_PER_FOLDER}개 ·
+                하나당 {MAX_ALIAS_LENGTH}자. 공백이나 밑줄 같은 표기 차이는 자동으로 맞추므로
+                넣지 않아도 됩니다.
+              </p>
+            </div>
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setNameDialog(null)}>

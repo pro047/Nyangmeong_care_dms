@@ -1,11 +1,23 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Upload, X, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react'
+import { toast } from 'sonner'
 import { formatBytes } from '@/lib/format'
 import { runUploadFlow, type UploadBatch } from '@/lib/upload-flow'
 import { putToS3 } from '@/lib/upload-xhr'
+import { buildFolderTree, flattenFolderTree, type FolderAliasRow } from '@/lib/folder'
+import { classifyFileName, type ClassifyResult } from '@/lib/classify'
+import {
+  createPlannedFolders,
+  defaultDestination,
+  emptyCreatedFolders,
+  plannedFolderNames,
+  resolveDestination,
+  type Destination,
+  type FolderCreateOutcome,
+} from '@/lib/classify-plan'
 
 type ItemStatus = 'pending' | 'uploading' | 'done' | 'error'
 
@@ -15,9 +27,19 @@ type Item = {
   status: ItemStatus
   progress: number
   error?: string
+  /** 자동 분류 모드에서만 채운다. */
+  result?: ClassifyResult
+  dest?: Destination
+  /** 개별 셀렉트로 직접 고른 건은 "만들지 않음" 체크가 덮지 않는다. */
+  destTouched?: boolean
 }
 
 const MAX_PARALLEL = 3
+
+/** 모드 셀렉트의 값. 폴더 id 와도 미분류('')와도 겹치지 않아야 한다. */
+const AUTO = '__auto__'
+/** 목적지 셀렉트에서 "새 폴더"를 고른 값. */
+const NEW_FOLDER = '__new__'
 
 function titleFromFileName(fileName: string) {
   const dot = fileName.lastIndexOf('.')
@@ -31,16 +53,21 @@ async function errorMessage(res: Response, fallback: string) {
 
 export function UploadDialog({
   defaultFolderId,
-  folderOptions,
+  folders,
 }: {
   defaultFolderId: string | null
-  folderOptions: { id: string; name: string; depth: number }[]
+  folders: FolderAliasRow[]
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [items, setItems] = useState<Item[]>([])
-  // '' 는 미분류. 지금 열어 둔 폴더가 기본값이고 모달 안에서 바꿀 수 있다.
-  const [folderId, setFolderId] = useState(defaultFolderId ?? '')
+  // AUTO 는 자동 분류, '' 는 미분류. 지금 열어 둔 폴더가 있으면 그것이 기본값이다.
+  const [mode, setMode] = useState(defaultFolderId ?? AUTO)
+  // 미리보기에서 "새 폴더 생성"을 통째로 끈 상태.
+  const [skipNew, setSkipNew] = useState(false)
+  // 자동 모드에서 업로드 시작 버튼을 눌렀는지. 누르기 전까지는 아무것도 만들지 않는다.
+  const [started, setStarted] = useState(false)
+  const [preparing, setPreparing] = useState(false)
   const [dragging, setDragging] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   // 진행 중인 PUT. 모달을 닫을 때 전부 abort 한다.
@@ -49,15 +76,22 @@ export function UploadDialog({
   // 아직 시작도 안 한 대기 파일을 못 막는다. 배치 단위로 "그만둔다"를 표시한다.
   const batches = useRef(new Set<UploadBatch>())
 
-  const uploading = items.some((i) => i.status === 'uploading' || i.status === 'pending')
-  const finished = items.length > 0 && !uploading
+  const folderOptions = useMemo(() => flattenFolderTree(buildFolderTree(folders)), [folders])
+
+  // 폴더가 하나도 없으면 자동 모드는 조용히 미분류 업로드로 동작한다 (사양).
+  const autoPreview = mode === AUTO && folders.length > 0
+  const previewing = autoPreview && !started && items.length > 0
+
+  const uploading =
+    !previewing && items.some((i) => i.status === 'uploading' || i.status === 'pending')
+  const finished = !previewing && items.length > 0 && !uploading
 
   const update = useCallback((id: string, patch: Partial<Item>) => {
     setItems((prev) => prev.map((i) => (i.id === id ? { ...i, ...patch } : i)))
   }, [])
 
   const uploadOne = useCallback(
-    async (item: Item, batch: UploadBatch) => {
+    async (item: Item, batch: UploadBatch, folderId: string | null) => {
       const { file } = item
       const contentType = file.type || 'application/octet-stream'
       update(item.id, { status: 'uploading', progress: 0 })
@@ -88,7 +122,7 @@ export function UploadDialog({
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               title: titleFromFileName(file.name),
-              // 서버 스키마는 처음부터 folderId 를 받았다. '' 는 미분류라 키 자체를 뺀다.
+              // 서버 스키마는 처음부터 folderId 를 받았다. 미분류는 키 자체를 뺀다.
               ...(folderId ? { folderId } : {}),
               s3Key: key,
               keyToken,
@@ -103,39 +137,140 @@ export function UploadDialog({
       // cancelled 면 아무것도 하지 않는다 — close() 가 목록을 비운다.
       if (outcome.kind === 'done') update(item.id, { status: 'done', progress: 100 })
       if (outcome.kind === 'error') update(item.id, { status: 'error', error: outcome.message })
+
+      return outcome
     },
-    [update, folderId],
+    [update],
   )
 
-  const addFiles = useCallback(
-    (fileList: FileList | null) => {
-      if (!fileList?.length) return
-      const added: Item[] = Array.from(fileList).map((file) => ({
-        id: crypto.randomUUID(),
-        file,
-        status: 'pending',
-        progress: 0,
-      }))
-      setItems((prev) => [...prev, ...added])
+  /** 문서가 하나도 안 들어간 자동 생성 폴더를 지운다. 취소도 전건 실패도 이 규칙 하나로 덮인다. */
+  const cleanupCreatedFolders = useCallback(
+    async (createdIds: string[], usedFolderIds: string[]) => {
+      for (const id of emptyCreatedFolders(createdIds, usedFolderIds)) {
+        await fetch(`/api/folders/${id}`, { method: 'DELETE' }).catch(() => null)
+      }
+      router.refresh()
+    },
+    [router],
+  )
 
-      // 동시 업로드 수를 제한해 브라우저 커넥션과 S3 요청이 몰리지 않게 한다.
-      const batch = { cancelled: false }
-      batches.current.add(batch)
+  const runBatch = useCallback(
+    (batch: UploadBatch, jobs: { item: Item; folderId: string | null }[], createdIds: string[]) => {
+      // 문서가 실제로 들어간 폴더. React state 가 아니라 이 클로저에 둬야 한다 —
+      // close() 가 items 를 비운 뒤에도 settle 시점에 정확한 수가 필요하다.
+      const usedFolderIds: string[] = []
 
       let cursor = 0
       const worker = async () => {
         // 취소되면 남은 파일은 시작조차 하지 않는다. 예전엔 모달을 닫아도
         // 대기 중이던 파일들이 계속 올라갔다.
-        while (!batch.cancelled && cursor < added.length) {
-          await uploadOne(added[cursor++], batch)
+        while (!batch.cancelled && cursor < jobs.length) {
+          const job = jobs[cursor++]
+          const outcome = await uploadOne(job.item, batch, job.folderId)
+          if (outcome.kind === 'done' && job.folderId) usedFolderIds.push(job.folderId)
         }
       }
       void Promise.all(Array.from({ length: MAX_PARALLEL }, worker)).finally(() => {
         batches.current.delete(batch)
+        if (createdIds.length > 0) void cleanupCreatedFolders(createdIds, usedFolderIds)
       })
     },
-    [uploadOne],
+    [uploadOne, cleanupCreatedFolders],
   )
+
+  const addFiles = useCallback(
+    (fileList: FileList | null) => {
+      if (!fileList?.length) return
+
+      const added: Item[] = Array.from(fileList).map((file) => {
+        const result = autoPreview ? classifyFileName(file.name, folders) : undefined
+        return {
+          id: crypto.randomUUID(),
+          file,
+          status: 'pending' as const,
+          progress: 0,
+          result,
+          dest: result ? defaultDestination(result) : undefined,
+        }
+      })
+      setItems((prev) => [...prev, ...added])
+
+      // 자동 모드는 여기서 올리지 않는다. 조용히 배정하지 않는 것이 이 기능의 전제라
+      // 사람이 미리보기를 확인하고 시작 버튼을 눌러야 시작한다.
+      if (autoPreview) return
+
+      // 동시 업로드 수를 제한해 브라우저 커넥션과 S3 요청이 몰리지 않게 한다.
+      const batch: UploadBatch = { cancelled: false }
+      batches.current.add(batch)
+      const folderId = mode === AUTO || mode === '' ? null : mode
+      runBatch(
+        batch,
+        added.map((item) => ({ item, folderId })),
+        [],
+      )
+    },
+    [autoPreview, folders, mode, runBatch],
+  )
+
+  /** 화면에 보이는 목적지. "만들지 않음"은 직접 고르지 않은 제안 건에만 걸린다. */
+  const effectiveDest = useCallback(
+    (item: Item): Destination => {
+      if (!item.dest) return { kind: 'none' }
+      if (skipNew && item.dest.kind === 'new' && !item.destTouched) return { kind: 'none' }
+      return item.dest
+    },
+    [skipNew],
+  )
+
+  const createFolder = useCallback(async (name: string): Promise<FolderCreateOutcome> => {
+    const res = await fetch('/api/folders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      // 파일명에 상위 폴더를 추론할 신호가 없다. 자동 생성은 전부 루트이고 별칭도 없다.
+      body: JSON.stringify({ name }),
+    })
+    if (res.ok) {
+      const body = (await res.json()) as { id: string }
+      return { ok: true, id: body.id }
+    }
+    return { ok: false, conflict: res.status === 409 }
+  }, [])
+
+  const startAuto = useCallback(async () => {
+    // 확정 시점의 목록을 붙잡아 둔다. 시작 뒤 화면이 바뀌어도 보낼 것은 이것이다.
+    const jobItems = items
+    const dests = jobItems.map(effectiveDest)
+
+    setStarted(true)
+    setPreparing(true)
+
+    // 폴더 생성 중에 닫힐 수 있으므로 배치를 먼저 등록한다.
+    const batch: UploadBatch = { cancelled: false }
+    batches.current.add(batch)
+
+    const names = plannedFolderNames(dests)
+    const created = await createPlannedFolders(names, createFolder)
+    const createdIds = Array.from(created.values()).filter((id): id is string => id !== null)
+    setPreparing(false)
+
+    if (batch.cancelled) {
+      batches.current.delete(batch)
+      // 방금 만든 폴더에는 아직 아무것도 안 들어갔다.
+      if (createdIds.length > 0) void cleanupCreatedFolders(createdIds, [])
+      return
+    }
+
+    const missing = names.length - createdIds.length
+    if (missing > 0) {
+      toast.error(`새 폴더 ${missing}개를 만들지 못했습니다. 해당 문서는 미분류로 올립니다.`)
+    }
+
+    runBatch(
+      batch,
+      jobItems.map((item, i) => ({ item, folderId: resolveDestination(dests[i], created) })),
+      createdIds,
+    )
+  }, [items, effectiveDest, createFolder, cleanupCreatedFolders, runBatch])
 
   const close = useCallback(() => {
     // 예전엔 uploading 이면 그냥 return 해서 탈출구가 없었다. PUT 이 응답 없이 멈추면
@@ -151,8 +286,11 @@ export function UploadDialog({
 
     setOpen(false)
     setItems([])
+    setStarted(false)
+    setSkipNew(false)
+    setPreparing(false)
     // 다음에 열 때는 지금 보고 있는 폴더가 다시 기본값이어야 한다.
-    setFolderId(defaultFolderId ?? '')
+    setMode(defaultFolderId ?? AUTO)
     // 취소했더라도 그 전에 끝난 것이 있으면 목록에 반영해야 한다.
     router.refresh()
   }, [uploading, router, defaultFolderId])
@@ -168,6 +306,68 @@ export function UploadDialog({
 
   const doneCount = items.filter((i) => i.status === 'done').length
   const errorCount = items.filter((i) => i.status === 'error').length
+
+  const rows = previewing ? items.map((item) => ({ item, dest: effectiveDest(item) })) : []
+  const toFolder = rows.filter((r) => r.dest.kind === 'folder')
+  const toNew = rows.filter((r) => r.dest.kind === 'new')
+  const toNone = rows.filter((r) => r.dest.kind === 'none')
+  const hasProposal = items.some((i) => i.result?.kind === 'propose')
+
+  const changeDest = (item: Item, value: string) => {
+    const proposed = item.result?.kind === 'propose' ? item.result.proposedName : null
+    const dest: Destination =
+      value === NEW_FOLDER && proposed !== null
+        ? { kind: 'new', name: proposed }
+        : value === ''
+          ? { kind: 'none' }
+          : { kind: 'folder', folderId: value }
+    update(item.id, { dest, destTouched: true })
+  }
+
+  const destValue = (dest: Destination) =>
+    dest.kind === 'new' ? NEW_FOLDER : dest.kind === 'folder' ? dest.folderId : ''
+
+  const renderPreviewGroup = (
+    title: string,
+    group: { item: Item; dest: Destination }[],
+    extra?: React.ReactNode,
+  ) => (
+    <section className="mt-4">
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-xs font-medium text-ink">
+          {title} <span className="text-ink-muted">{group.length}건</span>
+        </h3>
+        {extra}
+      </div>
+      {group.length > 0 && (
+        <ul className="mt-2 space-y-2">
+          {group.map(({ item, dest }) => (
+            <li key={item.id} className="rounded-lg border border-border px-3.5 py-2.5">
+              <p className="truncate-cell text-sm text-ink">{item.file.name}</p>
+              <p className="mt-0.5 text-xs text-ink-muted">{item.result?.reason}</p>
+              <select
+                value={destValue(dest)}
+                aria-label={`${item.file.name} 저장할 폴더`}
+                onChange={(e) => changeDest(item, e.target.value)}
+                className="mt-2 w-full rounded-lg border border-border bg-surface py-1.5 pr-8 pl-2.5 text-xs text-ink outline-none focus:border-accent"
+              >
+                {item.result?.kind === 'propose' && (
+                  <option value={NEW_FOLDER}>새 폴더 &lsquo;{item.result.proposedName}&rsquo;</option>
+                )}
+                <option value="">— (미분류)</option>
+                {folderOptions.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {'　'.repeat(option.depth)}
+                    {option.name}
+                  </option>
+                ))}
+              </select>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  )
 
   return (
     <>
@@ -208,20 +408,22 @@ export function UploadDialog({
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto p-5">
-              {/* 조용히 배정하면 "왜 여기 올라갔지"가 된다. 올라갈 곳을 보여주고 고르게 한다.
-                  파일을 담은 뒤에는 잠근다 — 이미 올라간 건이 따라 옮겨지지 않아 한 배치가
-                  두 폴더로 갈라진다. 바꾸려면 닫고 다시 연다. */}
+              {/* 조용히 배정하면 "왜 여기 올라갔지"가 된다. 자동 분류에서는 미리보기가 그
+                  역할을 이어받는다. 파일을 담은 뒤에 잠그는 이유는 바뀌었다 — 이제
+                  "한 배치 한 폴더" 보호가 아니라, 배치의 분류 방식이 담는 순간 정해지기
+                  때문이다. 바꾸려면 닫고 다시 연다. */}
               <div className="mb-3">
                 <label htmlFor="upload-folder" className="text-xs font-medium text-ink">
                   저장할 폴더
                 </label>
                 <select
                   id="upload-folder"
-                  value={folderId}
+                  value={mode}
                   disabled={items.length > 0}
-                  onChange={(e) => setFolderId(e.target.value)}
+                  onChange={(e) => setMode(e.target.value)}
                   className="mt-1 w-full rounded-lg border border-border bg-surface py-2 pr-8 pl-3 text-sm text-ink outline-none focus:border-accent disabled:opacity-60"
                 >
+                  <option value={AUTO}>자동 분류 (파일명으로 정함)</option>
                   <option value="">— (미분류)</option>
                   {folderOptions.map((option) => (
                     <option key={option.id} value={option.id}>
@@ -231,44 +433,74 @@ export function UploadDialog({
                     </option>
                   ))}
                 </select>
+                {mode === AUTO && folders.length === 0 && (
+                  <p className="mt-1.5 text-xs text-ink-muted">
+                    폴더가 없어 전부 미분류로 올라갑니다.
+                  </p>
+                )}
               </div>
 
-              <div
-                onDragOver={(e) => {
-                  e.preventDefault()
-                  setDragging(true)
-                }}
-                onDragLeave={() => setDragging(false)}
-                onDrop={(e) => {
-                  e.preventDefault()
-                  setDragging(false)
-                  addFiles(e.dataTransfer.files)
-                }}
-                onClick={() => inputRef.current?.click()}
-                className={`cursor-pointer rounded-xl border-2 border-dashed px-6 py-8 text-center transition-colors ${
-                  dragging
-                    ? 'border-accent bg-accent-soft'
-                    : 'border-border-strong hover:border-accent hover:bg-canvas'
-                }`}
-              >
-                <Upload className="mx-auto mb-2 h-6 w-6 text-ink-subtle" aria-hidden />
-                <p className="text-sm font-medium text-ink">파일을 끌어다 놓거나 클릭해서 선택</p>
-                <p className="mt-1 text-xs text-ink-muted">
-                  여러 개를 한 번에 올릴 수 있습니다 · 파일당 최대 100MB
-                </p>
-                <input
-                  ref={inputRef}
-                  type="file"
-                  multiple
-                  className="hidden"
-                  onChange={(e) => {
-                    addFiles(e.target.files)
-                    e.target.value = ''
+              {/* 자동 모드는 배치가 하나뿐이어야 취소 정리가 단순해진다. 시작 뒤에는 못 담는다. */}
+              {!(autoPreview && started) && (
+                <div
+                  onDragOver={(e) => {
+                    e.preventDefault()
+                    setDragging(true)
                   }}
-                />
-              </div>
+                  onDragLeave={() => setDragging(false)}
+                  onDrop={(e) => {
+                    e.preventDefault()
+                    setDragging(false)
+                    addFiles(e.dataTransfer.files)
+                  }}
+                  onClick={() => inputRef.current?.click()}
+                  className={`cursor-pointer rounded-xl border-2 border-dashed px-6 py-8 text-center transition-colors ${
+                    dragging
+                      ? 'border-accent bg-accent-soft'
+                      : 'border-border-strong hover:border-accent hover:bg-canvas'
+                  }`}
+                >
+                  <Upload className="mx-auto mb-2 h-6 w-6 text-ink-subtle" aria-hidden />
+                  <p className="text-sm font-medium text-ink">파일을 끌어다 놓거나 클릭해서 선택</p>
+                  <p className="mt-1 text-xs text-ink-muted">
+                    여러 개를 한 번에 올릴 수 있습니다 · 파일당 최대 100MB
+                  </p>
+                  <input
+                    ref={inputRef}
+                    type="file"
+                    multiple
+                    className="hidden"
+                    onChange={(e) => {
+                      addFiles(e.target.files)
+                      e.target.value = ''
+                    }}
+                  />
+                </div>
+              )}
 
-              {items.length > 0 && (
+              {previewing && (
+                <>
+                  {renderPreviewGroup('기존 폴더로 이동', toFolder)}
+                  {renderPreviewGroup(
+                    '새 폴더 생성 후 이동',
+                    toNew,
+                    hasProposal ? (
+                      <label className="flex shrink-0 items-center gap-1.5 text-xs text-ink-muted">
+                        <input
+                          type="checkbox"
+                          checked={skipNew}
+                          onChange={(e) => setSkipNew(e.target.checked)}
+                          className="h-3.5 w-3.5 accent-[var(--color-accent)]"
+                        />
+                        만들지 않음
+                      </label>
+                    ) : undefined,
+                  )}
+                  {renderPreviewGroup('미분류', toNone)}
+                </>
+              )}
+
+              {!previewing && items.length > 0 && (
                 <ul className="mt-4 space-y-2">
                   {items.map((item) => (
                     <li key={item.id} className="rounded-lg border border-border px-3.5 py-2.5">
@@ -309,19 +541,37 @@ export function UploadDialog({
 
             <div className="flex items-center justify-between gap-3 border-t border-border px-5 py-3.5">
               <p className="text-xs text-ink-muted">
-                {items.length === 0
-                  ? ' '
-                  : uploading
-                    ? `업로드 중… ${doneCount}/${items.length}`
-                    : `완료 ${doneCount}건${errorCount > 0 ? ` · 실패 ${errorCount}건` : ''}`}
+                {previewing
+                  ? `${items.length}건 · 올리기 전에 확인하세요`
+                  : items.length === 0
+                    ? ' '
+                    : uploading
+                      ? `업로드 중… ${doneCount}/${items.length}`
+                      : `완료 ${doneCount}건${errorCount > 0 ? ` · 실패 ${errorCount}건` : ''}`}
               </p>
-              <button
-                type="button"
-                onClick={close}
-                className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-hover"
-              >
-                {uploading ? '취소' : finished ? '완료' : '닫기'}
-              </button>
+              <div className="flex shrink-0 items-center gap-2">
+                <button
+                  type="button"
+                  onClick={close}
+                  className={
+                    previewing
+                      ? 'rounded-lg border border-border px-4 py-2 text-sm font-medium text-ink transition-colors hover:bg-canvas'
+                      : 'rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-hover'
+                  }
+                >
+                  {previewing ? '취소' : uploading ? '취소' : finished ? '완료' : '닫기'}
+                </button>
+                {previewing && (
+                  <button
+                    type="button"
+                    disabled={preparing}
+                    onClick={() => void startAuto()}
+                    className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-hover disabled:opacity-60"
+                  >
+                    업로드 시작
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>

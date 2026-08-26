@@ -22,7 +22,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 
   const { id } = await params
-  const { name } = parsed.data
+  const { name, aliases } = parsed.data
 
   // "같은 위치"를 판정하려면 대상의 부모를 알아야 한다.
   const target = await prisma.folder.findUnique({ where: { id }, select: { parentId: true } })
@@ -40,7 +40,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 
   try {
-    await prisma.folder.update({ where: { id }, data: { name }, select: { id: true } })
+    // aliases 를 안 보낸 요청은 별칭을 건드리지 않는다 (이름만 바꾸던 기존 호출 보존).
+    await prisma.folder.update({
+      where: { id },
+      data: aliases === undefined ? { name } : { name, aliases },
+      select: { id: true },
+    })
   } catch (err) {
     const failure = folderMutationFailure(err)
     if (!failure) throw err

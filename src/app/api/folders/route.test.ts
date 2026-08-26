@@ -57,6 +57,26 @@ describe('POST /api/folders', () => {
     expect(await res.json()).toEqual({ id: 'folder_1', name: '기획' })
   })
 
+  it('aliases 를 보내면 정규화되어 create data 에 들어가야 한다', async () => {
+    const res = await POST(
+      post({ name: '화면설계서', aliases: [' 와이어프레임 ', '와이어프레임', 'WF'] }),
+    )
+
+    expect(create.mock.calls[0][0].data).toEqual({
+      name: '화면설계서',
+      parentId: null,
+      aliases: ['와이어프레임', 'WF'],
+    })
+    expect(res.status).toBe(201)
+  })
+
+  it('aliases 를 안 보내면 create data 에 aliases 키 자체가 없어야 한다', async () => {
+    // 스키마의 @default([]) 가 빈 배열을 넣는다 — 라우트가 키를 만들어 붙이면 안 된다.
+    await POST(post({ name: '기획' }))
+
+    expect(create.mock.calls[0][0].data).toEqual({ name: '기획', parentId: null })
+  })
+
   it('같은 위치에 같은 이름이 있으면 409 이고 create 하지 않아야 한다', async () => {
     findFirst.mockResolvedValue({ id: 'folder_0' })
 
