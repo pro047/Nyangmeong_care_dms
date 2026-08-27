@@ -197,6 +197,7 @@
 - [x] 업로드 시 저장 폴더 선택 (`5da27b4`)
 - [x] shadcn/ui 도입, `window.alert` 7곳 → sonner, 파괴적 확인 3곳 → AlertDialog,
       `window.prompt` 2곳 → Dialog 폼 (`b2a6ee6`)
+- [x] 파괴적 버튼(`폴더 삭제`·`영구삭제`)의 빨강 복구 — `asChild` className 병합 (2026-08-27)
 
 > **패키지가 늘었다** — 이 리포에서 패키지 추가는 M0 이후 처음이다.
 > `shadcn` · `radix-ui` · `sonner` · `class-variance-authority` · `clsx` ·
@@ -242,14 +243,29 @@
 > **토스트 겹침은 문제 아님으로 닫았다** — 2개가 동시에 뜨면 sonner 가 뒤엣것을 접지만,
 > 사람이 보고 받아들일 만하다고 판단했다.
 >
-> **발견 ① — 파괴적 버튼의 빨강이 죽어 있다 (미수정).** `폴더 삭제`·`영구삭제` 두 곳이
-> 코드로는 `bg-danger`(`#c50000`) 인데 화면에는 검정(`rgb(23,23,23)`)으로 나온다.
-> `alert-dialog.tsx:158-161` 의 `<Button variant="default" asChild>` 가 Radix Slot 으로
-> className 을 **문자열로 이어붙이기만** 하고 tailwind-merge 를 안 거쳐서, `bg-primary` 와
-> `bg-danger` 가 둘 다 남고 CSS 생성 순서로 `bg-primary` 가 이긴다.
+> **발견 ① — 파괴적 버튼의 빨강이 죽어 있었다. ✅ 고쳤다 (2026-08-27).**
+> `폴더 삭제`·`영구삭제` 두 곳이 코드로는 `bg-danger`(`#c50000`) 인데 화면에는
+> 검정(`rgb(23,23,23)`)으로 나왔다. `alert-dialog.tsx:158-161` 의
+> `<Button variant="default" asChild>` 가 Radix Slot 으로 className 을 **문자열로
+> 이어붙이기만** 하고 tailwind-merge 를 안 거쳐서, `bg-primary` 와 `bg-danger` 가 둘 다
+> 남고 CSS 생성 순서로 `bg-primary` 가 이겼다.
 > **위 "색이 깨져 있었다" 와 같은 계열이다** — 빌드도 린트도 못 잡고, 되돌릴 수 없는 동작
-> 두 개가 일반 버튼과 구분이 안 된다. 고치는 방향은 `className` 을 Action 이 아니라
-> **Button 에 넘겨** `cn` 이 충돌 클래스를 떨어뜨리게 하는 것이다.
+> 두 개가 일반 버튼과 구분이 안 됐다.
+>
+> `className` 을 Action 이 아니라 **Button 에 넘겼다** — Button 이 그것을
+> `buttonVariants({ variant, size, className })` 에 넣어 `cn`(twMerge)이 충돌 클래스를
+> 떨어뜨린다. `AlertDialogCancel` 도 같은 모양이라 **같이 고쳤다** (지금은 `variant="outline"`
+> 이라 증상이 안 났을 뿐 구조가 같다).
+>
+> **대조로 판정했다** — `test/e2e/danger-color.mjs` (`npm run test:e2e:danger`) 가
+> `getComputedStyle` 로 두 버튼의 배경을 읽는다. 고친 뒤 `rgb(197,0,0)`, `git stash` 로
+> 되돌리면 `rgb(23,23,23)` 이 나온다. **되돌린 쪽을 실제로 돌려 본 것이 핵심이다** —
+> 안 그러면 하네스가 그냥 통과하는 것인지 구분이 안 된다. `취소`(outline) 는 흰색
+> 그대로인 것도 같이 봤다(빨강을 전면 도포한 게 아니라는 대조).
+> 이 결함 계열은 `npm test`·`lint`·`build` 가 **원리상 못 잡는다** — 셋 다 통과했었다.
+>
+> **`shadcn add` 로 받은 컴포넌트는 `asChild` 의 className 병합도 대조해야 한다**—
+> `@theme inline` 충돌(위 "색이 깨져 있었다")에 이어 두 번째다.
 >
 > **`window.confirm` 2곳이 남아 있는 것은 의도다** (2026-08-27 재확인). 자동 분류 #5 실측 때
 > Playwright 가 이 창을 기본값(dismiss)으로 닫아 취소가 안 먹으면서 눈에 띄었고 처음엔
