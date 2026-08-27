@@ -155,12 +155,10 @@ function AlertDialogAction({
 }: React.ComponentProps<typeof AlertDialogPrimitive.Action> &
   Pick<React.ComponentProps<typeof Button>, "variant" | "size">) {
   return (
-    <Button variant={variant} size={size} asChild>
-      <AlertDialogPrimitive.Action
-        data-slot="alert-dialog-action"
-        className={cn(className)}
-        {...props}
-      />
+    // className 은 Button 에 넘긴다 — Slot 은 두 className 을 이어붙이기만 해서
+    // 자식에 두면 bg-danger 가 variant 의 bg-primary 를 못 이긴다 (cn 의 twMerge 를 거쳐야 한다)
+    <Button variant={variant} size={size} className={className} asChild>
+      <AlertDialogPrimitive.Action data-slot="alert-dialog-action" {...props} />
     </Button>
   )
 }
@@ -173,12 +171,8 @@ function AlertDialogCancel({
 }: React.ComponentProps<typeof AlertDialogPrimitive.Cancel> &
   Pick<React.ComponentProps<typeof Button>, "variant" | "size">) {
   return (
-    <Button variant={variant} size={size} asChild>
-      <AlertDialogPrimitive.Cancel
-        data-slot="alert-dialog-cancel"
-        className={cn(className)}
-        {...props}
-      />
+    <Button variant={variant} size={size} className={className} asChild>
+      <AlertDialogPrimitive.Cancel data-slot="alert-dialog-cancel" {...props} />
     </Button>
   )
 }

@@ -12,7 +12,8 @@
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
     "postinstall": "prisma generate",
-    "test:e2e": "node --env-file=.env test/e2e/document-detail.mjs"
+    "test:e2e": "node --env-file=.env test/e2e/document-detail.mjs",
+    "test:e2e:danger": "node --env-file=.env test/e2e/danger-color.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1114.0",
