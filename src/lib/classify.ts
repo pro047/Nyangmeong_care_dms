@@ -36,7 +36,9 @@ function stripExtension(fileName: string): string {
   return dot > 0 ? fileName.slice(0, dot) : fileName
 }
 
-/** 브라우저가 붙이는 중복 접미사. `(1)` 은 숫자일 때만 지운다 — `(HLT)` 는 핵심어다. */
+/** 브라우저가 붙이는 중복 접미사. `(1)` 은 숫자일 때만 지운다 — 숫자가 아닌 괄호를
+    **일괄** 지우면 문장 가운데의 핵심어까지 날아간다. 끝에 붙은 영문 코드는 층위가
+    다른 문제라 TRAILING_CODE 가 위치를 한정해서 따로 뗀다. */
 const DUPLICATE_SUFFIX = /\s*(?:\(\d+\)|(?:[-–—]\s*)?복사본)/gu
 
 /** `v0.2` `v0_3` `v0_2b`. 구분자로 쪼개기 **전에** 원문에서 지워야 한다 — `v0_3` 을 먼저
@@ -52,6 +54,11 @@ const SEPARATORS = /[_\s—–-]+/u
     와이어프레임은 `04_`·`06_` 로 갈린다. */
 const NUMBER_PREFIX = /^\d{1,3}$/u
 
+/** 끝에 붙은 짧은 영문 대문자 코드(`HLT`·`(HLT)`). 카테고리가 아니라 그 문서만의
+    식별자라 폴더 이름에 들어가면 문서 1건짜리 폴더가 된다. 소문자(`final`)와 5자 이상은
+    실제 단어일 확률이 높아 건드리지 않는다. */
+const TRAILING_CODE = /^\(?[A-Z]{2,4}\)?$/u
+
 /**
  * 제안 폴더명용 핵심어. 표시용이라 대소문자는 그대로 두고 구분자만 공백 하나로 고른다.
  * 사람이 미리보기에서 확인·해제하는 것이 안전판이므로 이름 품질이 완벽할 필요는 없다.
@@ -64,6 +71,9 @@ export function extractCore(fileName: string): string {
 
   const tokens = withoutNoise.split(SEPARATORS).filter((token) => token !== '')
   if (tokens.length > 0 && NUMBER_PREFIX.test(tokens[0])) tokens.shift()
+
+  // 토큰이 1개 남으면 멈춘다 — `WF.html` 이 빈 제안이 되면 폴더를 아예 못 얻는다.
+  while (tokens.length > 1 && TRAILING_CODE.test(tokens[tokens.length - 1])) tokens.pop()
 
   return tokens.join(' ')
 }

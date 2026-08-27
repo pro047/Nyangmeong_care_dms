@@ -34,7 +34,8 @@ describe('classifyFileName — 실데이터 기준선 7건', () => {
 
   it.each([
     ['02_IA 구조도_v0.2_2026_08_17.xlsx', 'IA 구조도'],
-    ['04_건강기록_와이어프레임_HLT_v0_2b (1).html', '건강기록 와이어프레임 HLT'],
+    // 끝 영문 코드 HLT 는 카테고리가 아니라 문서 식별자다 — TRAILING_CODE 가 뗀다.
+    ['04_건강기록_와이어프레임_HLT_v0_2b (1).html', '건강기록 와이어프레임'],
     ['06_로그인_회원가입_와이어프레임.html', '로그인 회원가입 와이어프레임'],
   ])('%s → propose %s', (fileName, proposedName) => {
     expect(classifyFileName(fileName, BASELINE)).toEqual({
@@ -193,10 +194,34 @@ describe('extractCore', () => {
     expect(extractCore('보고서 복사본.pdf')).toBe('보고서')
   })
 
-  it('(숫자) 만 지워야 한다 — (HLT) 는 핵심어라 남는다', () => {
+  it('괄호는 (숫자) 만 일괄 삭제한다 — 가운데 (HLT) 는 남고 끝의 (HLT) 는 지워진다', () => {
+    // 두 규칙의 층위가 다르다: DUPLICATE_SUFFIX 는 위치 무관하게 숫자 괄호만 지우고,
+    // TRAILING_CODE 는 끝 위치의 영문 코드만 뗀다. 가운데 괄호는 핵심어일 수 있어 남는다.
+    expect(extractCore('건강기록 (HLT) 보고서.html')).toBe('건강기록 (HLT) 보고서')
     expect(extractCore('냥멍케어 화면설계서 — 건강기록 (HLT) v0.2.html')).toBe(
-      '냥멍케어 화면설계서 건강기록 (HLT)',
+      '냥멍케어 화면설계서 건강기록',
     )
+  })
+
+  it('끝에 붙은 영문 대문자 2~4자 코드를 지워야 한다', () => {
+    expect(extractCore('04_건강기록_와이어프레임_HLT_v0_2b (1).html')).toBe('건강기록 와이어프레임')
+  })
+
+  it('끝 코드가 반복되면 전부 지워야 한다', () => {
+    expect(extractCore('기획_AB_CD.html')).toBe('기획')
+  })
+
+  it('토큰이 1개 남으면 멈춰야 한다 — WF.html 이 빈 제안이 되면 폴더를 못 얻는다', () => {
+    expect(extractCore('WF.html')).toBe('WF')
+  })
+
+  it('앞·가운데의 영문 코드는 안 지운다 — IA 는 앞 토큰이라 남는다', () => {
+    expect(extractCore('02_IA 구조도_v0.2_2026_08_17.xlsx')).toBe('IA 구조도')
+  })
+
+  it('소문자·5자 이상 영문은 안 지운다 — 실제 단어일 확률이 높다', () => {
+    expect(extractCore('회의록_final.html')).toBe('회의록 final')
+    expect(extractCore('보고서_LOGIN.html')).toBe('보고서 LOGIN')
   })
 
   it('맨 앞 숫자 prefix 토큰을 지워야 한다', () => {

@@ -3,12 +3,13 @@ import {
   createPlannedFolders,
   defaultDestination,
   emptyCreatedFolders,
+  findExistingFolderByName,
   plannedFolderNames,
   resolveDestination,
   type Destination,
   type FolderCreateOutcome,
 } from '@/lib/classify-plan'
-import { REASON_NO_MATCH, REASON_PROPOSE } from '@/lib/classify'
+import { REASON_NO_MATCH, REASON_PROPOSE, type ClassifyFolder } from '@/lib/classify'
 
 describe('defaultDestination', () => {
   it('match → 그 폴더, propose → 새 폴더, unclassified → 미분류여야 한다', () => {
@@ -48,6 +49,60 @@ describe('plannedFolderNames', () => {
 
     expect(plannedFolderNames(destinations)).toEqual(['회의록'])
     expect(plannedFolderNames([])).toEqual([])
+  })
+})
+
+describe('findExistingFolderByName', () => {
+  const folders: ClassifyFolder[] = [
+    { id: 'f-req', name: '요구사항정의서', aliases: [] },
+    { id: 'f-screen', name: '화면설계서', aliases: ['와이어프레임'] },
+  ]
+
+  it('이름 정확일치면 그 폴더 id 여야 한다', () => {
+    expect(findExistingFolderByName('화면설계서', folders)).toBe('f-screen')
+  })
+
+  it('표기(공백·NFD·대소문자)가 달라도 정규화가 같으면 같은 폴더여야 한다', () => {
+    // 이게 없으면 `요구사항 정의서` 로 고칠 때 유사 중복 폴더가 조용히 생긴다.
+    expect(findExistingFolderByName('요구사항 정의서', folders)).toBe('f-req')
+    expect(findExistingFolderByName('요구사항 정의서'.normalize('NFD'), folders)).toBe('f-req')
+
+    const ia: ClassifyFolder[] = [{ id: 'f-ia', name: 'IA구조도', aliases: [] }]
+    expect(findExistingFolderByName('ia 구조도', ia)).toBe('f-ia')
+  })
+
+  it('별칭과 일치해도 그 폴더로 가야 한다 — 분류기의 별칭 의미론과 같다', () => {
+    expect(findExistingFolderByName('와이어프레임', folders)).toBe('f-screen')
+  })
+
+  it('동명 폴더 2개(부모만 다름)면 null — 고를 수 없으면 흡수하지 않는다', () => {
+    const dup: ClassifyFolder[] = [
+      { id: 'f-a', name: '설계서', aliases: [] },
+      { id: 'f-b', name: '설계서', aliases: [] },
+    ]
+    expect(findExistingFolderByName('설계서', dup)).toBeNull()
+  })
+
+  it('한 폴더가 이름·별칭 양쪽으로 걸리면 그 폴더 id 여야 한다 (모호 아님)', () => {
+    const both: ClassifyFolder[] = [{ id: 'f-x', name: '화면설계서', aliases: ['화면 설계서'] }]
+    expect(findExistingFolderByName('화면 설계서', both)).toBe('f-x')
+  })
+
+  it('아무것도 안 걸리면 null 이어야 한다', () => {
+    expect(findExistingFolderByName('회의록', folders)).toBeNull()
+    expect(findExistingFolderByName('화면설계서', [])).toBeNull()
+  })
+
+  it('부분 문자열은 안 걸린다 — 설계 가 화면설계서 에 흡수되면 안 된다', () => {
+    // classifyFileName 의 부분 매칭과 다른 정확일치임을 못박는다 — 이 값은 파일명이
+    // 아니라 사람이 폴더 이름으로 직접 적은 것이다.
+    expect(findExistingFolderByName('설계', folders)).toBeNull()
+    expect(findExistingFolderByName('화면설계서 초안', folders)).toBeNull()
+  })
+
+  it('정규화하면 비는 이름(공백·기호뿐)은 null 이어야 한다', () => {
+    expect(findExistingFolderByName('   ', folders)).toBeNull()
+    expect(findExistingFolderByName('()', folders)).toBeNull()
   })
 })
 

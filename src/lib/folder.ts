@@ -41,6 +41,18 @@ export const folderCreateSchema = z
   }))
   .refine((body) => refineAliases(body.aliases))
 
+/**
+ * 폴더 이름 검증. 통과면 null, 아니면 사용자에게 보일 한국어 메시지.
+ * 기준은 folderCreateSchema 와 같다(trim 후 1~100자) — 보내고 나서 400 을 받아야
+ * 알게 되는 자리를 화면에서 먼저 막는다.
+ */
+export function folderNameError(name: string): string | null {
+  const trimmed = name.trim()
+  if (trimmed.length === 0) return '폴더 이름을 입력하세요.'
+  if (trimmed.length > 100) return '폴더 이름은 100자까지입니다.'
+  return null
+}
+
 /** aliases 를 생략하면 undefined 다 — 이름만 바꾸던 기존 호출이 별칭을 지우면 안 된다. */
 export const folderPatchSchema = z
   .object({

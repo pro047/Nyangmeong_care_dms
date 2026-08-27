@@ -1,4 +1,4 @@
-import { normalizeForMatch, type ClassifyResult } from '@/lib/classify'
+import { normalizeForMatch, type ClassifyFolder, type ClassifyResult } from '@/lib/classify'
 
 /**
  * 미리보기에서 사람이 확인한 뒤의 절차. upload-flow.ts 와 같은 이유로 컴포넌트가 아니라
@@ -34,6 +34,37 @@ export function plannedFolderNames(destinations: Destination[]): string[] {
   }
 
   return names
+}
+
+/**
+ * 사람이 고친 새 폴더 이름이 기존 폴더의 이름·별칭과 정규화 기준으로 **정확히** 같으면
+ * 그 폴더 id 를 돌려준다. 이게 없으면 두 가지로 샌다 — 표기까지 같으면 생성이 409 로
+ * 튕겨 미분류가 되고(사용자 의도 배반), 표기만 다르면(`요구사항 정의서` vs
+ * `요구사항정의서`) 유사 중복 폴더가 조용히 생긴다.
+ *
+ * classifyFileName 의 부분 문자열 매칭과 달리 정확일치인 이유: 이 이름은 파일명이
+ * 아니라 사람이 폴더 이름으로 직접 적은 값이라 `설계` 가 `화면설계서` 를 뜻하지 않는다.
+ * 서로 다른 폴더 여러 개에 걸리면(부모만 다른 동명) 고를 수 없으므로 흡수하지 않는다.
+ */
+export function findExistingFolderByName(
+  name: string,
+  folders: ClassifyFolder[],
+): string | null {
+  const key = normalizeForMatch(name)
+  if (key === '') return null
+
+  const matched = new Set<string>()
+  for (const folder of folders) {
+    for (const candidate of [folder.name, ...folder.aliases]) {
+      if (normalizeForMatch(candidate) === key) {
+        matched.add(folder.id)
+        break
+      }
+    }
+  }
+
+  if (matched.size !== 1) return null
+  return matched.values().next().value ?? null
 }
 
 export type FolderCreateOutcome = { ok: true; id: string } | { ok: false; conflict: boolean }

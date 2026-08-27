@@ -49,3 +49,4 @@ next-env.d.ts
 
 # e2e 스크린샷·임시 파일 (증거용, 리포에는 안 넣는다)
 test/e2e/shots/
+test/e2e/_files/
