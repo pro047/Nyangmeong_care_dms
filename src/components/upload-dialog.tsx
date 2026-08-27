@@ -7,12 +7,18 @@ import { toast } from 'sonner'
 import { formatBytes } from '@/lib/format'
 import { runUploadFlow, type UploadBatch } from '@/lib/upload-flow'
 import { putToS3 } from '@/lib/upload-xhr'
-import { buildFolderTree, flattenFolderTree, type FolderAliasRow } from '@/lib/folder'
+import {
+  buildFolderTree,
+  flattenFolderTree,
+  folderNameError,
+  type FolderAliasRow,
+} from '@/lib/folder'
 import { classifyFileName, type ClassifyResult } from '@/lib/classify'
 import {
   createPlannedFolders,
   defaultDestination,
   emptyCreatedFolders,
+  findExistingFolderByName,
   plannedFolderNames,
   resolveDestination,
   type Destination,
@@ -77,6 +83,10 @@ export function UploadDialog({
   const batches = useRef(new Set<UploadBatch>())
 
   const folderOptions = useMemo(() => flattenFolderTree(buildFolderTree(folders)), [folders])
+  const folderNameById = useMemo(
+    () => new Map(folders.map((folder) => [folder.id, folder.name])),
+    [folders],
+  )
 
   // 폴더가 하나도 없으면 자동 모드는 조용히 미분류 업로드로 동작한다 (사양).
   const autoPreview = mode === AUTO && folders.length > 0
@@ -239,7 +249,16 @@ export function UploadDialog({
   const startAuto = useCallback(async () => {
     // 확정 시점의 목록을 붙잡아 둔다. 시작 뒤 화면이 바뀌어도 보낼 것은 이것이다.
     const jobItems = items
-    const dests = jobItems.map(effectiveDest)
+    // 사람이 고친 이름이 기존 폴더와 같으면 새로 만들지 않고 그리로 보낸다. trim 은
+    // 여기서 해야 한다 — 서버 스키마가 trim 하므로 안 하면 plannedFolderNames 의 표기와
+    // 실제로 생긴 폴더 이름이 어긋난다.
+    const dests = jobItems.map(effectiveDest).map((dest): Destination => {
+      if (dest.kind !== 'new') return dest
+      const existingId = findExistingFolderByName(dest.name, folders)
+      return existingId !== null
+        ? { kind: 'folder', folderId: existingId }
+        : { kind: 'new', name: dest.name.trim() }
+    })
 
     setStarted(true)
     setPreparing(true)
@@ -270,7 +289,7 @@ export function UploadDialog({
       jobItems.map((item, i) => ({ item, folderId: resolveDestination(dests[i], created) })),
       createdIds,
     )
-  }, [items, effectiveDest, createFolder, cleanupCreatedFolders, runBatch])
+  }, [items, effectiveDest, folders, createFolder, cleanupCreatedFolders, runBatch])
 
   const close = useCallback(() => {
     // 예전엔 uploading 이면 그냥 return 해서 탈출구가 없었다. PUT 이 응답 없이 멈추면
@@ -312,6 +331,9 @@ export function UploadDialog({
   const toNew = rows.filter((r) => r.dest.kind === 'new')
   const toNone = rows.filter((r) => r.dest.kind === 'none')
   const hasProposal = items.some((i) => i.result?.kind === 'propose')
+  const invalidNameCount = toNew.filter(
+    (r) => r.dest.kind === 'new' && folderNameError(r.dest.name) !== null,
+  ).length
 
   const changeDest = (item: Item, value: string) => {
     const proposed = item.result?.kind === 'propose' ? item.result.proposedName : null
@@ -326,6 +348,40 @@ export function UploadDialog({
 
   const destValue = (dest: Destination) =>
     dest.kind === 'new' ? NEW_FOLDER : dest.kind === 'folder' ? dest.folderId : ''
+
+  /**
+   * 새 폴더 이름 편집칸. 제안 이름은 카테고리가 아니라 문서 제목으로 나오는 일이 잦은데
+   * 파일명만으로는 그 둘을 가릴 신호가 없다 — 사람이 여기서 고치는 것이 유일한 해법이다.
+   * 고친 행은 destTouched 로 표시해 "만들지 않음" 체크가 덮지 않게 한다(셀렉트와 같은 의미론).
+   */
+  const renderNameEditor = (item: Item, name: string) => {
+    const error = folderNameError(name)
+    const existingId = error === null ? findExistingFolderByName(name, folders) : null
+    const existingName = existingId === null ? undefined : folderNameById.get(existingId)
+
+    return (
+      <div className="mt-2">
+        <input
+          type="text"
+          value={name}
+          maxLength={100}
+          aria-label={`${item.file.name} 새 폴더 이름`}
+          onChange={(e) =>
+            update(item.id, { dest: { kind: 'new', name: e.target.value }, destTouched: true })
+          }
+          className="w-full rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs text-ink outline-none focus:border-accent"
+        />
+        {error !== null && <p className="mt-1 text-xs text-danger">{error}</p>}
+        {/* 힌트만 보여주고 행을 "기존 폴더" 그룹으로 옮기지는 않는다 — 타이핑 중에 행이
+            그룹 사이를 움직이면 입력칸이 unmount 되어 포커스를 잃는다. */}
+        {existingName !== undefined && (
+          <p className="mt-1 text-xs text-ink-muted">
+            기존 폴더 &lsquo;{existingName}&rsquo;와 같아 그 폴더로 들어갑니다
+          </p>
+        )}
+      </div>
+    )
+  }
 
   const renderPreviewGroup = (
     title: string,
@@ -362,6 +418,7 @@ export function UploadDialog({
                   </option>
                 ))}
               </select>
+              {dest.kind === 'new' && renderNameEditor(item, dest.name)}
             </li>
           ))}
         </ul>
@@ -407,11 +464,23 @@ export function UploadDialog({
               </button>
             </div>
 
+            {/* 스크롤 영역 **바깥**에 둔다. CSS sticky 가 아니라 구조라 깨질 방법이 없다 —
+                이 화면의 결정은 "이 배분이 이래도 되는가"이고 그 답이 이 건수다. */}
+            {previewing && (
+              <div className="border-b border-border bg-canvas px-5 py-2 text-xs text-ink-muted">
+                기존 {toFolder.length} · 새 폴더 {toNew.length} · 미분류 {toNone.length}
+              </div>
+            )}
+
             <div className="min-h-0 flex-1 overflow-y-auto p-5">
               {/* 조용히 배정하면 "왜 여기 올라갔지"가 된다. 자동 분류에서는 미리보기가 그
                   역할을 이어받는다. 파일을 담은 뒤에 잠그는 이유는 바뀌었다 — 이제
                   "한 배치 한 폴더" 보호가 아니라, 배치의 분류 방식이 담는 순간 정해지기
                   때문이다. 바꾸려면 닫고 다시 연다. */}
+              {previewing ? (
+                // 어차피 disabled 라 조작할 수 없는 66px 이다. 그 세로를 판단 대상(행)에 넘긴다.
+                <p className="mb-3 text-xs text-ink-muted">저장할 폴더: 자동 분류</p>
+              ) : (
               <div className="mb-3">
                 <label htmlFor="upload-folder" className="text-xs font-medium text-ink">
                   저장할 폴더
@@ -439,44 +508,74 @@ export function UploadDialog({
                   </p>
                 )}
               </div>
+              )}
+
+              {/* 드롭존 밖에 둔다 — 미리보기에서는 한 줄 버튼이 이 input 을 대신 연다. */}
+              <input
+                ref={inputRef}
+                type="file"
+                multiple
+                className="hidden"
+                onChange={(e) => {
+                  addFiles(e.target.files)
+                  e.target.value = ''
+                }}
+              />
 
               {/* 자동 모드는 배치가 하나뿐이어야 취소 정리가 단순해진다. 시작 뒤에는 못 담는다. */}
-              {!(autoPreview && started) && (
-                <div
-                  onDragOver={(e) => {
-                    e.preventDefault()
-                    setDragging(true)
-                  }}
-                  onDragLeave={() => setDragging(false)}
-                  onDrop={(e) => {
-                    e.preventDefault()
-                    setDragging(false)
-                    addFiles(e.dataTransfer.files)
-                  }}
-                  onClick={() => inputRef.current?.click()}
-                  className={`cursor-pointer rounded-xl border-2 border-dashed px-6 py-8 text-center transition-colors ${
-                    dragging
-                      ? 'border-accent bg-accent-soft'
-                      : 'border-border-strong hover:border-accent hover:bg-canvas'
-                  }`}
-                >
-                  <Upload className="mx-auto mb-2 h-6 w-6 text-ink-subtle" aria-hidden />
-                  <p className="text-sm font-medium text-ink">파일을 끌어다 놓거나 클릭해서 선택</p>
-                  <p className="mt-1 text-xs text-ink-muted">
-                    여러 개를 한 번에 올릴 수 있습니다 · 파일당 최대 100MB
-                  </p>
-                  <input
-                    ref={inputRef}
-                    type="file"
-                    multiple
-                    className="hidden"
-                    onChange={(e) => {
-                      addFiles(e.target.files)
-                      e.target.value = ''
+              {!(autoPreview && started) &&
+                (previewing ? (
+                  // 미리보기에서는 판단 대상인 행이 세로를 가져가야 한다. 140px 드롭존을
+                  // 한 줄로 접되 파일 추가 자체는 남긴다 — 시작 전에 더 담을 수 있어야 한다(사양).
+                  <button
+                    type="button"
+                    onDragOver={(e) => {
+                      e.preventDefault()
+                      setDragging(true)
                     }}
-                  />
-                </div>
-              )}
+                    onDragLeave={() => setDragging(false)}
+                    onDrop={(e) => {
+                      e.preventDefault()
+                      setDragging(false)
+                      addFiles(e.dataTransfer.files)
+                    }}
+                    onClick={() => inputRef.current?.click()}
+                    className={`w-full rounded-lg border border-dashed py-1.5 text-center text-xs transition-colors ${
+                      dragging
+                        ? 'border-accent bg-accent-soft text-ink'
+                        : 'border-border-strong text-ink-muted hover:border-accent hover:bg-canvas hover:text-ink'
+                    }`}
+                  >
+                    + 파일 더 담기 (끌어다 놓아도 됩니다)
+                  </button>
+                ) : (
+                  <div
+                    onDragOver={(e) => {
+                      e.preventDefault()
+                      setDragging(true)
+                    }}
+                    onDragLeave={() => setDragging(false)}
+                    onDrop={(e) => {
+                      e.preventDefault()
+                      setDragging(false)
+                      addFiles(e.dataTransfer.files)
+                    }}
+                    onClick={() => inputRef.current?.click()}
+                    className={`cursor-pointer rounded-xl border-2 border-dashed px-6 py-8 text-center transition-colors ${
+                      dragging
+                        ? 'border-accent bg-accent-soft'
+                        : 'border-border-strong hover:border-accent hover:bg-canvas'
+                    }`}
+                  >
+                    <Upload className="mx-auto mb-2 h-6 w-6 text-ink-subtle" aria-hidden />
+                    <p className="text-sm font-medium text-ink">
+                      파일을 끌어다 놓거나 클릭해서 선택
+                    </p>
+                    <p className="mt-1 text-xs text-ink-muted">
+                      여러 개를 한 번에 올릴 수 있습니다 · 파일당 최대 100MB
+                    </p>
+                  </div>
+                ))}
 
               {previewing && (
                 <>
@@ -540,9 +639,11 @@ export function UploadDialog({
             </div>
 
             <div className="flex items-center justify-between gap-3 border-t border-border px-5 py-3.5">
-              <p className="text-xs text-ink-muted">
+              <p className={`text-xs ${invalidNameCount > 0 ? 'text-danger' : 'text-ink-muted'}`}>
                 {previewing
-                  ? `${items.length}건 · 올리기 전에 확인하세요`
+                  ? invalidNameCount > 0
+                    ? `새 폴더 이름 ${invalidNameCount}건을 고쳐야 시작할 수 있습니다`
+                    : `${items.length}건 · 올리기 전에 확인하세요`
                   : items.length === 0
                     ? ' '
                     : uploading
@@ -564,7 +665,7 @@ export function UploadDialog({
                 {previewing && (
                   <button
                     type="button"
-                    disabled={preparing}
+                    disabled={preparing || invalidNameCount > 0}
                     onClick={() => void startAuto()}
                     className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-hover disabled:opacity-60"
                   >

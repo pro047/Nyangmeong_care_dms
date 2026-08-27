@@ -4,6 +4,7 @@ import {
   flattenFolderTree,
   folderCreateSchema,
   folderMutationFailure,
+  folderNameError,
   folderPatchSchema,
   FOLDER_NAME_CONFLICT,
   FOLDER_NOT_FOUND,
@@ -92,6 +93,26 @@ describe('folderCreateSchema', () => {
     expect(parsed.parentId).toBeUndefined()
     expect(folderCreateSchema.safeParse({ name: '기획', parentId: 'f1' }).success).toBe(true)
     expect(folderCreateSchema.safeParse({ name: '기획', parentId: '' }).success).toBe(false)
+  })
+})
+
+describe('folderNameError', () => {
+  it('빈 이름·공백뿐인 이름은 메시지를 돌려야 한다', () => {
+    expect(folderNameError('')).toEqual(expect.any(String))
+    expect(folderNameError('   ')).toEqual(expect.any(String))
+  })
+
+  it('1자와 100자는 통과(null), 101자는 메시지여야 한다', () => {
+    expect(folderNameError('a')).toBeNull()
+    expect(folderNameError('a'.repeat(100))).toBeNull()
+    expect(folderNameError('a'.repeat(101))).toEqual(expect.any(String))
+  })
+
+  it('folderCreateSchema 와 판정이 같아야 한다 — trim 후 길이를 본다', () => {
+    // 화면 가드가 통과시킨 이름이 서버에서 400 으로 튕기면(또는 그 반대) 가드의 의미가 없다.
+    for (const name of ['', '   ', 'a', ` ${'a'.repeat(100)} `, 'a'.repeat(100), 'a'.repeat(101)]) {
+      expect(folderNameError(name) === null).toBe(folderCreateSchema.safeParse({ name }).success)
+    }
   })
 })
 
