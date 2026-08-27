@@ -34,8 +34,8 @@ const ctx = await browser.newContext({ baseURL: APP })
 await ctx.addCookies([cookieFor(token)])
 const page = await ctx.newPage()
 const api = ctx.request
-// 삭제 confirm 은 자동 수락한다. 없으면 B6 이 영원히 기다린다.
-page.on('dialog', (d) => d.accept())
+// 삭제 확인은 더 이상 window.confirm 이 아니다 — UI 정비에서 AlertDialog 로 바뀌었다.
+// 브라우저 대화상자가 아니라 화면의 일부라 page.on('dialog') 로는 안 잡힌다. B6 이 직접 누른다.
 
 // presign 이 내준 키를 전부 기록한다. B9 는 PUT 까지 성공하고 POST 가 404 로 막히므로
 // DB 행이 없는 객체가 남는데, 앱 IAM 에 s3:ListBucket 이 없어 **나중에는 찾을 수 없다.**
@@ -49,6 +49,18 @@ page.on('response', async (res) => {
 /** 타임라인 행을 "v2최신…" 같은 원문 그대로 받는다. 버전 셀에는 배지가 붙어 exact 매칭이 안 된다. */
 const timeline = () => page.locator('tbody tr').allInnerTexts()
 
+/**
+ * not-found 본문이 뜰 때까지 기다린다. count() 는 기다리지 않는데 RSC 는 뼈대(헤더·사이드바)를
+ * 먼저 흘려보내고 본문을 나중에 붙이므로, 즉시 세면 회차마다 결과가 갈린다.
+ */
+const notFoundShown = () =>
+  page
+    .getByText('문서를 찾을 수 없습니다')
+    .first()
+    .waitFor({ state: 'visible', timeout: 10000 })
+    .then(() => true)
+    .catch(() => false)
+
 try {
   // ── B1 목록 → 상세
   await page.goto('/')
@@ -60,9 +72,9 @@ try {
 
   // ── B8 없는 id → not-found (앱 셸 유지)
   await page.goto('/documents/does-not-exist-xyz')
-  const nf = await page.getByText('문서를 찾을 수 없습니다').count()
+  const nf = await notFoundShown()
   const shell = await page.getByRole('link', { name: '전체 문서' }).count()
-  check('B8', '없는 id → not-found, 헤더·사이드바 유지', nf > 0 && shell > 0, `문구=${nf} 셸=${shell}`)
+  check('B8', '없는 id → not-found, 헤더·사이드바 유지', nf && shell > 0, `문구=${nf} 셸=${shell}`)
 
   // ── B5 제목·설명 수정
   await page.goto(`/documents/${DOC}`)
@@ -121,15 +133,18 @@ try {
 
   // ── B7 휴지통 문서 상세 → not-found, 복구하면 정상 (대조)
   await page.goto(`/documents/${DOC}`)
-  const nfTrashed = await page.getByText('문서를 찾을 수 없습니다').count()
+  const nfTrashed = await notFoundShown()
   const restored = await api.post(`/api/documents/${DOC}/restore`)
   await page.goto(`/documents/${DOC}`)
   const back = await page.locator('h1').first().innerText()
   check('B7', '휴지통 문서 → not-found, 복구 후 정상 (대조)',
-        nfTrashed > 0 && back.includes('자동검증'), `복구=${restored.status()}`)
+        nfTrashed && back.includes('자동검증'), `복구=${restored.status()}`)
 
   // ── B6 상세에서 휴지통으로 → 목록 이동
-  await page.getByRole('button', { name: /휴지통/ }).first().click()
+  await page.locator('button[aria-label$="휴지통으로 이동"]').first().click()
+  // 트리거와 확인 버튼의 접근성 이름이 겹친다(트리거는 문서 제목이 앞에 붙는다).
+  // 다이얼로그 안에서 골라야 트리거를 다시 누르는 꼴이 된다.
+  await page.getByRole('alertdialog').getByRole('button', { name: '휴지통으로 이동' }).click()
   await page.waitForURL('**/', { timeout: 10000 }).catch(() => {})
   const gone = !(await page.locator('tbody').innerText().catch(() => '')).includes('자동검증')
   await page.goto('/trash')
