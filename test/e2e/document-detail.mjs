@@ -1,7 +1,7 @@
 /**
  * M3 상세 페이지 브라우저 검증. DESIGN.md §7.2 의 B1~B9 를 자동화한 것이다.
  *
- * 전제: SSH 터널(15432) + `npm run dev`(3002) + 실제 .env.
+ * 전제: `npm run dev`(3002) + 실제 .env. 개발 DB 는 Neon 이라 터널이 필요 없다.
  * 실행:  node --env-file=.env test/e2e/document-detail.mjs
  *
  * 디스코드 로그인은 자동화하지 않는다 — helpers.mintSession 이 세션 쿠키를 직접 서명한다.
@@ -9,11 +9,14 @@
  */
 import { chromium } from '@playwright/test'
 import { writeFileSync, mkdirSync } from 'node:fs'
-import { APP, mintSession, cookieFor, seedDocument, purgeDocument } from './helpers.mjs'
+import { APP, mintSession, cookieFor, seedDocument, purgeDocument, purgeFolders } from './helpers.mjs'
 
 const SHOT = 'test/e2e/shots'
 mkdirSync(SHOT, { recursive: true })
 const TMP = 'test/e2e/shots/_v2.txt'
+
+// 뒷정리 기준점. 이 시각 이후에 생긴 폴더만 지운다 (helpers.purgeFolders).
+const startedAt = new Date()
 
 const results = []
 const check = (id, desc, pass, detail = '') => {
@@ -155,7 +158,9 @@ try {
 } finally {
   await browser.close()
   const purged = await purgeDocument(DOC, presignedKeys)
-  console.log(`정리: 행 삭제 + S3 객체 ${purged.length}개 삭제`)
+  // 이 스위트는 폴더를 안 만들지만, 만들었다면 남기지 않는다는 것을 여기서 보장한다.
+  const folders = await purgeFolders(startedAt)
+  console.log(`정리: 행 삭제 + S3 객체 ${purged.length}개 삭제 + 폴더 ${folders.length}개 삭제`)
   const pass = results.filter((r) => r.pass).length
   console.log(`\n===== ${pass}/${results.length} PASS =====`)
   process.exitCode = pass === results.length ? 0 : 1

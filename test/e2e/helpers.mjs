@@ -59,6 +59,31 @@ export async function seedDocument(token, { title, fileName, body }) {
 }
 
 /**
+ * 테스트가 만든 폴더를 지운다. 자동 분류는 **폴더를 만드는 기능**이라 실측을 돌릴 때마다
+ * dev DB 에 제안 폴더가 쌓인다.
+ *
+ * 이름이 아니라 생성 시각으로 고른다 — 자동 분류는 기존 폴더에도 문서를 넣으므로 이름으로
+ * 지우면 팀이 만든 폴더를 지운다. 문서가 남은 폴더도 건너뛴다: purgeDocument 를 먼저 돌리면
+ * 테스트가 만든 문서는 이미 없고, 그래도 남아 있다면 테스트 것이 아니라는 뜻이다.
+ *
+ * created_at 은 timestamp **without** time zone 이고 값은 UTC 다. Date 를 그대로 넘기면
+ * node-postgres 가 로컬시(KST)로 직렬화해 9시간 미래와 비교하게 되고 **아무것도 안 지워진다**
+ * (실측으로 겪었다). toISOString() + ::timestamp 로 양쪽을 UTC 벽시계로 맞춘다.
+ */
+export async function purgeFolders(since) {
+  return withDb(async (c) => {
+    const { rows } = await c.query(
+      `delete from folders f
+        where f.created_at >= $1::timestamp
+          and not exists (select 1 from documents d where d.folder_id = f.id)
+        returning f.name`,
+      [since.toISOString()],
+    )
+    return rows.map((r) => r.name)
+  })
+}
+
+/**
  * 테스트가 만든 것을 지운다. 소프트 삭제는 S3 객체를 남기므로(HANDOFF "S3 고아 객체" 지뢰)
  * 여기서는 행과 객체를 둘 다 없앤다 — 테스트가 팀 DB 에 쓰레기를 쌓으면 안 된다.
  */
