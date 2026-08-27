@@ -408,7 +408,12 @@ export function UploadDialog({
                 className="mt-2 w-full rounded-lg border border-border bg-surface py-1.5 pr-8 pl-2.5 text-xs text-ink outline-none focus:border-accent"
               >
                 {item.result?.kind === 'propose' && (
-                  <option value={NEW_FOLDER}>새 폴더 &lsquo;{item.result.proposedName}&rsquo;</option>
+                  // proposedName 은 담는 순간 고정된다. 편집칸이 dest.name 을 바꾸므로
+                  // 그걸 그대로 쓰면 라벨만 옛 제안에 남아 같은 행이 두 이름을 말한다.
+                  <option value={NEW_FOLDER}>
+                    새 폴더 &lsquo;{dest.kind === 'new' ? dest.name : item.result.proposedName}
+                    &rsquo;
+                  </option>
                 )}
                 <option value="">— (미분류)</option>
                 {folderOptions.map((option) => (
