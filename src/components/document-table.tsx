@@ -45,7 +45,7 @@ export function DocumentTable({ documents }: { documents: DocumentListItem[] }) 
                 <td className="max-w-0 px-4 py-3">
                   {/* 제목은 상세로 간다. 바로 받고 싶으면 오른쪽 다운로드 아이콘. */}
                   <Link href={`/documents/${doc.id}`} className="flex items-center gap-2.5">
-                    <span className="flex h-7 w-9 shrink-0 items-center justify-center rounded bg-canvas text-[10px] font-bold text-ink-muted">
+                    <span className="flex h-7 w-9 shrink-0 items-center justify-center rounded bg-canvas text-xs font-semibold text-ink-muted">
                       {latest ? fileLabel(latest.fileName) : '—'}
                     </span>
                     <span className="min-w-0">
@@ -62,7 +62,7 @@ export function DocumentTable({ documents }: { documents: DocumentListItem[] }) 
                         <Link
                           key={tag.name}
                           href={`/?tag=${encodeURIComponent(tag.name)}`}
-                          className="rounded bg-canvas px-1.5 py-0.5 text-[11px] text-ink-muted transition-colors hover:bg-accent-soft hover:text-accent"
+                          className="rounded bg-canvas px-1.5 py-0.5 text-xs text-ink-muted transition-colors hover:bg-accent-soft hover:text-accent"
                         >
                           {tag.name}
                         </Link>

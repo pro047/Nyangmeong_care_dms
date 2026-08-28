@@ -25,7 +25,7 @@ export default async function TrashPage() {
   return (
     <div>
       <div className="mb-5">
-        <h1 className="text-lg font-bold text-ink">휴지통</h1>
+        <h1 className="text-xl font-semibold text-ink">휴지통</h1>
         <p className="mt-0.5 text-sm text-ink-muted">
           {documents.length > 0
             ? `${documents.length}개 문서 · 복구하면 전체 문서로 돌아갑니다`
@@ -59,7 +59,7 @@ export default async function TrashPage() {
                     {/* 다운로드 라우트가 휴지통 문서를 404로 막으므로 제목에 링크를 걸지 않는다. */}
                     <td className="max-w-0 px-4 py-3">
                       <span className="flex items-center gap-2.5">
-                        <span className="flex h-7 w-9 shrink-0 items-center justify-center rounded bg-canvas text-[10px] font-bold text-ink-muted">
+                        <span className="flex h-7 w-9 shrink-0 items-center justify-center rounded bg-canvas text-xs font-semibold text-ink-muted">
                           {latest ? fileLabel(latest.fileName) : '—'}
                         </span>
                         <span className="truncate-cell block min-w-0 font-medium text-ink">

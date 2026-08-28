@@ -74,7 +74,7 @@ export default async function DocumentsPage({
     <div>
       <div className="mb-5 flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-lg font-bold text-ink">{heading}</h1>
+          <h1 className="text-xl font-semibold text-ink">{heading}</h1>
           <p className="mt-0.5 text-sm text-ink-muted">
             {documents.length > 0 ? `${documents.length}개 문서` : '최근 수정순으로 표시됩니다'}
           </p>

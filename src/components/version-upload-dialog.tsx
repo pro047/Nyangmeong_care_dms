@@ -164,7 +164,7 @@ export function VersionUploadDialog({
             className="flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-xl bg-surface shadow-xl"
           >
             <div className="flex items-center justify-between border-b border-border px-5 py-4">
-              <h2 id="version-upload-title" className="truncate-cell text-sm font-bold text-ink">
+              <h2 id="version-upload-title" className="truncate-cell text-sm font-semibold text-ink">
                 새 버전 올리기 — {title}
               </h2>
               <button

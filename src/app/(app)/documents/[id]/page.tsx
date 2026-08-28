@@ -131,7 +131,7 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
 
       {latest && (
         <section>
-          <h2 className="mt-6 mb-2.5 text-sm font-bold text-ink">미리보기</h2>
+          <h2 className="mt-6 mb-2.5 text-sm font-semibold text-ink">미리보기</h2>
           {kind === 'pdf' && (
             <iframe
               src={previewSrc}
@@ -152,7 +152,7 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
           )}
           {kind === 'none' && (
             <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-surface p-5">
-              <span className="flex h-9 w-11 shrink-0 items-center justify-center rounded bg-canvas text-[10px] font-bold text-ink-muted">
+              <span className="flex h-9 w-11 shrink-0 items-center justify-center rounded bg-canvas text-xs font-semibold text-ink-muted">
                 {fileLabel(latest.fileName)}
               </span>
               <p className="min-w-0 text-sm text-ink-muted">
@@ -170,7 +170,7 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
         </section>
       )}
 
-      <h2 className="mt-6 mb-2.5 text-sm font-bold text-ink">버전 이력</h2>
+      <h2 className="mt-6 mb-2.5 text-sm font-semibold text-ink">버전 이력</h2>
       <div className="overflow-hidden rounded-xl border border-border bg-surface">
         <table className="w-full text-sm">
           <thead>
@@ -190,14 +190,14 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
                 <td className="px-4 py-3 whitespace-nowrap">
                   <span className="font-medium text-ink">v{version.versionNo}</span>
                   {version.versionNo === latest?.versionNo && (
-                    <span className="ml-1.5 rounded bg-accent-soft px-1.5 py-0.5 text-[10px] font-medium text-accent">
+                    <span className="ml-1.5 rounded bg-accent-soft px-1.5 py-0.5 text-xs font-medium text-accent">
                       최신
                     </span>
                   )}
                 </td>
                 <td className="max-w-0 px-4 py-3">
                   <span className="flex items-center gap-2.5">
-                    <span className="flex h-7 w-9 shrink-0 items-center justify-center rounded bg-canvas text-[10px] font-bold text-ink-muted">
+                    <span className="flex h-7 w-9 shrink-0 items-center justify-center rounded bg-canvas text-xs font-semibold text-ink-muted">
                       {fileLabel(version.fileName)}
                     </span>
                     <span className="truncate-cell block min-w-0 text-ink">{version.fileName}</span>

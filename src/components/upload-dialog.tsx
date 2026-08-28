@@ -452,7 +452,7 @@ export function UploadDialog({
             className="flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-xl bg-surface shadow-xl"
           >
             <div className="flex items-center justify-between border-b border-border px-5 py-4">
-              <h2 id="upload-title" className="text-sm font-bold text-ink">
+              <h2 id="upload-title" className="text-sm font-semibold text-ink">
                 문서 업로드
               </h2>
               <button

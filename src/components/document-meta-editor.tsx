@@ -62,7 +62,7 @@ export function DocumentMetaEditor({
     return (
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <h1 className="text-lg font-bold text-ink">{title}</h1>
+          <h1 className="text-xl font-semibold text-ink">{title}</h1>
           <p className={`mt-1 text-sm ${description ? 'text-ink-muted' : 'text-ink-subtle'}`}>
             {description ?? '설명 없음'}
           </p>
