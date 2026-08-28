@@ -5,6 +5,7 @@ import { DocumentMetaEditor } from '@/components/document-meta-editor'
 import { DocumentRowActions } from '@/components/document-row-actions'
 import { DocumentFolderSelect } from '@/components/document-folder-select'
 import { TagEditor } from '@/components/tag-editor'
+import { SpreadsheetPreview } from '@/components/spreadsheet-preview'
 import { VersionUploadDialog } from '@/components/version-upload-dialog'
 import { prisma } from '@/lib/prisma'
 import { formatBytes, formatDateTime, fileLabel } from '@/lib/format'
@@ -152,6 +153,17 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
                 className="max-h-[70vh] max-w-full object-contain"
               />
             </div>
+          )}
+          {kind === 'xlsx' && (
+            <SpreadsheetPreview
+              // 재업로드하면 src 의 ?v 가 바뀐다. key 로 갈아끼워야 이전 버전의
+              // 시트가 남지 않는다 — 상태를 effect 안에서 되돌리는 것보다 싸다.
+              key={previewSrc}
+              src={previewSrc}
+              fileName={latest.fileName}
+              sizeBytes={latest.sizeBytes}
+              downloadHref={`/api/documents/${document.id}/download`}
+            />
           )}
           {kind === 'none' && (
             <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-surface p-5">

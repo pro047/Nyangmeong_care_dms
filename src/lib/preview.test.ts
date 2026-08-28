@@ -36,13 +36,24 @@ describe('previewKind', () => {
     expect(previewKind('application/pdf-x; charset=utf-8')).toBe('none')
   })
 
+  it('xlsx 는 전용 뷰어로 간다 — 팀 문서 10건이 이 경로다', () => {
+    expect(previewKind('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')).toBe(
+      'xlsx',
+    )
+    expect(previewKind('APPLICATION/VND.OPENXMLFORMATS-OFFICEDOCUMENT.SPREADSHEETML.SHEET')).toBe(
+      'xlsx',
+    )
+    // 구 이진 형식은 ExcelJS 가 못 읽는다. xlsx 로 보내면 빈 화면이 되므로 폴백이 낫다
+    expect(previewKind('application/vnd.ms-excel')).toBe('none')
+    // docx 는 여전히 범위 밖이다
+    expect(
+      previewKind('application/vnd.openxmlformats-officedocument.wordprocessingml.document'),
+    ).toBe('none')
+  })
+
   it('그 외는 전부 none — 폴백 박스(아이콘 + 다운로드)로 간다', () => {
     // file.type 이 비었을 때 업로드가 저장하는 폴백값
     expect(previewKind('application/octet-stream')).toBe('none')
-    // xlsx 는 iframe 에 못 넣는다 — 별도 뷰어가 받는다
-    expect(previewKind('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')).toBe(
-      'none',
-    )
     expect(previewKind('')).toBe('none')
   })
 })

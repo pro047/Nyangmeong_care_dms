@@ -1,4 +1,4 @@
-export type PreviewKind = 'pdf' | 'image' | 'html' | 'none'
+export type PreviewKind = 'pdf' | 'image' | 'html' | 'xlsx' | 'none'
 
 /**
  * 브라우저가 그대로 열 수 있는 형식만 인라인으로 본다. 나머지는 다운로드.
@@ -15,5 +15,8 @@ export function previewKind(mimeType: string): PreviewKind {
   if (type.startsWith('image/')) return 'image'
   // html 은 pdf 와 같은 iframe 을 탄다 — S3 오리진에서 실행되므로 앱에 닿지 못한다.
   if (type === 'text/html') return 'html'
+  // xlsx 는 브라우저가 못 여는 유일한 예외다. 전용 뷰어가 받아 직접 그린다.
+  // xls(구 이진 형식)는 뺀다 — ExcelJS 가 못 읽어서 빈 화면이 된다.
+  if (type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') return 'xlsx'
   return 'none'
 }
