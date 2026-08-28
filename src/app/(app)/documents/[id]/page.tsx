@@ -53,7 +53,7 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
     : ''
 
   return (
-    <div className="mx-auto max-w-4xl">
+    <div>
       <Link
         href="/"
         className="mb-4 inline-flex items-center gap-1.5 text-sm text-ink-muted transition-colors hover:text-ink"

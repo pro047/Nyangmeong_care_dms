@@ -23,7 +23,7 @@ export default async function TrashPage() {
   const documents = await getTrashedDocuments()
 
   return (
-    <div className="mx-auto max-w-6xl">
+    <div>
       <div className="mb-5">
         <h1 className="text-lg font-bold text-ink">휴지통</h1>
         <p className="mt-0.5 text-sm text-ink-muted">

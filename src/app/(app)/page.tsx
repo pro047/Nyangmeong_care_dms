@@ -71,7 +71,7 @@ export default async function DocumentsPage({
       : '전체 문서'
 
   return (
-    <div className="mx-auto max-w-6xl">
+    <div>
       <div className="mb-5 flex items-center justify-between gap-4">
         <div>
           <h1 className="text-lg font-bold text-ink">{heading}</h1>
