@@ -12,8 +12,13 @@ Next.js 16 · React 19 · TypeScript · Tailwind 4 · Prisma 7 + PostgreSQL(RDS)
 
 근거는 `HANDOFF.md`에 있다. 리팩터링하다 아래를 무너뜨리지 말 것.
 
-- **`Document`와 `DocumentVersion`은 분리 유지.** 재업로드 시 `Document`는 그대로 두고
-  `DocumentVersion`만 추가한다. "최신 버전"은 컬럼이 아니라 `versionNo desc` 정렬로 구한다.
+- **`Document`와 `DocumentVersion`은 분리 유지.** 재업로드 시 `Document`에 쓰는 것은
+  **제목 하나뿐**이고(아래), 나머지는 `DocumentVersion`만 추가한다. 파일 정보(`fileName`·
+  `s3Key`·`mimeType`·`sizeBytes`)가 `Document`로 올라가면 분리가 깨진 것이다.
+  "최신 버전"은 컬럼이 아니라 `versionNo desc` 정렬로 구한다.
+  - **제목은 2026-08-28 에 연 예외다.** 현재 제목이 *이전 버전 파일명에서 자동 생성된 값
+    그대로*일 때만 새 파일명을 따라간다(`retitleOnReupload`). 사람이 고친 제목은 덮지
+    않는다 — 되돌릴 방법이 없다. 판정은 버전 조회에 얹어서 하고 **쿼리를 더 내지 않는다**.
 - **1문서 = 1파일.** 한 문서에 여러 파일을 붙이지 않는다.
 - **파일은 앱 서버를 거치지 않는다.** 업로드는 presigned PUT으로 브라우저 → S3 직접,
   다운로드는 presigned GET. 서버로 받아 중계하는 방식으로 바꾸지 말 것.
