@@ -132,7 +132,10 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
       {latest && (
         <section>
           <h2 className="mt-6 mb-2.5 text-sm font-semibold text-ink">미리보기</h2>
-          {kind === 'pdf' && (
+          {/* html 도 같은 iframe 이다. sandbox 를 안 거는 이유 — 문서는 S3 오리진에서
+              실행되므로 앱 쿠키·DOM 에 원리상 닿지 못하고, 팀 화면설계서는 인터랙티브라
+              스크립트를 막으면 정적 껍데기가 된다 (MILESTONES 미리보기 행). */}
+          {(kind === 'pdf' || kind === 'html') && (
             <iframe
               src={previewSrc}
               title={`${latest.fileName} 미리보기`}
