@@ -46,7 +46,9 @@ export default async function TrashPage() {
                 <th scope="col" className="px-4 py-2.5 font-medium">문서</th>
                 <th scope="col" className="hidden px-4 py-2.5 font-medium sm:table-cell">크기</th>
                 <th scope="col" className="px-4 py-2.5 font-medium">삭제</th>
-                <th scope="col" className="w-24 px-4 py-2.5"><span className="sr-only">복구</span></th>
+                {/* 폭을 고정하지 않는다. 아이콘 전용 열(전체 문서의 w-12)과 달리 여기는
+                    텍스트 버튼이 둘이라, 좁게 잡으면 한국어가 글자 단위로 줄바꿈된다. */}
+                <th scope="col" className="px-4 py-2.5"><span className="sr-only">복구</span></th>
               </tr>
             </thead>
             <tbody>
@@ -71,7 +73,7 @@ export default async function TrashPage() {
                     <td className="px-4 py-3 whitespace-nowrap text-ink-muted">
                       {doc.deletedAt ? formatRelative(doc.deletedAt) : '—'}
                     </td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="px-4 py-3 text-right whitespace-nowrap">
                       <TrashRowActions id={doc.id} title={doc.title} />
                     </td>
                   </tr>
