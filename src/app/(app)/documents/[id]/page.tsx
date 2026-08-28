@@ -5,6 +5,7 @@ import { DocumentMetaEditor } from '@/components/document-meta-editor'
 import { DocumentRowActions } from '@/components/document-row-actions'
 import { DocumentFolderSelect } from '@/components/document-folder-select'
 import { TagEditor } from '@/components/tag-editor'
+import { SpreadsheetPreview } from '@/components/spreadsheet-preview'
 import { VersionUploadDialog } from '@/components/version-upload-dialog'
 import { prisma } from '@/lib/prisma'
 import { formatBytes, formatDateTime, fileLabel } from '@/lib/format'
@@ -132,7 +133,10 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
       {latest && (
         <section>
           <h2 className="mt-6 mb-2.5 text-sm font-semibold text-ink">미리보기</h2>
-          {kind === 'pdf' && (
+          {/* html 도 같은 iframe 이다. sandbox 를 안 거는 이유 — 문서는 S3 오리진에서
+              실행되므로 앱 쿠키·DOM 에 원리상 닿지 못하고, 팀 화면설계서는 인터랙티브라
+              스크립트를 막으면 정적 껍데기가 된다 (MILESTONES 미리보기 행). */}
+          {(kind === 'pdf' || kind === 'html') && (
             <iframe
               src={previewSrc}
               title={`${latest.fileName} 미리보기`}
@@ -149,6 +153,17 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
                 className="max-h-[70vh] max-w-full object-contain"
               />
             </div>
+          )}
+          {kind === 'xlsx' && (
+            <SpreadsheetPreview
+              // 재업로드하면 src 의 ?v 가 바뀐다. key 로 갈아끼워야 이전 버전의
+              // 시트가 남지 않는다 — 상태를 effect 안에서 되돌리는 것보다 싸다.
+              key={previewSrc}
+              src={previewSrc}
+              fileName={latest.fileName}
+              sizeBytes={latest.sizeBytes}
+              downloadHref={`/api/documents/${document.id}/download`}
+            />
           )}
           {kind === 'none' && (
             <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-surface p-5">
