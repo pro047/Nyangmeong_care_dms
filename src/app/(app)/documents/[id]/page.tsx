@@ -10,6 +10,7 @@ import { prisma } from '@/lib/prisma'
 import { formatBytes, formatDateTime, fileLabel } from '@/lib/format'
 import { activeDocumentWhere } from '@/lib/trash'
 import { buildFolderTree, flattenFolderTree } from '@/lib/folder'
+import { previewKind } from '@/lib/preview'
 
 export const dynamic = 'force-dynamic'
 
@@ -41,6 +42,10 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
 
   const latest = document.versions[0]
   const folderOptions = flattenFolderTree(buildFolderTree(folders))
+  const kind = latest ? previewKind(latest.mimeType) : 'none'
+  // ?v 를 붙이지 않는다 — 라우트가 versionNo desc 로 최신을 고르므로 재업로드하면
+  // 미리보기도 따라간다. inline=1 이어야 브라우저가 내려받지 않고 연다.
+  const previewSrc = `/api/documents/${document.id}/download?inline=1`
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -118,6 +123,47 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
           </div>
         </div>
       </div>
+
+      {latest && (
+        <section>
+          <h2 className="mt-6 mb-2.5 text-sm font-bold text-ink">미리보기</h2>
+          {kind === 'pdf' && (
+            <iframe
+              src={previewSrc}
+              title={`${latest.fileName} 미리보기`}
+              className="h-[70vh] w-full rounded-xl border border-border bg-surface"
+            />
+          )}
+          {kind === 'image' && (
+            <div className="flex justify-center rounded-xl border border-border bg-surface p-4">
+              {/* eslint-disable-next-line @next/next/no-img-element -- 서명 URL 로 307 되는
+                  라우트라 next/image 의 최적화 대상이 아니다 */}
+              <img
+                src={previewSrc}
+                alt={latest.fileName}
+                className="max-h-[70vh] max-w-full object-contain"
+              />
+            </div>
+          )}
+          {kind === 'none' && (
+            <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-surface p-5">
+              <span className="flex h-9 w-11 shrink-0 items-center justify-center rounded bg-canvas text-[10px] font-bold text-ink-muted">
+                {fileLabel(latest.fileName)}
+              </span>
+              <p className="min-w-0 text-sm text-ink-muted">
+                이 형식은 미리보기를 지원하지 않습니다. 내려받아서 여세요.
+              </p>
+              <a
+                href={`/api/documents/${document.id}/download`}
+                className="ml-auto flex items-center gap-2 rounded-lg border border-border px-3.5 py-2 text-sm text-ink transition-colors hover:bg-canvas"
+              >
+                <Download className="h-4 w-4" />
+                다운로드
+              </a>
+            </div>
+          )}
+        </section>
+      )}
 
       <h2 className="mt-6 mb-2.5 text-sm font-bold text-ink">버전 이력</h2>
       <div className="overflow-hidden rounded-xl border border-border bg-surface">

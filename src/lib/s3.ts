@@ -72,8 +72,3 @@ export async function headObjectSize(key: string): Promise<number | null> {
     return null
   }
 }
-
-/** 주말 범위: PDF와 이미지만 브라우저에서 바로 미리보기. 나머지는 다운로드. */
-export function canPreview(mimeType: string) {
-  return mimeType === 'application/pdf' || mimeType.startsWith('image/')
-}
