@@ -43,9 +43,14 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
   const latest = document.versions[0]
   const folderOptions = flattenFolderTree(buildFolderTree(folders))
   const kind = latest ? previewKind(latest.mimeType) : 'none'
-  // ?v 를 붙이지 않는다 — 라우트가 versionNo desc 로 최신을 고르므로 재업로드하면
-  // 미리보기도 따라간다. inline=1 이어야 브라우저가 내려받지 않고 연다.
-  const previewSrc = `/api/documents/${document.id}/download?inline=1`
+  // versionNo 를 URL 에 박는다. 라우트는 ?v 없이도 최신을 주지만 그러면 v1 과 v2 의
+  // 주소가 같아서, 재업로드 후 router.refresh() 로 이 컴포넌트가 다시 그려져도
+  // src 가 안 바뀌어 브라우저가 캐시된 v1 을 계속 보여준다 (2026-08-28 실측).
+  // 번호를 넣으면 주소가 달라져 다시 받고, 표에 보이는 버전과도 어긋나지 않는다.
+  // inline=1 이어야 브라우저가 내려받지 않고 연다.
+  const previewSrc = latest
+    ? `/api/documents/${document.id}/download?inline=1&v=${latest.versionNo}`
+    : ''
 
   return (
     <div className="mx-auto max-w-4xl">
