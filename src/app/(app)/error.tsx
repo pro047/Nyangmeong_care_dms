@@ -22,7 +22,7 @@ export default function AppError({
       <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-danger-soft">
         <AlertTriangle className="h-6 w-6 text-danger" />
       </div>
-      <h2 className="text-base font-bold text-ink">화면을 불러오지 못했습니다</h2>
+      <h2 className="text-base font-semibold text-ink">화면을 불러오지 못했습니다</h2>
       <p className="mt-2 text-sm leading-relaxed text-ink-muted">
         {looksLikeDbIssue
           ? '데이터베이스에 연결할 수 없습니다. SSH 터널이 열려 있는지 확인해주세요.'

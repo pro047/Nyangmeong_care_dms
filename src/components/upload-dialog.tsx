@@ -14,6 +14,7 @@ import {
   type FolderAliasRow,
 } from '@/lib/folder'
 import { classifyFileName, type ClassifyResult } from '@/lib/classify'
+import { titleFromFileName } from '@/lib/title'
 import {
   createPlannedFolders,
   defaultDestination,
@@ -46,11 +47,6 @@ const MAX_PARALLEL = 3
 const AUTO = '__auto__'
 /** 목적지 셀렉트에서 "새 폴더"를 고른 값. */
 const NEW_FOLDER = '__new__'
-
-function titleFromFileName(fileName: string) {
-  const dot = fileName.lastIndexOf('.')
-  return dot > 0 ? fileName.slice(0, dot) : fileName
-}
 
 async function errorMessage(res: Response, fallback: string) {
   const body = await res.json().catch(() => null)
@@ -456,7 +452,7 @@ export function UploadDialog({
             className="flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-xl bg-surface shadow-xl"
           >
             <div className="flex items-center justify-between border-b border-border px-5 py-4">
-              <h2 id="upload-title" className="text-sm font-bold text-ink">
+              <h2 id="upload-title" className="text-sm font-semibold text-ink">
                 문서 업로드
               </h2>
               <button

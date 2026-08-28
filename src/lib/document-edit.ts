@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { TITLE_MAX_LENGTH } from '@/lib/title'
 
 export const MOVE_FOLDER_NOT_FOUND = '이동할 폴더를 찾을 수 없습니다.'
 
@@ -6,7 +7,7 @@ export const MOVE_FOLDER_NOT_FOUND = '이동할 폴더를 찾을 수 없습니�
 export const documentPatchSchema = z
   .object({
     // trim 을 min/max 앞에 둔다. 뒤에 두면 공백뿐인 제목이 min(1)을 통과한다.
-    title: z.string().trim().min(1).max(200).optional(),
+    title: z.string().trim().min(1).max(TITLE_MAX_LENGTH).optional(),
     description: z.string().trim().max(2000).nullable().optional(),
     // description 과 같은 3상: 문자열이면 그 폴더로, null 이면 미분류로, 생략이면 그대로 둔다.
     folderId: z.string().min(1).nullable().optional(),

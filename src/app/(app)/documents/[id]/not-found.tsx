@@ -4,7 +4,7 @@ import { FileQuestion } from 'lucide-react'
 // 이 세그먼트에만 둔다. (app)/ 에 두면 다른 페이지의 notFound() 까지 "문서" 문구로 잡힌다.
 export default function DocumentNotFound() {
   return (
-    <div className="mx-auto max-w-6xl">
+    <div>
       <div className="rounded-xl border border-dashed border-border-strong bg-surface py-20 text-center">
         <FileQuestion className="mx-auto mb-3 h-8 w-8 text-ink-subtle" aria-hidden />
         <p className="text-sm font-medium text-ink">문서를 찾을 수 없습니다</p>

@@ -5,6 +5,7 @@ import { notifyUpload } from '@/lib/discord'
 import { MAX_UPLOAD_BYTES, headObjectSize } from '@/lib/s3'
 import { verifyUploadToken } from '@/lib/upload-token'
 import { ACTIVE_DOCUMENT_NOT_FOUND, activeDocumentWhere } from '@/lib/trash'
+import { retitleOnReupload } from '@/lib/title'
 import {
   nextVersionNo,
   toChangeNote,
@@ -15,7 +16,8 @@ import {
 export const dynamic = 'force-dynamic'
 
 /**
- * 재업로드. S3 업로드가 끝난 뒤 호출되고, Document 는 그대로 둔 채 DocumentVersion 만 더한다.
+ * 재업로드. S3 업로드가 끝난 뒤 호출되고 DocumentVersion 을 더한다. Document 본체는
+ * 제목을 빼면 그대로다 — 자동 생성된 제목만 새 파일명을 따라간다 (retitleOnReupload).
  * 앞 세 단계(토큰·객체·크기)는 문서 생성(route.ts)과 같은 순서다 — 같은 presign 을 쓰기 때문이다.
  */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -54,7 +56,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const latest = await prisma.documentVersion.findFirst({
     where: { documentId: id, document: activeDocumentWhere() },
     orderBy: { versionNo: 'desc' },
-    select: { versionNo: true },
+    // fileName·title 도 같이 집는다 — 제목을 따라가게 할지 판정하는 데 쓴다.
+    // 별도 쿼리를 내지 않으려고 여기에 얹었다 (커넥션 상한이 5다).
+    select: { versionNo: true, fileName: true, document: { select: { title: true } } },
   })
   if (!latest) {
     return NextResponse.json({ error: ACTIVE_DOCUMENT_NOT_FOUND }, { status: 404 })
@@ -62,6 +66,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const versionNo = nextVersionNo(latest.versionNo)
   const note = toChangeNote(changeNote)
+  // null 이면 제목을 건드리지 않는다 (사람이 고친 제목이거나 바뀔 것이 없다).
+  const nextTitle = retitleOnReupload(latest.document.title, latest.fileName, fileName)
 
   // 여기까지 오는 사이 남이 같은 번호를 올리거나 문서를 지울 수 있다. 락 대신
   // @@unique([documentId, versionNo]) 와 where 의 deletedAt 이 그 창을 막고,
@@ -75,6 +81,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       // documentVersion.create 로 만들면 부모에 UPDATE 가 안 나가 @updatedAt 이 멈춰
       // 목록(최근 수정순)에서 재업로드한 문서가 올라오지 않는다.
       data: {
+        ...(nextTitle ? { title: nextTitle } : {}),
         versions: {
           create: {
             versionNo,

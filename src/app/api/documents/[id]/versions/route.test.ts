@@ -41,7 +41,13 @@ beforeEach(() => {
   getSession.mockReset().mockResolvedValue(SESSION)
   verifyUploadToken.mockReset().mockResolvedValue(true)
   headObjectSize.mockReset().mockResolvedValue(1234)
-  findFirst.mockReset().mockResolvedValue({ versionNo: 2 })
+  // 기본값은 '사람이 고친 제목'이다 ('문서' != '이전' = titleFromFileName('이전.pdf')).
+  // 이래야 제목 갱신이 끼어들지 않아 나머지 테스트가 재업로드 본연의 동작만 본다.
+  findFirst.mockReset().mockResolvedValue({
+    versionNo: 2,
+    fileName: '이전.pdf',
+    document: { title: '문서' },
+  })
   update.mockReset().mockResolvedValue({ id: 'doc_1', title: '문서' })
   notifyUpload.mockReset().mockResolvedValue(undefined)
 })
@@ -200,13 +206,49 @@ describe('POST /api/documents/[id]/versions — 불변식', () => {
     expect(query.where).toMatchObject({ documentId: 'doc_1', document: { deletedAt: null } })
   })
 
-  it('재업로드는 Document 필드를 건드리지 않고 버전만 중첩 생성해야 한다', async () => {
+  it('재업로드가 Document 에 쓰는 것은 제목뿐이어야 한다', async () => {
     // 1문서 = 1파일: 파일 정보는 DocumentVersion 에만 산다. data 에 fileName/s3Key 가
     // 직접 들어오면 Document/DocumentVersion 분리가 깨진 것이다.
+    // 제목은 2026-08-28 에 의도적으로 연 예외다 (MILESTONES.md 확정된 설계 결정).
     await POST(post(BODY), PARAMS)
 
     const args = update.mock.calls[0][0]
     expect(Object.keys(args.data)).toEqual(['versions'])
     expect(Object.keys(args.data.versions)).toEqual(['create'])
+  })
+
+  it('제목이 자동 생성값 그대로면 새 파일명을 따라가야 한다', async () => {
+    findFirst.mockResolvedValue({
+      versionNo: 2,
+      fileName: '이전.pdf',
+      document: { title: '이전' },
+    })
+
+    await POST(post(BODY), PARAMS)
+
+    // BODY.fileName 이 '보고서.pdf' 다
+    expect(update.mock.calls[0][0].data.title).toBe('보고서')
+  })
+
+  it('사람이 고친 제목은 재업로드가 덮지 않아야 한다', async () => {
+    // 되돌릴 방법이 없는 파괴적 동작이라 불변식만큼 강하게 잡아 둔다.
+    findFirst.mockResolvedValue({
+      versionNo: 2,
+      fileName: '이전.pdf',
+      document: { title: '2026 상반기 보고' },
+    })
+
+    await POST(post(BODY), PARAMS)
+
+    expect(update.mock.calls[0][0].data).not.toHaveProperty('title')
+  })
+
+  it('제목 판정에 쓰는 값을 버전 조회에서 같이 집어야 한다 (추가 왕복 금지)', async () => {
+    // 커넥션 상한이 5다. 판정 하나 때문에 쿼리를 더 내면 안 된다.
+    await POST(post(BODY), PARAMS)
+
+    expect(findFirst).toHaveBeenCalledTimes(1)
+    const select = findFirst.mock.calls[0][0].select
+    expect(select).toMatchObject({ fileName: true, document: { select: { title: true } } })
   })
 })

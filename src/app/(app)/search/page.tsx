@@ -33,8 +33,8 @@ export default async function SearchPage({
   // 헤더 폼을 빈 칸으로 제출하면 여기로 온다. 500 대신 안내를 띄운다.
   if (q === null) {
     return (
-      <div className="mx-auto max-w-6xl">
-        <h1 className="mb-5 text-lg font-bold text-ink">검색</h1>
+      <div>
+        <h1 className="mb-5 text-xl font-semibold text-ink">검색</h1>
         <div className="rounded-xl border border-dashed border-border-strong bg-surface py-20 text-center">
           <Search className="mx-auto mb-3 h-8 w-8 text-ink-subtle" aria-hidden />
           <p className="text-sm font-medium text-ink">검색어를 입력하세요</p>
@@ -47,9 +47,9 @@ export default async function SearchPage({
   const documents = await searchDocuments(q)
 
   return (
-    <div className="mx-auto max-w-6xl">
+    <div>
       <div className="mb-5">
-        <h1 className="text-lg font-bold text-ink">‘{q}’ 검색 결과</h1>
+        <h1 className="text-xl font-semibold text-ink">‘{q}’ 검색 결과</h1>
         <p className="mt-0.5 text-sm text-ink-muted">{documents.length}건</p>
       </div>
 

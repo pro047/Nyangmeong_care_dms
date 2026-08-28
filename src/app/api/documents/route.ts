@@ -5,11 +5,12 @@ import { prisma } from '@/lib/prisma'
 import { notifyUpload } from '@/lib/discord'
 import { MAX_UPLOAD_BYTES, headObjectSize } from '@/lib/s3'
 import { verifyUploadToken } from '@/lib/upload-token'
+import { TITLE_MAX_LENGTH } from '@/lib/title'
 
 export const dynamic = 'force-dynamic'
 
 const bodySchema = z.object({
-  title: z.string().min(1).max(200),
+  title: z.string().min(1).max(TITLE_MAX_LENGTH),
   description: z.string().max(2000).optional(),
   folderId: z.string().optional(),
   s3Key: z.string().min(1),

@@ -16,10 +16,10 @@ export default async function LoginPage({
     <main className="flex min-h-screen items-center justify-center px-4">
       <div className="w-full max-w-sm rounded-xl border border-border bg-surface p-8 shadow-sm">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-accent text-xl font-bold text-white">
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-accent text-xl font-semibold text-white">
             D
           </div>
-          <h1 className="text-xl font-bold text-ink">팀 문서 관리</h1>
+          <h1 className="text-xl font-semibold text-ink">팀 문서 관리</h1>
           <p className="mt-1.5 text-sm text-ink-muted">
             프로젝트 문서를 한 곳에서 관리합니다.
           </p>

@@ -7,10 +7,10 @@ export function AppHeader({ user }: { user: SessionUser }) {
   return (
     <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-4 border-b border-border bg-surface px-4">
       <Link href="/" className="flex shrink-0 items-center gap-2">
-        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent text-sm font-bold text-white">
+        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent text-sm font-semibold text-white">
           D
         </span>
-        <span className="hidden text-sm font-bold text-ink sm:inline">팀 문서 관리</span>
+        <span className="hidden text-sm font-semibold text-ink sm:inline">팀 문서 관리</span>
       </Link>
 
       {/* GET 폼이라 제출하면 ?q= 가 붙은 채 /search 로 이동한다 — 별도 핸들러가 필요 없다. */}
