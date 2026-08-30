@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { ACTIVE_DOCUMENT_NOT_FOUND } from '@/lib/trash'
+import { S3_KEY_ALREADY_USED } from '@/lib/upload-guard'
 
 export const VERSION_CONFLICT =
   '같은 문서에 다른 버전이 동시에 올라왔습니다. 새로고침 후 다시 시도해 주세요.'
@@ -26,20 +27,40 @@ export function nextVersionNo(latestVersionNo: number | null): number {
   return latestVersionNo === null ? 1 : latestVersionNo + 1
 }
 
-export type VersionCreateFailure = { status: 404 | 409; error: string }
+export type VersionCreateFailure = { status: 400 | 404 | 409; error: string }
 
 /**
  * Prisma 오류를 HTTP 결과로 해석한다. 오류 클래스를 import 하지 않고 code 속성만 보는 이유:
  * 실제로 판단에 쓰는 것은 코드 문자열뿐이고, 생성 클라이언트를 테스트로 끌어올 필요가 없다.
  *
- * P2002 는 @@unique([documentId, versionNo]) 충돌 = 같은 번호를 동시에 올린 것,
+ * P2002 는 유일 제약 충돌인데 **제약이 둘이라 뜻이 갈린다** — s3_key 면 같은 업로드를
+ * 두 번 쓴 것(400), documentId+versionNo 면 같은 번호를 동시에 올린 것(409)이다.
+ * meta.target 을 안 보고 뭉개면 재사용 사고가 "버전 번호 충돌"로 보고돼 원인을 못 찾는다.
  * P2025 는 update 대상 없음 = 조회와 수정 사이에 문서가 휴지통으로 갔다는 뜻이다.
  * 그 외는 null 을 돌려 호출자가 rethrow 하게 둔다 — 모르는 오류를 404/409로 뭉개지 않는다.
  */
 export function versionCreateFailure(err: unknown): VersionCreateFailure | null {
   const code =
     typeof err === 'object' && err !== null ? (err as { code?: unknown }).code : undefined
-  if (code === 'P2002') return { status: 409, error: VERSION_CONFLICT }
+  if (code === 'P2002') {
+    return isS3KeyConflict(err)
+      ? { status: 400, error: S3_KEY_ALREADY_USED }
+      : { status: 409, error: VERSION_CONFLICT }
+  }
   if (code === 'P2025') return { status: 404, error: ACTIVE_DOCUMENT_NOT_FOUND }
   return null
+}
+
+/**
+ * P2002 가 s3_key 제약에서 났는가. `meta.target` 은 Prisma 버전·드라이버에 따라
+ * 문자열 배열이거나 문자열 하나라 둘 다 받는다. 판정이 안 되면 false 를 돌려
+ * 기존 해석(버전 번호 충돌)으로 떨어진다 — 모르는 것을 새 분기로 끌어오지 않는다.
+ */
+export function isS3KeyConflict(err: unknown): boolean {
+  const meta =
+    typeof err === 'object' && err !== null ? (err as { meta?: unknown }).meta : undefined
+  const target =
+    typeof meta === 'object' && meta !== null ? (meta as { target?: unknown }).target : undefined
+  if (Array.isArray(target)) return target.some((t) => String(t).includes('s3_key'))
+  return typeof target === 'string' && target.includes('s3_key')
 }

@@ -113,6 +113,18 @@ export function VersionUploadDialog({
         // 404(그 사이 삭제)·409(동시 재업로드) 는 서버 문구를 그대로 보여준다.
         if (!res.ok) throw new Error(await errorMessage(res, '새 버전을 저장하지 못했습니다.'))
       },
+      // 버전이 되지 못한 객체를 서버가 지운다. 지울지 말지는 서버가 참조 수로 정한다.
+      discard: async ({ key, keyToken }) => {
+        await fetch('/api/uploads/discard', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ s3Key: key, keyToken }),
+          // 이 요청은 기다려지지 않는다(upload-flow 의 fireDiscard). 취소 직후 탭을
+          // 닫거나 화면을 옮기면 브라우저가 끊어 객체가 그대로 남는다.
+          // 본문이 수백 바이트라 keepalive 상한(64KB)에 한참 못 미친다.
+          keepalive: true,
+        }).catch(() => null)
+      },
     })
 
     batches.current.delete(batch)

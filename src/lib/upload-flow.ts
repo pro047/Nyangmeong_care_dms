@@ -11,6 +11,8 @@ export type UploadFlowDeps = {
   presign: () => Promise<PresignResult>
   put: (presigned: PresignResult) => Promise<void>
   create: (presigned: PresignResult) => Promise<void>
+  /** 객체가 올라갔을 수 있는데 문서가 되지 못했을 때. 실패는 삼킨다(최선 노력). */
+  discard: (presigned: PresignResult) => Promise<void>
 }
 
 export type UploadOutcome =
@@ -50,20 +52,40 @@ export async function runUploadFlow(
     await deps.put(presigned)
   } catch (err) {
     // abort 로 깨어난 것과 진짜 실패를 여기서 가른다.
+    //
+    // 어느 쪽이든 정리를 부른다. abort 는 **본문을 다 보낸 뒤 응답이 오기 전**에도 걸리고
+    // (close() 가 cancelled 를 세운 직후 xhr.abort() 한다), 그때 객체는 이미 S3 에 있다.
+    // 여기서 안 부르면 s3:ListBucket 이 없어 사후에 찾지도 못하는 고아가 된다.
+    // 객체가 없는 경우에 불려도 무해하다 — DeleteObject 는 멱등이다(실측 X6).
+    fireDiscard(deps, presigned)
     return batch.cancelled ? { kind: 'cancelled' } : errorOutcome(err)
   }
 
   // PUT 이 끝난 뒤 취소됐을 수 있다(100% 직후 취소). 사람이 그만두라고 했으면
-  // 문서를 만들지 않는다. S3 객체는 고아로 남는데, 정리 경로는 아직 없다.
-  if (batch.cancelled) return { kind: 'cancelled' }
+  // 문서를 만들지 않고, 이미 올라간 객체는 정리에 맡긴다.
+  if (batch.cancelled) {
+    fireDiscard(deps, presigned)
+    return { kind: 'cancelled' }
+  }
 
   try {
     await deps.create(presigned)
   } catch (err) {
+    // 저장은 됐는데 응답만 잃은 경우일 수 있다. 여기서 가리지 않는다 — 실제로 지울지는
+    // 서버가 그 키의 참조 수를 보고 정한다.
+    fireDiscard(deps, presigned)
     return errorOutcome(err)
   }
 
   return { kind: 'done' }
+}
+
+/**
+ * 기다리지 않는다 — 사람이 닫은 뒤의 정리 요청이 취소·실패 반환을 지연시키면 안 된다.
+ * 실패도 삼킨다. 정리에 실패해 봐야 고아가 남을 뿐이고, 그건 이 함수가 판단할 일이 아니다.
+ */
+function fireDiscard(deps: UploadFlowDeps, presigned: PresignResult) {
+  void deps.discard(presigned).catch(() => {})
 }
 
 function errorOutcome(err: unknown): UploadOutcome {

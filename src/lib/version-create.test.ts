@@ -7,6 +7,7 @@ import {
   versionCreateSchema,
 } from '@/lib/version-create'
 import { ACTIVE_DOCUMENT_NOT_FOUND } from '@/lib/trash'
+import { S3_KEY_ALREADY_USED } from '@/lib/upload-guard'
 
 const VALID = {
   s3Key: 'documents/abc.pdf',
@@ -51,6 +52,28 @@ describe('versionCreateSchema', () => {
 describe('versionCreateFailure', () => {
   it('P2002(동시 재업로드)는 409 로 해석해야 한다', () => {
     expect(versionCreateFailure({ code: 'P2002' })).toEqual({
+      status: 409,
+      error: VERSION_CONFLICT,
+    })
+  })
+
+  // 유일 제약이 둘이라 P2002 의 뜻이 갈린다. target 을 안 보면 재사용 사고가
+  // "버전 번호 충돌"로 보고돼 원인을 못 찾는다.
+  it('P2002 가 s3_key 제약이면 400 으로 해석해야 한다', () => {
+    expect(versionCreateFailure({ code: 'P2002', meta: { target: ['s3_key'] } })).toEqual({
+      status: 400,
+      error: S3_KEY_ALREADY_USED,
+    })
+  })
+
+  it('target 이 문자열로 와도 s3_key 를 알아봐야 한다', () => {
+    expect(
+      versionCreateFailure({ code: 'P2002', meta: { target: 'document_versions_s3_key_key' } }),
+    ).toEqual({ status: 400, error: S3_KEY_ALREADY_USED })
+  })
+
+  it('target 을 알 수 없으면 기존 해석(409)으로 떨어져야 한다', () => {
+    expect(versionCreateFailure({ code: 'P2002', meta: {} })).toEqual({
       status: 409,
       error: VERSION_CONFLICT,
     })

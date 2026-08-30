@@ -138,6 +138,19 @@ export function UploadDialog({
           })
           if (!res.ok) throw new Error(await errorMessage(res, '문서 저장 실패'))
         },
+        // 문서가 되지 못한 객체를 서버가 지운다. 결과는 보지 않는다 — 지울지 말지는
+        // 서버가 참조 수로 정하고, 실패해도 사용자에게 알릴 것이 없다.
+        discard: async ({ key, keyToken }) => {
+          await fetch('/api/uploads/discard', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ s3Key: key, keyToken }),
+            // 이 요청은 기다려지지 않는다(upload-flow 의 fireDiscard). 취소 직후 탭을
+            // 닫거나 화면을 옮기면 브라우저가 끊어 객체가 그대로 남는다.
+            // 본문이 수백 바이트라 keepalive 상한(64KB)에 한참 못 미친다.
+            keepalive: true,
+          }).catch(() => null)
+        },
       })
 
       // cancelled 면 아무것도 하지 않는다 — close() 가 목록을 비운다.
