@@ -117,6 +117,8 @@ assert 로도 안 잡힌다. "이건 카테고리가 아니라 제목이다"는 
   `document_versions` · S3 객체만 지운다. **자동 분류는 폴더를 만드는 기능**이라 실측을
   돌릴 때마다 dev DB 에 제안 폴더가 쌓인다. `purgeFolders` 가 하나 더 필요하다
 - **이 PC 에 Playwright 브라우저가 없다.** `~/AppData/Local/ms-playwright/` 가 비어 있다
+  (2026-08-31 주: 이 경로는 **Windows 시절 기록**이다. 지금 머신은 macOS 라
+  `~/Library/Caches/ms-playwright` 를 보고, 거기엔 설치돼 있다)
   (2026-08-26 확인). `npx playwright install chromium` 이 선행이다
 
 #### 그 셋의 결과 (2026-08-27)

@@ -84,7 +84,11 @@ RDS 인스턴스 설정(파라미터 그룹, 보안 그룹, 마스터 비밀번�
 `.env`는 gitignore 대상이고, `.gitignore`의 `!.env.example` 예외를 지우지 말 것
 (기본값 `.env*`가 예제 파일까지 무시한다).
 
-**Windows 개발 환경.** git의 LF→CRLF 경고는 정상이다. 셸은 Git Bash.
+**개발 환경은 macOS 다** (2026-08-31 정정). 이 문단은 원래 *"Windows 개발 환경.
+git의 LF→CRLF 경고는 정상이다. 셸은 Git Bash"* 라고 적혀 있었다. 지금은 Darwin + zsh 다.
+경로가 갈리는 곳이 있으니 문서를 그대로 믿지 말 것 — 예: Playwright 브라우저는
+`~/AppData/Local/ms-playwright`(구 기록)가 아니라 `~/Library/Caches/ms-playwright` 에 있다.
+`.claude/settings.local.json` 의 PowerShell 규칙도 이 PC 에서는 쓰이지 않는다.
 
 ## 명시적으로 범위 밖
 

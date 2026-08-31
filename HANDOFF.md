@@ -378,7 +378,7 @@ PowerShell·sandbox 해제), `npx tsc --noEmit`, `./node_modules/.bin/tsc`,
 | `login/page.tsx:31` | `?error=` 값을 **화이트리스트 없이 그대로 렌더**한다. `page.tsx` 배너(`/`)는 `pageErrorMessage` 로 거르는데 `/login` 은 안 거른다 — 임의 문장이 빨간 배너로 뜬다. React 가 이스케이프하므로 XSS 는 아니고, 로그인 폼에 입력 필드가 없어 훔칠 것도 없다 (2026-08-25 코드 확인) | **계기 없음** — 심각도가 낮다. `/` 와 정책이 갈린다는 것만 기록해 둔다. 고친다면 `pageErrorMessage` 를 `/login` 에도 적용 |
 | `s3.ts:71` | `catch { return null }` 이 403·503 을 "파일 없음"으로 뭉갬 | 로그 추가로 충분 |
 | `upload-dialog.tsx:39,74,139`<br>`version-upload-dialog.tsx:39,50,98` | `inFlight` 에서 완료된 XHR 을 제거하지 않음. 줄번호는 `putToS3` 를 `lib/upload-xhr.ts` 로 뺀 뒤 기준(2026-08-24). 같은 결함이 재업로드 다이얼로그에 복제됐다 | 누수는 다이얼로그 수명 한정 |
-| `(app)/error.tsx:17-28` | DB 연결 실패에 **"SSH 터널"** 안내를 띄운다. 개발 DB 를 Neon 으로 바꾼 뒤로는 상황과 안 맞고(터널이 없다), 운영은 RDS 직결이라 배포 후에도 안 맞는다 (2026-08-25 B11 실측에서 확인) | **M6 배포 때** — 그때 환경이 확정되므로 문구를 그 환경에 맞춘다 |
+| ~~`(app)/error.tsx:17-28`~~ | **해소됨 (2026-08-31).** 계기("M6 배포 때")가 2026-08-25 에 이미 지났는데 6일간 처리가 안 됐다 — **계기 기반 목록의 약점이 이것이다. 계기가 왔는지 아무도 안 본다.** 고친 문구는 팀원이 실제로 할 수 있는 행동이다(관리자에게 "DB 연결 실패"라고 알림). 원문은 개발자용 지시가 사용자 화면에 새어 나온 것이었고, Neon 직결로 옮긴 뒤로는 터널 자체가 없다 |
 | `lib/tag.ts` (정규화) vs `lib/search.ts` (필터) | 영문 태그 대소문자 정책이 갈린다. **한 문서 안**에서는 `Plan`/`plan` 이 합쳐지는데(`normalizeTags` 가 대소문자 무시 중복 제거) **문서 사이**에서는 필터가 완전일치라 갈린다. `DESIGN.md` §4 가 "팀 태그는 한글 위주"를 근거로 의도적으로 수용한 것이다 | **영문 태그를 실제로 쓰기 시작하면** — 팀이 안 쓰면 계기가 안 온다. 고친다면 `Tag.name` 을 소문자로 저장하고 표시용 원본을 따로 두는 쪽인데 스키마 변경을 부른다 |
 | `page.tsx` 배너 (2차 리뷰) | `?error=notfound` 가 주소창에 눌러앉는다. 배너를 띄운 화면에서 업로드하면 `close()` 의 `router.refresh()` 가 **URL 을 안 바꿔서** 방금 성공한 업로드 옆에 낡은 에러가 남는다 | 닫기 버튼(`history.replaceState`)이나 렌더 후 파라미터 제거. ~~M3 상세 페이지가 배너를 하나 더 쓸 것이므로 그때 같이~~ — **그 전제가 깨졌다.** 상세 페이지는 배너 대신 `notFound()` + 세그먼트 `not-found.tsx` 를 쓴다(URL 에 에러가 눌러앉지 않는다). 배너를 쓰는 곳은 목록의 다운로드 링크뿐이라 이 항목은 계기 없이 남는다 |
 | `download/route.ts:36` (2차 리뷰) | 같은 핸들러의 401 만 여전히 내비게이션에 JSON 을 준다 | **의도된 것.** proxy 가 같은 쿠키를 같은 키로 먼저 검증하므로 도달 창은 프록시 통과와 라우트 도착 사이 수 ms 경합뿐이다. 이유를 `route.test.ts` 주석에 박아 뒀다 |
@@ -433,6 +433,16 @@ grep -o -- "--color-accent:[^;}]*" .next/static/chunks/*.css   # 리터럴이어
 `test/e2e/suggest-name-edit.mjs` 로 재구성했다 — **원본과 항목 번호가 다르다.**
 남은 것은 커밋 메시지뿐이므로 **파이프라인 주행의 커밋 메시지를 길게 쓰는 것이 실제로
 보험이 된다.** `.pipeline/` 을 추적할지는 **아직 정하지 않았다**(gitignore 정책 변경).
+
+**문서가 Windows 를 전제한 곳이 남아 있다** (2026-08-31 정정). `CLAUDE.md:87` 이
+*"Windows 개발 환경 · 셸은 Git Bash"* 라고 적고 있었다 — 지금 머신은 Darwin + zsh 다.
+경로가 갈리는 자리가 실제로 있다:
+
+- Playwright 브라우저는 `~/AppData/Local/ms-playwright` 가 아니라
+  `~/Library/Caches/ms-playwright` 에 있다 (아카이브 "실측 방법" 절의 기록이 구 경로다)
+- `.claude/settings.local.json` 의 PowerShell 규칙은 이 PC 에서 쓰이지 않는다. 그래서
+  **파이프라인 결함 2번의 "다음 주행에서 권한 거부 8→4 로 떨어지는지 확인"은 이 머신에서는
+  계기가 오지 않는다** — 검증 항목으로 계속 들고 있을 이유가 없다
 
 **맥에서 처음 돌릴 때 `prisma generate` 를 안 하면 `GET / 500` 이 난다** (2026-08-28).
 사인은 `Unknown field 'aliases' for select statement on model 'Folder'` 인데
@@ -659,7 +669,7 @@ src/
       documents/[id]/not-found.tsx  없는/휴지통 문서. 배너 리다이렉트가 아니라 이 자리에서 알린다
       trash/page.tsx          휴지통
       search/page.tsx         검색 결과 (헤더 검색창의 대상)
-      error.tsx               에러 바운더리. DB 연결 실패를 따로 안내 (터널 끊김 대비)
+      error.tsx               에러 바운더리. DB 연결 실패를 따로 안내 (문구는 팀원용 — 개발자 지시 금지)
     login/                    비로그인 구간
     api/auth/                 login · callback · logout
     api/documents/
