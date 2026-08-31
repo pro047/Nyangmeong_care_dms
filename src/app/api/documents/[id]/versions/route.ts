@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { notifyUpload } from '@/lib/discord'
 import { MAX_UPLOAD_BYTES, headObjectSize } from '@/lib/s3'
 import { verifyUploadToken } from '@/lib/upload-token'
+import { S3_KEY_ALREADY_USED } from '@/lib/upload-guard'
 import { ACTIVE_DOCUMENT_NOT_FOUND, activeDocumentWhere } from '@/lib/trash'
 import { retitleOnReupload } from '@/lib/title'
 import {
@@ -36,6 +37,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   // ① 이 키가 우리가 이 사용자에게 발급한 것인가.
   if (!(await verifyUploadToken(keyToken, s3Key, session.id))) {
     return NextResponse.json({ error: '업로드 정보가 만료되었거나 올바르지 않습니다.' }, { status: 400 })
+  }
+
+  // ①-2 이 키로 이미 버전이 만들어졌는가. keyToken 은 검증돼도 소모되지 않아
+  //     (upload-token.ts) 5분간 재사용할 수 있다. 여기서 끊지 않으면 같은 객체를
+  //     가리키는 버전이 생기고, 영구삭제가 남의 파일까지 지울 뻔한 상황이 된다.
+  const used = await prisma.documentVersion.findFirst({
+    where: { s3Key },
+    select: { id: true },
+  })
+  if (used) {
+    return NextResponse.json({ error: S3_KEY_ALREADY_USED }, { status: 400 })
   }
 
   // ② 객체가 실제로 올라갔는가. 크기는 클라이언트 신고값 대신 여기서 얻는다.

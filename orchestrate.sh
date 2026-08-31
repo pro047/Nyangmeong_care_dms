@@ -10,6 +10,7 @@
 #   ./orchestrate.sh <feature-name>
 #   AUTO=1 ./orchestrate.sh <feature-name>     # 사람 게이트 건너뜀 (무인)
 #   MAX_RETRY=3 ./orchestrate.sh <feature-name>
+#   RESUME_FROM=verify ./orchestrate.sh <feature-name>   # impl 건너뛰고 verify 부터
 
 set -euo pipefail
 
@@ -25,6 +26,17 @@ AUTO="${AUTO:-0}"
 # (중단 후 재실행에서 비싼 설계를 다시 만들지 않기 위한 것 — 설계 게이트는 그대로 거친다)
 # 설계를 새로 뽑고 싶으면 FRESH_DESIGN=1
 FRESH_DESIGN="${FRESH_DESIGN:-0}"
+# RESUME_FROM=verify — 첫 바퀴에서 impl 을 건너뛰고 verify 부터 시작한다.
+#
+# 계기(2026-08-30): verify 가 계정 세션 한도(api_error)로 죽었다. 코드는 impl 이
+# STATUS: DONE 으로 남긴 그대로인데, 재시도 루프가 impl→verify 를 한 쌍으로 묶고
+# 있어서 재실행하면 impl 부터 다시 돈다 (design·judge 에만 재사용 로직이 있다).
+#
+# **자동 판정을 넣지 않는 이유**: 루프는 두 실패를 구분해야 한다 —
+#   검증 명령 실패(테스트가 빨감) → impl 재주행이 **필요하다**
+#   단계 자체가 사망(예산·API 오류)   → impl 재주행이 **불필요하다**
+# 셸이 이 둘을 안전하게 가르지 못한다. 그래서 사람이 명시할 때만 건너뛴다.
+RESUME_FROM="${RESUME_FROM:-}"
 # vitest 4 (`npm test` = `vitest run`). 테스트 파일이 0개면 실패한다
 # (vitest.config.mts 의 passWithNoTests:false) — 검증 단계가 테스트를 안 쓰고
 # 넘어간 것을 게이트가 통과시키면 안 되기 때문이다.
@@ -694,15 +706,36 @@ check_protected() {
     || die "$stage 단계가 보호 파일을 수정함: $changed — git checkout 으로 되돌린 뒤 설계부터 다시 볼 것"
 }
 
+# RESUME_FROM 은 건너뛰기다. 근거가 없으면 조용히 넘어가는 대신 여기서 죽는다 —
+# 오타(RESUME_FROM=verfiy)가 "그냥 impl 이 또 돌았다"로 나타나면 알아채지 못한다.
+if [ -n "$RESUME_FROM" ]; then
+  [ "$RESUME_FROM" = "verify" ] \
+    || die "RESUME_FROM 은 verify 만 지원한다 (받은 값: $RESUME_FROM)"
+  [ -f "$WORK/IMPL.md" ] \
+    && [ "$(grep -m1 '^STATUS:' "$WORK/IMPL.md" | awk '{print $2}')" = "DONE" ] \
+    || die "RESUME_FROM=verify 인데 $WORK/IMPL.md 가 없거나 STATUS: DONE 이 아니다 — 건너뛸 근거가 없다"
+fi
+
 while :; do
   ATTEMPT=$((ATTEMPT + 1))
   log "── 시도 $ATTEMPT/$((MAX_RETRY + 1))"
 
-  run_stage impl   "$MODEL_IMPL"   "$FALLBACK_IMPL"   "$PROMPTS/impl.md"   "$WORK/IMPL.md"
+  if [ "$RESUME_FROM" = "verify" ] && [ "$ATTEMPT" = 1 ]; then
+    # 보호 파일 검사의 사각을 git 으로 메운다. check_protected 는 "이번 실행이
+    # 바꿨는가"를 보는데, impl 을 이번에 안 돌리면 이전 실행의 결과가 이미 기준선에
+    # 들어가 있어 원리상 안 보인다.
+    RESUMED_DIRTY="$(cd "$ROOT" && git status --porcelain -- $PROTECTED 2>/dev/null | awk '{print $2}' | tr '\n' ' ')"
+    [ -z "$RESUMED_DIRTY" ] \
+      || die "RESUME_FROM=verify — 보호 파일이 커밋 기준으로 변경돼 있다: $RESUMED_DIRTY. 이전 impl 이 건드렸는지 확인하고 git checkout 으로 되돌린 뒤 다시 실행해라 (의도한 변경이면 커밋한 뒤 실행)"
+    log "↺ RESUME_FROM=verify — impl 건너뜀 (기존 IMPL.md 재사용, 보호 파일 git 대조 통과)"
+    state "REUSED:impl" "RESUME_FROM=verify — 기존 IMPL.md 재사용"
+  else
+    run_stage impl   "$MODEL_IMPL"   "$FALLBACK_IMPL"   "$PROMPTS/impl.md"   "$WORK/IMPL.md"
 
-  # 구현 직후에 검사한다. 검증 단계까지 흘려보내면 그 위에 테스트가 쌓여서
-  # 되돌리는 비용이 올라간다.
-  check_protected impl
+    # 구현 직후에 검사한다. 검증 단계까지 흘려보내면 그 위에 테스트가 쌓여서
+    # 되돌리는 비용이 올라간다.
+    check_protected impl
+  fi
 
   run_stage verify "$MODEL_VERIFY" "$FALLBACK_VERIFY" "$PROMPTS/verify.md" "$WORK/VERIFY.md"
 

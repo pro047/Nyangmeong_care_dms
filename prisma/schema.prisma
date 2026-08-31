@@ -78,6 +78,10 @@ model DocumentVersion {
   uploadedBy User     @relation(fields: [uploadedById], references: [id])
 
   @@unique([documentId, versionNo])
+  /// 한 S3 객체는 한 버전만 가리킨다. 라우트의 사전 조회(check-then-act)는 동시 요청
+  /// 두 발을 못 막는데, 그때 서로 다른 문서가 한 객체를 공유하면 영구삭제가 남의 파일을
+  /// 지우거나(참조 수 검사가 막지만) 지울 수 없는 고아를 남긴다. 최종 방어선은 DB 다.
+  @@unique([s3Key])
   @@index([documentId, versionNo(sort: Desc)])
   @@map("document_versions")
 }
