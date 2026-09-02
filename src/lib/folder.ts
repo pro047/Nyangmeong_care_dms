@@ -103,6 +103,29 @@ export function buildFolderTree(rows: FolderRow[]): FolderNode[] {
   return roots
 }
 
+/**
+ * `화면설계서 > 마이페이지`. 2뎁스가 되면서 이름만으로는 어느 폴더인지 못 가린다 —
+ * 부모만 다른 동명 폴더가 실제로 공존한다.
+ *
+ * 조상이 목록에 없으면(경합) 거기서 끊는다 — buildFolderTree 가 고아 노드를 버리는 것과
+ * 같은 판단이다. 방문한 id 를 세는 것은 순환 대비다. reparent 라우트가 없어 순환은
+ * 만들어질 수 없지만, 여기는 트리와 달리 순환이 무한 루프가 되어 화면이 멈춘다.
+ */
+export function folderPath(folderId: string, folders: FolderRow[], sep = ' > '): string {
+  const byId = new Map(folders.map((row) => [row.id, row]))
+  const names: string[] = []
+  const seen = new Set<string>()
+
+  let cursor = byId.get(folderId)
+  while (cursor !== undefined && !seen.has(cursor.id)) {
+    seen.add(cursor.id)
+    names.unshift(cursor.name)
+    cursor = cursor.parentId === null ? undefined : byId.get(cursor.parentId)
+  }
+
+  return names.join(sep)
+}
+
 /** 트리를 깊이 우선으로 펴서 들여쓰기용 depth 를 붙인다 (셀렉트 옵션). */
 export function flattenFolderTree(nodes: FolderNode[]): { id: string; name: string; depth: number }[] {
   const flat: { id: string; name: string; depth: number }[] = []

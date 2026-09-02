@@ -6,6 +6,7 @@ import {
   folderMutationFailure,
   folderNameError,
   folderPatchSchema,
+  folderPath,
   FOLDER_NAME_CONFLICT,
   FOLDER_NOT_FOUND,
   MAX_ALIAS_LENGTH,
@@ -71,6 +72,46 @@ describe('flattenFolderTree', () => {
       { id: 'g1', name: '초안', depth: 2 },
       { id: 'r2', name: '회의', depth: 0 },
     ])
+  })
+})
+
+describe('folderPath', () => {
+  const rows: FolderRow[] = [
+    { id: 'f-screen', name: '화면설계서', parentId: null },
+    { id: 'f-spec', name: '기능명세서', parentId: null },
+    { id: 'f-screen-mypage', name: '마이페이지', parentId: 'f-screen' },
+    { id: 'f-spec-mypage', name: '마이페이지', parentId: 'f-spec' },
+  ]
+
+  it('2뎁스 폴더는 "부모 > 이름" 경로여야 한다', () => {
+    expect(folderPath('f-screen-mypage', rows)).toBe('화면설계서 > 마이페이지')
+    // 동명이라도 부모가 다르면 경로가 다르다 — 이름만으로는 못 가리는 것이 이 함수의 존재 이유다.
+    expect(folderPath('f-spec-mypage', rows)).toBe('기능명세서 > 마이페이지')
+  })
+
+  it('루트 폴더는 이름 하나여야 한다', () => {
+    expect(folderPath('f-screen', rows)).toBe('화면설계서')
+  })
+
+  it('부모가 목록에 없으면 거기서 끊어야 한다 (buildFolderTree 의 고아 판단과 같다)', () => {
+    const orphan: FolderRow[] = [{ id: 'x', name: '고아', parentId: 'missing' }]
+    expect(folderPath('x', orphan)).toBe('고아')
+  })
+
+  it('목록에 없는 id 는 빈 문자열이어야 한다', () => {
+    expect(folderPath('ghost', rows)).toBe('')
+  })
+
+  it('구분자를 바꿀 수 있어야 한다', () => {
+    expect(folderPath('f-screen-mypage', rows, '/')).toBe('화면설계서/마이페이지')
+  })
+
+  it('순환이 있어도 끝나야 한다 — 무한 루프면 화면이 멈춘다', () => {
+    const cycle: FolderRow[] = [
+      { id: 'a', name: 'A', parentId: 'b' },
+      { id: 'b', name: 'B', parentId: 'a' },
+    ]
+    expect(folderPath('a', cycle)).toBe('B > A')
   })
 })
 

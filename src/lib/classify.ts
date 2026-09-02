@@ -13,9 +13,19 @@ export const REASON_NO_MATCH = '맞는 폴더 없음'
 export const REASON_AMBIGUOUS = '여러 폴더에 해당해 고르지 못함'
 export const REASON_PROPOSE = '맞는 폴더가 없어 새 폴더를 제안'
 
+export const REASON_SUB_NONE = '하위 이름 없음'
+export const REASON_SUB_AMBIGUOUS = '하위가 여러 개라 상위에 둠'
+export const REASON_SUB_PROPOSE = '새 하위 폴더 제안'
+
 /** 근거 한 줄. 없으면 사용자가 분류 전체를 의심한다 (사양 "UI — 올라가기 전에 보여준다"). */
 export function matchReason(key: string, isAlias: boolean): string {
   return isAlias ? `별칭 '${key}' 일치` : `'${key}' 일치`
+}
+
+/** 2단계 결과는 카테고리 근거와 하위 근거를 둘 다 보여야 한다 — 어느 단계에서 갈렸는지가
+    사용자가 고칠지 말지를 정하는 정보다. */
+export function subReason(categoryReason: string, tail: string): string {
+  return `${categoryReason} · ${tail}`
 }
 
 /**
@@ -60,10 +70,10 @@ const NUMBER_PREFIX = /^\d{1,3}$/u
 const TRAILING_CODE = /^\(?[A-Z]{2,4}\)?$/u
 
 /**
- * 제안 폴더명용 핵심어. 표시용이라 대소문자는 그대로 두고 구분자만 공백 하나로 고른다.
- * 사람이 미리보기에서 확인·해제하는 것이 안전판이므로 이름 품질이 완벽할 필요는 없다.
+ * 노이즈만 걷어낸 토큰열. 카테고리 구간 제거를 토큰 단위로 해야 표기(공백·대소문자)가
+ * 보존된다 — 정규화 문자열에서 잘라내면 `로그인회원가입` 같은 붙임말이 나온다.
  */
-export function extractCore(fileName: string): string {
+export function coreTokens(fileName: string): string[] {
   const withoutNoise = stripExtension(fileName)
     .replace(DUPLICATE_SUFFIX, '')
     .replace(VERSION_TOKEN, '')
@@ -75,32 +85,78 @@ export function extractCore(fileName: string): string {
   // 토큰이 1개 남으면 멈춘다 — `WF.html` 이 빈 제안이 되면 폴더를 아예 못 얻는다.
   while (tokens.length > 1 && TRAILING_CODE.test(tokens[tokens.length - 1])) tokens.pop()
 
+  return tokens
+}
+
+/**
+ * 제안 폴더명용 핵심어. 표시용이라 대소문자는 그대로 두고 구분자만 공백 하나로 고른다.
+ * 사람이 미리보기에서 확인·해제하는 것이 안전판이므로 이름 품질이 완벽할 필요는 없다.
+ */
+export function extractCore(fileName: string): string {
+  return coreTokens(fileName).join(' ')
+}
+
+/**
+ * 하위 폴더 이름. keys 는 매칭된 카테고리 폴더의 이름과 별칭이다.
+ *
+ * 연속된 토큰 부분열의 정규화 결합이 키와 같으면 그 구간을 통째로 지운다 — 실데이터의
+ * `03_메인페이지_기능_명세서…` 에서 카테고리 `기능명세서` 가 `기능`·`명세서` 두 토큰에
+ * 걸쳐 있어 토큰 하나씩 비교하면 안 지워진다.
+ *
+ * 결과가 빈 문자열인 것은 정상이다 — `04_기능명세서_v0.1.xlsx` 처럼 카테고리뿐인 파일명은
+ * 남는 토큰이 0개이고, 호출자는 그것을 "카테고리 루트에 둔다"로 읽는다(확정 규칙 4).
+ */
+export function extractSubName(fileName: string, keys: string[]): string {
+  const tokens = coreTokens(fileName)
+
+  const keySet = new Set<string>()
+  for (const key of keys) {
+    const normalized = normalizeForMatch(key)
+    if (normalized.length >= MIN_KEY_LENGTH) keySet.add(normalized)
+  }
+
+  let i = 0
+  while (i < tokens.length) {
+    let hit = false
+    // 같은 시작점에서는 긴 구간부터 본다 — 짧은 쪽을 먼저 지우면 여러 토큰에 걸친
+    // 카테고리의 나머지 토큰이 하위 이름에 남는다.
+    for (let j = tokens.length - 1; j >= i; j--) {
+      if (!keySet.has(normalizeForMatch(tokens.slice(i, j + 1).join('')))) continue
+      tokens.splice(i, j - i + 1)
+      hit = true
+      break
+    }
+    // 지웠으면 i 를 올리지 않는다 — 같은 자리에 이어지는 키도 지워야 한다.
+    if (!hit) i += 1
+  }
+
   return tokens.join(' ')
 }
 
-export type ClassifyFolder = { id: string; name: string; aliases: string[] }
+export type ClassifyFolder = {
+  id: string
+  name: string
+  parentId: string | null
+  aliases: string[]
+}
 
 export type ClassifyResult =
   | { kind: 'match'; folderId: string; reason: string }
-  | { kind: 'propose'; proposedName: string; reason: string }
+  // parentId 가 null 이면 새 루트 카테고리, 아니면 그 카테고리 밑의 새 하위 폴더다.
+  | { kind: 'propose'; parentId: string | null; proposedName: string; reason: string }
   | { kind: 'unclassified'; reason: string }
 
-type Candidate = { folderId: string; score: number; reason: string }
+type Match = { folder: ClassifyFolder; reason: string; ambiguous: boolean }
 
 /**
  * 매칭은 "정규화한 파일명에 키가 부분 문자열로 들어 있는가"이고 점수는 키의 정규화 길이다.
  * 긴 키가 더 구체적이므로 `설계서` 와 `화면설계서` 가 함께 있으면 후자가 이긴다.
  */
-export function classifyFileName(fileName: string, folders: ClassifyFolder[]): ClassifyResult {
-  // 폴더가 하나도 없으면 제안조차 하지 않는다 — 사양: 조용히 아무 일도 안 하는 것이 정상이다.
-  if (folders.length === 0) return { kind: 'unclassified', reason: REASON_NO_MATCH }
-
-  const haystack = normalizeForMatch(stripExtension(fileName))
-
-  let best: Candidate | null = null
+function bestMatch(haystack: string, candidates: ClassifyFolder[]): Match | null {
+  let best: { folder: ClassifyFolder; score: number; reason: string } | null = null
   const bestFolderIds = new Set<string>()
 
-  for (const folder of folders) {
+  for (const folder of candidates) {
     for (const [index, key] of [folder.name, ...folder.aliases].entries()) {
       const normalized = normalizeForMatch(key)
       if (normalized.length < MIN_KEY_LENGTH) continue
@@ -109,23 +165,78 @@ export function classifyFileName(fileName: string, folders: ClassifyFolder[]): C
       const score = normalized.length
       if (best !== null && score < best.score) continue
       if (best === null || score > best.score) {
-        best = { folderId: folder.id, score, reason: matchReason(key, index > 0) }
+        best = { folder, score, reason: matchReason(key, index > 0) }
         bestFolderIds.clear()
       }
       bestFolderIds.add(folder.id)
     }
   }
 
-  if (best !== null) {
-    // 같은 이름 폴더가 부모만 다르게 공존할 수 있다. 문자열 일치만으로는 고를 수 없다.
-    if (bestFolderIds.size > 1) return { kind: 'unclassified', reason: REASON_AMBIGUOUS }
-    return { kind: 'match', folderId: best.folderId, reason: best.reason }
+  if (best === null) return null
+  return { folder: best.folder, reason: best.reason, ambiguous: bestFolderIds.size > 1 }
+}
+
+/**
+ * 2단계로 정한다 — 루트 폴더로 카테고리를 먼저 고르고, 그 폴더의 **직계 자식만** 후보로
+ * 다시 매칭한다. 평면 매칭을 유지하면 점수가 키 길이라 자식 `로그인`(3)이 부모
+ * `화면설계서`(5)에게 항상 져서 하위 폴더를 만들어도 재사용되지 않는다(확정 규칙 1).
+ */
+export function classifyFileName(fileName: string, folders: ClassifyFolder[]): ClassifyResult {
+  const roots = folders.filter((folder) => folder.parentId === null)
+  // 카테고리가 될 루트가 없으면 제안조차 하지 않는다 — 사양: 조용히 아무 일도 안 하는 것이
+  // 정상이다. 자식만 있는 목록도 여기로 떨어진다(카테고리를 고를 근거가 없다).
+  if (roots.length === 0) return { kind: 'unclassified', reason: REASON_NO_MATCH }
+
+  const haystack = normalizeForMatch(stripExtension(fileName))
+
+  const category = bestMatch(haystack, roots)
+
+  if (category === null) {
+    // 새 카테고리 제안은 1뎁스까지다(확정 규칙 6) — 파일명 안에서 어느 토큰이 카테고리인지
+    // 가릴 근거가 없다.
+    const proposedName = extractCore(fileName)
+    if (proposedName === '' || proposedName.length > MAX_PROPOSED_NAME_LENGTH) {
+      return { kind: 'unclassified', reason: REASON_NO_MATCH }
+    }
+    return { kind: 'propose', parentId: null, proposedName, reason: REASON_PROPOSE }
   }
 
-  const proposedName = extractCore(fileName)
-  if (proposedName === '' || proposedName.length > MAX_PROPOSED_NAME_LENGTH) {
-    return { kind: 'unclassified', reason: REASON_NO_MATCH }
+  // 같은 이름 루트가 공존할 수 있다. 문자열 일치만으로는 고를 수 없다.
+  if (category.ambiguous) return { kind: 'unclassified', reason: REASON_AMBIGUOUS }
+
+  const children = folders.filter((folder) => folder.parentId === category.folder.id)
+  const sub = bestMatch(haystack, children)
+
+  if (sub !== null) {
+    if (sub.ambiguous) {
+      return {
+        kind: 'match',
+        folderId: category.folder.id,
+        reason: subReason(category.reason, REASON_SUB_AMBIGUOUS),
+      }
+    }
+    return {
+      kind: 'match',
+      folderId: sub.folder.id,
+      reason: subReason(category.reason, `하위 ${sub.reason}`),
+    }
   }
 
-  return { kind: 'propose', proposedName, reason: REASON_PROPOSE }
+  // 붙는 자식이 없을 때만 파일명에서 뽑는다(확정 규칙 2). 매칭이 먼저라야 제품명 접두사
+  // (`냥멍케어`)가 붙은 파일이 두 번째부터 기존 하위 폴더로 들어간다.
+  const subName = extractSubName(fileName, [category.folder.name, ...category.folder.aliases])
+  if (subName === '' || subName.length > MAX_PROPOSED_NAME_LENGTH) {
+    return {
+      kind: 'match',
+      folderId: category.folder.id,
+      reason: subReason(category.reason, REASON_SUB_NONE),
+    }
+  }
+
+  return {
+    kind: 'propose',
+    parentId: category.folder.id,
+    proposedName: subName,
+    reason: subReason(category.reason, REASON_SUB_PROPOSE),
+  }
 }

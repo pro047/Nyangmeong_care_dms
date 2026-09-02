@@ -11,6 +11,7 @@ import {
   buildFolderTree,
   flattenFolderTree,
   folderNameError,
+  folderPath,
   type FolderAliasRow,
 } from '@/lib/folder'
 import { classifyFileName, type ClassifyResult } from '@/lib/classify'
@@ -20,7 +21,7 @@ import {
   defaultDestination,
   emptyCreatedFolders,
   findExistingFolderByName,
-  plannedFolderNames,
+  plannedFolders,
   resolveDestination,
   type Destination,
   type FolderCreateOutcome,
@@ -241,19 +242,32 @@ export function UploadDialog({
     [skipNew],
   )
 
-  const createFolder = useCallback(async (name: string): Promise<FolderCreateOutcome> => {
-    const res = await fetch('/api/folders', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      // 파일명에 상위 폴더를 추론할 신호가 없다. 자동 생성은 전부 루트이고 별칭도 없다.
-      body: JSON.stringify({ name }),
-    })
-    if (res.ok) {
-      const body = (await res.json()) as { id: string }
-      return { ok: true, id: body.id }
-    }
-    return { ok: false, conflict: res.status === 409 }
-  }, [])
+  const createFolder = useCallback(
+    async (parentId: string | null, name: string): Promise<FolderCreateOutcome> => {
+      const res = await fetch('/api/folders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        // parentId 는 카테고리로 매칭된 **기존** 루트 폴더뿐이다. 별칭은 자동으로 안 붙인다.
+        body: JSON.stringify(parentId === null ? { name } : { name, parentId }),
+      })
+      if (res.ok) {
+        const body = (await res.json()) as { id: string }
+        return { ok: true, id: body.id }
+      }
+      return { ok: false, conflict: res.status === 409 }
+    },
+    [],
+  )
+
+  /** 새 폴더 행의 라벨. 2뎁스면 경로로 보여야 어느 카테고리 밑인지 알 수 있다. */
+  const newFolderLabel = useCallback(
+    (parentId: string | null, name: string) => {
+      if (parentId === null) return name
+      const parent = folderPath(parentId, folders)
+      return parent === '' ? name : `${parent} > ${name}`
+    },
+    [folders],
+  )
 
   const startAuto = useCallback(async () => {
     // 확정 시점의 목록을 붙잡아 둔다. 시작 뒤 화면이 바뀌어도 보낼 것은 이것이다.
@@ -263,10 +277,10 @@ export function UploadDialog({
     // 실제로 생긴 폴더 이름이 어긋난다.
     const dests = jobItems.map(effectiveDest).map((dest): Destination => {
       if (dest.kind !== 'new') return dest
-      const existingId = findExistingFolderByName(dest.name, folders)
+      const existingId = findExistingFolderByName(dest.name, dest.parentId, folders)
       return existingId !== null
         ? { kind: 'folder', folderId: existingId }
-        : { kind: 'new', name: dest.name.trim() }
+        : { kind: 'new', parentId: dest.parentId, name: dest.name.trim() }
     })
 
     setStarted(true)
@@ -276,8 +290,8 @@ export function UploadDialog({
     const batch: UploadBatch = { cancelled: false }
     batches.current.add(batch)
 
-    const names = plannedFolderNames(dests)
-    const created = await createPlannedFolders(names, createFolder)
+    const plans = plannedFolders(dests)
+    const created = await createPlannedFolders(plans, createFolder)
     const createdIds = Array.from(created.values()).filter((id): id is string => id !== null)
     setPreparing(false)
 
@@ -288,7 +302,7 @@ export function UploadDialog({
       return
     }
 
-    const missing = names.length - createdIds.length
+    const missing = plans.length - createdIds.length
     if (missing > 0) {
       toast.error(`새 폴더 ${missing}개를 만들지 못했습니다. 해당 문서는 미분류로 올립니다.`)
     }
@@ -345,10 +359,10 @@ export function UploadDialog({
   ).length
 
   const changeDest = (item: Item, value: string) => {
-    const proposed = item.result?.kind === 'propose' ? item.result.proposedName : null
+    const proposal = item.result?.kind === 'propose' ? item.result : null
     const dest: Destination =
-      value === NEW_FOLDER && proposed !== null
-        ? { kind: 'new', name: proposed }
+      value === NEW_FOLDER && proposal !== null
+        ? { kind: 'new', parentId: proposal.parentId, name: proposal.proposedName }
         : value === ''
           ? { kind: 'none' }
           : { kind: 'folder', folderId: value }
@@ -363,9 +377,11 @@ export function UploadDialog({
    * 파일명만으로는 그 둘을 가릴 신호가 없다 — 사람이 여기서 고치는 것이 유일한 해법이다.
    * 고친 행은 destTouched 로 표시해 "만들지 않음" 체크가 덮지 않게 한다(셀렉트와 같은 의미론).
    */
-  const renderNameEditor = (item: Item, name: string) => {
+  const renderNameEditor = (item: Item, dest: Extract<Destination, { kind: 'new' }>) => {
+    const { parentId, name } = dest
     const error = folderNameError(name)
-    const existingId = error === null ? findExistingFolderByName(name, folders) : null
+    // 흡수 판정도 부모 스코프 안에서 해야 한다 — 부모가 다른 동명 폴더는 다른 폴더다.
+    const existingId = error === null ? findExistingFolderByName(name, parentId, folders) : null
     const existingName = existingId === null ? undefined : folderNameById.get(existingId)
 
     return (
@@ -376,7 +392,10 @@ export function UploadDialog({
           maxLength={100}
           aria-label={`${item.file.name} 새 폴더 이름`}
           onChange={(e) =>
-            update(item.id, { dest: { kind: 'new', name: e.target.value }, destTouched: true })
+            update(item.id, {
+              dest: { kind: 'new', parentId, name: e.target.value },
+              destTouched: true,
+            })
           }
           className="w-full rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs text-ink outline-none focus:border-accent"
         />
@@ -420,7 +439,10 @@ export function UploadDialog({
                   // proposedName 은 담는 순간 고정된다. 편집칸이 dest.name 을 바꾸므로
                   // 그걸 그대로 쓰면 라벨만 옛 제안에 남아 같은 행이 두 이름을 말한다.
                   <option value={NEW_FOLDER}>
-                    새 폴더 &lsquo;{dest.kind === 'new' ? dest.name : item.result.proposedName}
+                    새 폴더 &lsquo;
+                    {dest.kind === 'new'
+                      ? newFolderLabel(dest.parentId, dest.name)
+                      : newFolderLabel(item.result.parentId, item.result.proposedName)}
                     &rsquo;
                   </option>
                 )}
@@ -432,7 +454,7 @@ export function UploadDialog({
                   </option>
                 ))}
               </select>
-              {dest.kind === 'new' && renderNameEditor(item, dest.name)}
+              {dest.kind === 'new' && renderNameEditor(item, dest)}
             </li>
           ))}
         </ul>

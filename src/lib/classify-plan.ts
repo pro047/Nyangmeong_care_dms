@@ -8,32 +8,46 @@ import { normalizeForMatch, type ClassifyFolder, type ClassifyResult } from '@/l
 /** 한 파일의 최종 목적지. */
 export type Destination =
   | { kind: 'folder'; folderId: string }
-  | { kind: 'new'; name: string }
+  | { kind: 'new'; parentId: string | null; name: string }
   | { kind: 'none' }
 
 export function defaultDestination(result: ClassifyResult): Destination {
   if (result.kind === 'match') return { kind: 'folder', folderId: result.folderId }
-  if (result.kind === 'propose') return { kind: 'new', name: result.proposedName }
+  if (result.kind === 'propose') {
+    return { kind: 'new', parentId: result.parentId, name: result.proposedName }
+  }
   return { kind: 'none' }
 }
 
 /**
- * 만들어야 할 폴더 이름. 정규화 기준으로 같은 이름은 하나로 합치고 먼저 나온 표기를 남긴다
- * (태그·별칭 정규화와 같은 규칙). 이렇게 합쳐야 제안 이름이 같은 파일들이 한 폴더로 간다.
+ * 새 폴더의 동일성 키. 같은 이름이라도 부모가 다르면 다른 폴더다 — 실데이터에
+ * `화면설계서 > 마이페이지` 와 `기능명세서 > 마이페이지` 가 동시에 있어서 이름만으로
+ * 합치면 한 폴더로 뭉개진다. 이름 쪽은 태그·별칭과 같은 정규화 규칙을 쓴다.
  */
-export function plannedFolderNames(destinations: Destination[]): string[] {
+export function destKey(parentId: string | null, name: string): string {
+  // 폴더 id 에도 정규화한 이름에도 '/' 는 들어갈 수 없어 구분자로 안전하다.
+  return `${parentId ?? ''}/${normalizeForMatch(name)}`
+}
+
+export type PlannedFolder = { key: string; parentId: string | null; name: string }
+
+/**
+ * 만들어야 할 폴더. 같은 부모 밑의 같은 이름은 하나로 합치고 먼저 나온 표기를 남긴다 —
+ * 이렇게 합쳐야 제안 이름이 같은 파일들이 한 폴더로 간다.
+ */
+export function plannedFolders(destinations: Destination[]): PlannedFolder[] {
   const seen = new Set<string>()
-  const names: string[] = []
+  const plans: PlannedFolder[] = []
 
   for (const dest of destinations) {
     if (dest.kind !== 'new') continue
-    const key = normalizeForMatch(dest.name)
+    const key = destKey(dest.parentId, dest.name)
     if (seen.has(key)) continue
     seen.add(key)
-    names.push(dest.name)
+    plans.push({ key, parentId: dest.parentId, name: dest.name })
   }
 
-  return names
+  return plans
 }
 
 /**
@@ -44,10 +58,13 @@ export function plannedFolderNames(destinations: Destination[]): string[] {
  *
  * classifyFileName 의 부분 문자열 매칭과 달리 정확일치인 이유: 이 이름은 파일명이
  * 아니라 사람이 폴더 이름으로 직접 적은 값이라 `설계` 가 `화면설계서` 를 뜻하지 않는다.
- * 서로 다른 폴더 여러 개에 걸리면(부모만 다른 동명) 고를 수 없으므로 흡수하지 않는다.
+ *
+ * 후보를 parentId 가 같은 폴더로 좁히는 것이 2뎁스의 핵심이다 — 좁히지 않으면 부모만
+ * 다른 동명 폴더 2개에 걸려 matched.size !== 1 이 되고 흡수 자체가 죽는다.
  */
 export function findExistingFolderByName(
   name: string,
+  parentId: string | null,
   folders: ClassifyFolder[],
 ): string | null {
   const key = normalizeForMatch(name)
@@ -55,6 +72,7 @@ export function findExistingFolderByName(
 
   const matched = new Set<string>()
   for (const folder of folders) {
+    if (folder.parentId !== parentId) continue
     for (const candidate of [folder.name, ...folder.aliases]) {
       if (normalizeForMatch(candidate) === key) {
         matched.add(folder.id)
@@ -78,17 +96,17 @@ export type FolderCreateOutcome = { ok: true; id: string } | { ok: false; confli
  * 실패(409 포함)는 null 로 남긴다 — 그 이름을 고른 파일들은 미분류로 폴백한다.
  */
 export async function createPlannedFolders(
-  names: string[],
-  createFolder: (name: string) => Promise<FolderCreateOutcome>,
+  plans: PlannedFolder[],
+  createFolder: (parentId: string | null, name: string) => Promise<FolderCreateOutcome>,
 ): Promise<Map<string, string | null>> {
   const created = new Map<string, string | null>()
 
-  for (const name of names) {
+  for (const plan of plans) {
     try {
-      const outcome = await createFolder(name)
-      created.set(name, outcome.ok ? outcome.id : null)
+      const outcome = await createFolder(plan.parentId, plan.name)
+      created.set(plan.key, outcome.ok ? outcome.id : null)
     } catch {
-      created.set(name, null)
+      created.set(plan.key, null)
     }
   }
 
@@ -103,16 +121,8 @@ export function resolveDestination(
   if (dest.kind === 'folder') return dest.folderId
   if (dest.kind === 'none') return null
 
-  if (created.has(dest.name)) return created.get(dest.name) ?? null
-
-  // plannedFolderNames 가 중복을 합치면서 다른 표기를 남겼을 수 있다. 표기가 달라도
-  // 같은 폴더로 가야 하므로 정규화해서 다시 찾는다.
-  const key = normalizeForMatch(dest.name)
-  for (const [name, id] of created) {
-    if (normalizeForMatch(name) === key) return id
-  }
-
-  return null
+  // 키가 이미 정규화를 품고 있어서 plannedFolders 가 합치며 다른 표기를 남겼어도 찾아진다.
+  return created.get(destKey(dest.parentId, dest.name)) ?? null
 }
 
 /**
