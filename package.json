@@ -12,6 +12,8 @@
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
     "postinstall": "prisma generate",
+    "reclassify": "node --env-file=.env scripts/reclassify-folders.mjs",
+    "reclassify:rollback": "node --env-file=.env scripts/reclassify-rollback.mjs",
     "test:e2e": "node --env-file=.env test/e2e/document-detail.mjs",
     "test:e2e:danger": "node --env-file=.env test/e2e/danger-color.mjs",
     "test:e2e:sne": "node --env-file=.env test/e2e/suggest-name-edit.mjs",
