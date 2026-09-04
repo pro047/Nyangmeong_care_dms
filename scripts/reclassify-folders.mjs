@@ -190,6 +190,10 @@ function printReport(folders, documents, plan) {
   // 폴더 삭제는 사람이 UI 에서 한다 — schema.prisma:35 가 onDelete: Cascade 라 폴더를
   // 지우면 자식 폴더까지 데려간다.
   const emptied = folders.filter((folder) => {
+    // 자식을 계획 **이후** 세계(working)에서 본다. folders 는 계획 전 목록이라 이번에
+    // 만들어질 하위 폴더가 없고, 그 지도만 보면 카테고리가 잎으로 보인다 —
+    // 그대로 지우면 Cascade 로 하위 전부가 날아가고 스냅샷에는 폴더가 없어 못 되돌린다.
+    if (plan.working.some((f) => f.parentId === folder.id)) return false
     const before = countByFolder.get(folder.id) ?? 0
     if (before === 0) return false
     const leaving = plan.moves.filter((move) => move.from === folder.id).length
