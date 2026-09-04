@@ -70,6 +70,18 @@ const NUMBER_PREFIX = /^\d{1,3}$/u
 const TRAILING_CODE = /^\(?[A-Z]{2,4}\)?$/u
 
 /**
+ * 제품명. 모든 문서에 붙을 수 있어 하위 폴더를 좁히지 못한다 —
+ * `냥멍케어_기능명세서_건강기록` 이 `건강기록` 이 아니라 `냥멍케어 건강기록` 폴더를 만들면
+ * 같은 주제가 두 폴더로 갈린다.
+ *
+ * 원래는 "정착 뒤엔 매칭이 이긴다"로 수용했는데, 그 근거는 사람이 미리보기에서 고치는
+ * 업로드 경로에서만 성립한다. 소급 이동은 무인이라 안전판이 없고, 카테고리에 그 주제의
+ * 문서가 1건뿐이면 매칭할 상대가 영영 생기지 않는다 (`기능명세서 > 건강기록`).
+ */
+// 비교는 정규화된 형태끼리 한다 — 이 파일이 NFD 로 저장돼도 판정이 안 흔들린다.
+const PRODUCT_TOKENS = ['냥멍케어'].map(normalizeForMatch)
+
+/**
  * 노이즈만 걷어낸 토큰열. 카테고리 구간 제거를 토큰 단위로 해야 표기(공백·대소문자)가
  * 보존된다 — 정규화 문자열에서 잘라내면 `로그인회원가입` 같은 붙임말이 나온다.
  */
@@ -84,6 +96,13 @@ export function coreTokens(fileName: string): string[] {
 
   // 토큰이 1개 남으면 멈춘다 — `WF.html` 이 빈 제안이 되면 폴더를 아예 못 얻는다.
   while (tokens.length > 1 && TRAILING_CODE.test(tokens[tokens.length - 1])) tokens.pop()
+
+  // 제품명을 걷는다. 전부 제품명이면 그대로 둔다 — 빈 이름보다는 나쁜 이름이 낫다.
+  const isProduct = (token: string) =>
+    PRODUCT_TOKENS.includes(normalizeForMatch(token))
+  if (tokens.some((token) => !isProduct(token))) {
+    return tokens.filter((token) => !isProduct(token))
+  }
 
   return tokens
 }

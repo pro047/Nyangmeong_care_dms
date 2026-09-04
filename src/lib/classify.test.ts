@@ -48,8 +48,8 @@ describe('classifyFileName — 실데이터 기준선 (자식 없는 초기 상�
   it.each([
     ['03_마이페이지_화면설계서_v0_3_260817.html', '마이페이지'],
     ['03_메인페이지_화면설계서_v0.3_20260819.html', '메인페이지'],
-    // 자식이 없으면 추출이 폴백이라 제품명 접두사가 그대로 남는다 — 수용한 대가다.
-    ['냥멍케어 화면설계서 — 건강기록 (HLT) v0.2.html', '냥멍케어 건강기록'],
+    // 제품명은 걷힌다 — 자식이 없어 추출로 떨어져도 '건강기록' 이 나와야 한다.
+    ['냥멍케어 화면설계서 — 건강기록 (HLT) v0.2.html', '건강기록'],
   ])('%s → 화면설계서 밑 새 하위 폴더 %s 를 제안해야 한다', (fileName, proposedName) => {
     expect(classifyFileName(fileName, BASELINE)).toEqual({
       kind: 'propose',
@@ -223,15 +223,15 @@ const BASELINE_26: [string, ClassifyResult, ClassifyResult][] = [
     subPropose('f-screen', SCREEN, '고객센터'),
     subMatch('f-screen-cs', SCREEN, '고객센터'),
   ],
-  // 제품명 접두사. 추출만으로는 '냥멍케어 건강기록' — 수용한 대가이고, 정착 뒤엔 매칭이 이긴다.
+  // 제품명 접두사. 걷어내므로 자식이 없어도(A) 있어도(B) '건강기록' 하나로 모인다.
   [
     '냥멍케어_화면설계서_건강기록_HLT_v0.3.html',
-    subPropose('f-screen', SCREEN, '냥멍케어 건강기록'),
+    subPropose('f-screen', SCREEN, '건강기록'),
     subMatch('f-screen-health', SCREEN, '건강기록'),
   ],
   [
     '냥멍케어 화면설계서 — 건강기록 (HLT) v0.2.html',
-    subPropose('f-screen', SCREEN, '냥멍케어 건강기록'),
+    subPropose('f-screen', SCREEN, '건강기록'),
     subMatch('f-screen-health', SCREEN, '건강기록'),
   ],
   // 별칭 경유. 카테고리 근거가 별칭 문구이고 별칭 구간이 하위 이름에서 빠진다.
@@ -287,7 +287,7 @@ const BASELINE_26: [string, ClassifyResult, ClassifyResult][] = [
   ],
   [
     '냥멍케어_기능명세서_건강기록_HLT_v0_1.xlsx',
-    subPropose('f-spec', SPEC, '냥멍케어 건강기록'),
+    subPropose('f-spec', SPEC, '건강기록'),
     subMatch('f-spec-health', SPEC, '건강기록'),
   ],
   // 끝에 구분자가 남는 입력.
@@ -556,8 +556,19 @@ describe('extractCore', () => {
     // TRAILING_CODE 는 끝 위치의 영문 코드만 뗀다. 가운데 괄호는 핵심어일 수 있어 남는다.
     expect(extractCore('건강기록 (HLT) 보고서.html')).toBe('건강기록 (HLT) 보고서')
     expect(extractCore('냥멍케어 화면설계서 — 건강기록 (HLT) v0.2.html')).toBe(
-      '냥멍케어 화면설계서 건강기록',
+      '화면설계서 건강기록',
     )
+  })
+
+  it('제품명 토큰을 걷어야 한다 — 표기가 달라도 같이 걷힌다', () => {
+    expect(extractCore('냥멍케어_기능명세서_건강기록_HLT_v0_1.xlsx')).toBe('기능명세서 건강기록')
+    expect(extractCore('냥멍케어 커뮤니티.html')).toBe('커뮤니티')
+  })
+
+  it('제품명만 남으면 걷지 않는다 — 빈 이름보다 나쁜 이름이 낫다', () => {
+    // 빈 문자열이 되면 폴더 이름이 없어져 제안 자체가 불가능해진다.
+    expect(extractCore('냥멍케어.html')).toBe('냥멍케어')
+    expect(extractCore('냥멍케어_v0.2.html')).toBe('냥멍케어')
   })
 
   it('끝에 붙은 영문 대문자 2~4자 코드를 지워야 한다', () => {
