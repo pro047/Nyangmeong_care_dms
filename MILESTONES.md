@@ -570,12 +570,42 @@ aliases String[] @default([])
 `aliases` 컬럼이 있는 것을 `information_schema` 로 확인했다. 운영 쪽은 DB 분리 **전에**
 밀렸고 dev 는 그 이후 복제라 양쪽이 같다 — 근거와 함의는 `SETUP.md` 1-2 절.
 
-## 폴더 2뎁스 자동 분류 · 착수 (2026-08-31 결정)
+## 폴더 2뎁스 자동 분류 · 검증 통과 (2026-09-02) — **브라우저·DB 실측 남음**
 
 파일명이 `로그인_화면설계서` 면 `화면설계서 > 로그인` 으로 **두 단계**에 넣는다.
 
 **왜 지금인가.** 1뎁스 분류는 동작하지만 폴더가 목록을 못 좁힌다 — dev 실측에서
 `화면설계서` 한 폴더에 **11건**이 들어 있다. 폴더를 열어도 여전히 파일명을 읽어야 한다.
+
+### 진행 상황 (2026-09-02)
+
+파이프라인 `folder-depth2` 가 `../dms-folder-depth2`(`feature/folder-depth2`)에서 완주했다.
+
+| 단계 | 상태 |
+|---|---|
+| design · judge | ✅ 사람 승인 완료 (judge 36개 주장 전수 검증 — 반박 3 · 미확인 2) |
+| impl | ✅ `src/` 6파일, 신규 `scripts/reclassify-{folders,rollback}.mjs` |
+| verify | ✅ **통과** — `npm test` 26파일 **385건**(이전 240) · `npm run lint` · `npm run build` |
+| 커밋 | ✅ 4개 (`6472a83` 설정 · `df4056a` 기능 · `535d120` 스크립트 · `0ba90b1` 파이프라인 모델) |
+| main 머지 | ❌ **안 함 — 실측 전에는 하지 않는다** |
+
+**"통과"가 덮지 못하는 구간이 남아 있다.** `npm test` 는 순수 함수만 지나므로
+`upload-dialog.tsx` 는 한 줄도 실행되지 않았다. judge #29 가 짚은 대로 `ClassifyFolder` 에
+`parentId` 를 넣어도 호출부가 이미 `FolderAliasRow` 를 넘겨서 **타입 오류가 안 난다** —
+경로 라벨·`createFolder(parentId, name)`·흡수 판정은 **컴파일러가 침묵한다.**
+체크리스트는 그 worktree 의 `.pipeline/folder-depth2/VERIFY.md` §4 (브라우저 B1~B10 ·
+스크립트 S1~S7).
+
+**`VERIFY.md` 의 S0 은 이미 해소됐다** — `node -p "process.features.typescript"` = `strip`
+(2026-09-01 실측, v24.10.0). `--experimental-strip-types` 는 필요 없다. verify 세션이
+핸드오프를 안 읽어 미확인으로 올린 항목이다.
+
+**소급 스크립트는 아직 한 번도 실행된 적이 없다.** `src/lib/reclassify-script.test.ts` 는
+소스 **텍스트**를 grep 하는 테스트라 "실행하면 돈다"를 말해주지 않는다.
+
+**미해결이던 판단 1건은 닫혔다** — `DESIGN.md` §3.2 stage 1 의 "루트 0개" 분기는
+`classify.ts:188` 이 `unclassified(REASON_NO_MATCH)` 로 고정 반환한다(judge #28 권고대로).
+`DESIGN.md:373` C18 기대값에 남은 "또는 루트 제안" 문구만 낡았다.
 
 ### 착수 시점 실측 (2026-08-31, dev DB 읽기 전용 조회)
 
