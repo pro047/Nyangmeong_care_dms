@@ -36,6 +36,20 @@
 > **설계·판단검증 어디에도 이 항목이 없었다**(전수 grep). 2뎁스만 배포하면 팀이 그 빈
 > 화면을 본다. 사양은 `MILESTONES.md` §'카테고리 폴더 본문'.
 >
+> **그 후속이 끝났다** (2026-09-05). 파이프라인 `folder-children-view` 가 worktree
+> `../dms-folder-depth2-pipeline-folder-children-view`(`pipeline/folder-children-view`)에서
+> 완주했고, 본문에 **자식 폴더 카드 영역**을 얹었다. 목록 쿼리(`search.ts:30`)는 의도적으로
+> 그대로 뒀다 — 자손 합산은 `MILESTONES.md` §'카테고리 폴더 본문'이 버린 대안이다.
+> `npm test`(26파일 404건) · `npm run lint` · `npm run build`(라우트 20개 · `ƒ Proxy`)가
+> 통과한다. **브라우저 실측도 끝났다 — 33/33 통과**
+> (2026-09-05, `npm run test:e2e:children` · `test/e2e/folder-children-view.mjs`).
+> `화면설계서` 를 열면 카드 9장이 뜨고 점선 박스가 안 뜬다.
+>
+> **미확인이던 관계 `_count` 의 `where` 는 런타임에서 실제로 적용된다** — B6 이 실증했다
+> (카드 숫자 3 → 휴지통 → 2 → 복구 → 3). `DESIGN.md` D2 의 groupBy 폴백은 필요 없다.
+> 타입검사·린트·빌드가 **원리상 못 잡던** 자리라 이 실측 없이는 머지할 수 없었다.
+> **두 스트림은 함께 머지한다** — 2뎁스만 먼저 나가면 팀이 빈 화면을 본다.
+>
 > 진행 위치의 정본은 `MILESTONES.md` §'폴더 2뎁스 자동 분류'의 진행 상황 표다.
 > **미검증으로 남은 것: S6(낙관적 잠금) · B4(흡수 힌트).**
 >
