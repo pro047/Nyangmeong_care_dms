@@ -75,6 +75,9 @@ export type FolderNode = FolderRow & { children: FolderNode[] }
     별칭이 필요 없는 조회까지 컬럼을 더 읽어야 한다. */
 export type FolderAliasRow = FolderRow & { aliases: string[] }
 
+/** 카드 한 장. documentCount 는 그 폴더에 직접 담긴 활성 문서 수다(손자는 안 센다). */
+export type FolderChildCard = { id: string; name: string; documentCount: number }
+
 /** 평면 행을 트리로 접는다. 같은 층은 이름 오름차순(한국어 정렬). */
 export function buildFolderTree(rows: FolderRow[]): FolderNode[] {
   const byId = new Map<string, FolderNode>()
@@ -104,26 +107,75 @@ export function buildFolderTree(rows: FolderRow[]): FolderNode[] {
 }
 
 /**
- * `화면설계서 > 마이페이지`. 2뎁스가 되면서 이름만으로는 어느 폴더인지 못 가린다 —
- * 부모만 다른 동명 폴더가 실제로 공존한다.
+ * parentId 의 직계 자식만 카드로. 손자는 안 본다 — 화면은 한 층만 그리고 다음 층은
+ * 카드를 눌러 들어가서 본다. 정렬은 buildFolderTree 와 같은 한국어 이름 오름차순.
+ * documentCounts 에 없는 id 는 0 으로 읽는다 — 카운트 조회 방식이 바뀌어도 여기가 안 깨진다.
+ */
+export function childFolderCards(
+  parentId: string,
+  folders: FolderRow[],
+  documentCounts: ReadonlyMap<string, number>,
+): FolderChildCard[] {
+  return folders
+    .filter((row) => row.parentId === parentId)
+    .sort((a, b) => a.name.localeCompare(b.name, 'ko'))
+    .map((row) => ({
+      id: row.id,
+      name: row.name,
+      documentCount: documentCounts.get(row.id) ?? 0,
+    }))
+}
+
+/**
+ * 루트 → … → folderId 순의 조상 사슬.
  *
  * 조상이 목록에 없으면(경합) 거기서 끊는다 — buildFolderTree 가 고아 노드를 버리는 것과
  * 같은 판단이다. 방문한 id 를 세는 것은 순환 대비다. reparent 라우트가 없어 순환은
  * 만들어질 수 없지만, 여기는 트리와 달리 순환이 무한 루프가 되어 화면이 멈춘다.
  */
-export function folderPath(folderId: string, folders: FolderRow[], sep = ' > '): string {
+export function folderBreadcrumb(folderId: string, folders: FolderRow[]): FolderRow[] {
   const byId = new Map(folders.map((row) => [row.id, row]))
-  const names: string[] = []
+  const chain: FolderRow[] = []
   const seen = new Set<string>()
 
   let cursor = byId.get(folderId)
   while (cursor !== undefined && !seen.has(cursor.id)) {
     seen.add(cursor.id)
-    names.unshift(cursor.name)
+    chain.unshift(cursor)
     cursor = cursor.parentId === null ? undefined : byId.get(cursor.parentId)
   }
 
-  return names.join(sep)
+  return chain
+}
+
+/** `화면설계서 > 마이페이지`. 2뎁스가 되면서 이름만으로는 어느 폴더인지 못 가린다 —
+    부모만 다른 동명 폴더가 실제로 공존한다. 걷기 로직은 folderBreadcrumb 를 그대로 쓴다. */
+export function folderPath(folderId: string, folders: FolderRow[], sep = ' > '): string {
+  return folderBreadcrumb(folderId, folders)
+    .map((row) => row.name)
+    .join(sep)
+}
+
+/**
+ * 폴더 화면 부제. 둘 다 0 이면 null — 호출부가 기존 문구로 떨어진다.
+ */
+export function folderSummaryLine(childCount: number, documentCount: number): string | null {
+  if (childCount === 0 && documentCount === 0) return null
+  if (childCount === 0) return `${documentCount}개 문서`
+  if (documentCount === 0) return `하위 폴더 ${childCount}개`
+  return `하위 폴더 ${childCount}개 · ${documentCount}개 문서`
+}
+
+/**
+ * 문서 0건일 때 무엇을 보여줄지. hasChildren 이 filtered 를 이긴다 — 자식이 있는데
+ * 점선 박스를 띄우면 오늘의 빈 화면이 재현된다.
+ */
+export function emptyListKind(input: {
+  hasChildren: boolean
+  filtered: boolean
+}): 'children-only' | 'filtered' | 'none' {
+  if (input.hasChildren) return 'children-only'
+  return input.filtered ? 'filtered' : 'none'
 }
 
 /** 트리를 깊이 우선으로 펴서 들여쓰기용 depth 를 붙인다 (셀렉트 옵션). */

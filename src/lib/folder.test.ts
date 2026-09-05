@@ -1,12 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildFolderTree,
+  childFolderCards,
+  emptyListKind,
   flattenFolderTree,
+  folderBreadcrumb,
   folderCreateSchema,
   folderMutationFailure,
   folderNameError,
   folderPatchSchema,
   folderPath,
+  folderSummaryLine,
   FOLDER_NAME_CONFLICT,
   FOLDER_NOT_FOUND,
   MAX_ALIAS_LENGTH,
@@ -75,6 +79,95 @@ describe('flattenFolderTree', () => {
   })
 })
 
+describe('childFolderCards', () => {
+  // 직계 2개(건강기록·마이페이지) · 손자 1개 · 다른 루트의 자식 1개를 일부러 섞는다.
+  const rows: FolderRow[] = [
+    { id: 'r1', name: '화면설계서', parentId: null },
+    { id: 'r2', name: '기능명세서', parentId: null },
+    { id: 'c-mypage', name: '마이페이지', parentId: 'r1' },
+    { id: 'c-health', name: '건강기록', parentId: 'r1' },
+    { id: 'g-draft', name: '초안', parentId: 'c-mypage' },
+    { id: 'c-community', name: '커뮤니티', parentId: 'r2' },
+  ]
+  const counts = new Map([
+    ['c-mypage', 2],
+    ['c-health', 0],
+    ['g-draft', 5],
+    ['c-community', 7],
+  ])
+
+  it('직계 자식만 한국어 이름순으로 돌려야 한다 — 손자와 다른 루트의 자식은 빼야 한다', () => {
+    const cards = childFolderCards('r1', rows, counts)
+
+    expect(cards).toEqual([
+      { id: 'c-health', name: '건강기록', documentCount: 0 },
+      { id: 'c-mypage', name: '마이페이지', documentCount: 2 },
+    ])
+  })
+
+  it('자식이 없는 폴더는 빈 배열이어야 한다', () => {
+    expect(childFolderCards('g-draft', rows, counts)).toEqual([])
+    expect(childFolderCards('없는id', rows, counts)).toEqual([])
+  })
+
+  it('카운트 Map 에 없는 자식은 0 이어야 한다 — 예외로 화면을 죽이지 않는다', () => {
+    // 카운트 조회 방식이 바뀌어 일부 폴더가 Map 에서 빠져도 카드가 그려져야 한다.
+    const cards = childFolderCards('r1', rows, new Map([['c-mypage', 2]]))
+
+    expect(cards.map((card) => card.documentCount)).toEqual([0, 2])
+  })
+
+  it('입력 배열의 순서를 바꾸지 않아야 한다 — 같은 배열을 다른 곳에서도 쓴다', () => {
+    // sort 는 제자리 정렬이다. filter 로 복사하지 않고 folders.sort 로 고치면 같은 요청의
+    // 업로드 셀렉트·브레드크럼이 함께 뒤집힌다.
+    const before = rows.map((row) => row.id)
+
+    childFolderCards('r1', rows, counts)
+
+    expect(rows.map((row) => row.id)).toEqual(before)
+  })
+})
+
+describe('folderBreadcrumb', () => {
+  const rows: FolderRow[] = [
+    { id: 'f-screen', name: '화면설계서', parentId: null },
+    { id: 'f-screen-mypage', name: '마이페이지', parentId: 'f-screen' },
+  ]
+
+  it('2뎁스 폴더는 루트가 먼저 오는 조상 사슬이어야 한다', () => {
+    expect(folderBreadcrumb('f-screen-mypage', rows).map((row) => row.id)).toEqual([
+      'f-screen',
+      'f-screen-mypage',
+    ])
+  })
+
+  it('루트 폴더는 자기 자신 하나여야 한다', () => {
+    expect(folderBreadcrumb('f-screen', rows).map((row) => row.name)).toEqual(['화면설계서'])
+  })
+
+  it('목록에 없는 id 는 빈 배열이어야 한다', () => {
+    expect(folderBreadcrumb('ghost', rows)).toEqual([])
+  })
+
+  it('부모가 목록에 없으면 거기서 끊어야 한다 (buildFolderTree 의 고아 판단과 같다)', () => {
+    const orphan: FolderRow[] = [{ id: 'x', name: '고아', parentId: 'missing' }]
+
+    expect(folderBreadcrumb('x', orphan).map((row) => row.name)).toEqual(['고아'])
+  })
+
+  it('순환이 있어도 끝나고 방문한 두 개만 돌려야 한다 — 무한 루프면 화면이 멈춘다', () => {
+    const cycle: FolderRow[] = [
+      { id: 'a', name: 'A', parentId: 'b' },
+      { id: 'b', name: 'B', parentId: 'a' },
+    ]
+
+    const chain = folderBreadcrumb('a', cycle)
+
+    expect(chain).toHaveLength(2)
+    expect(chain.map((row) => row.name)).toEqual(['B', 'A'])
+  })
+})
+
 describe('folderPath', () => {
   const rows: FolderRow[] = [
     { id: 'f-screen', name: '화면설계서', parentId: null },
@@ -112,6 +205,59 @@ describe('folderPath', () => {
       { id: 'b', name: 'B', parentId: 'a' },
     ]
     expect(folderPath('a', cycle)).toBe('B > A')
+  })
+
+  it('folderBreadcrumb 의 이름을 이은 것과 같아야 한다 — 걷기 로직이 두 벌이면 안 된다', () => {
+    // 위 6건이 folderPath 의 계약이고, 이 케이스가 두 함수가 같은 걷기를 쓰는지를 못박는다.
+    const orphan: FolderRow[] = [{ id: 'x', name: '고아', parentId: 'missing' }]
+
+    for (const [id, list] of [
+      ['f-screen-mypage', rows],
+      ['f-screen', rows],
+      ['ghost', rows],
+      ['x', orphan],
+    ] as const) {
+      expect(folderPath(id, list)).toBe(
+        folderBreadcrumb(id, list)
+          .map((row) => row.name)
+          .join(' > '),
+      )
+    }
+  })
+})
+
+describe('folderSummaryLine', () => {
+  it('자식도 문서도 없으면 null 이어야 한다 — 호출부가 기존 안내 문구로 떨어진다', () => {
+    expect(folderSummaryLine(0, 0)).toBeNull()
+  })
+
+  it('자식이 없으면 지금까지의 문서 수 문구 그대로여야 한다', () => {
+    expect(folderSummaryLine(0, 2)).toBe('2개 문서')
+  })
+
+  it('자식만 있으면 하위 폴더 수만 보여야 한다', () => {
+    expect(folderSummaryLine(3, 0)).toBe('하위 폴더 3개')
+  })
+
+  it('둘 다 있으면 가운뎃점으로 이어야 한다', () => {
+    expect(folderSummaryLine(3, 2)).toBe('하위 폴더 3개 · 2개 문서')
+  })
+})
+
+describe('emptyListKind', () => {
+  it('자식 폴더가 있으면 필터 중이어도 children-only 여야 한다', () => {
+    // 이 우선순위가 뒤집히면 카드를 그려 놓고 그 아래 "조건에 맞는 문서가 없습니다" 점선
+    // 박스가 떠서 오늘 고친 빈 화면이 그대로 재현된다.
+    expect(emptyListKind({ hasChildren: true, filtered: true })).toBe('children-only')
+    expect(emptyListKind({ hasChildren: true, filtered: false })).toBe('children-only')
+  })
+
+  it('자식이 없고 필터 중이면 filtered 여야 한다', () => {
+    expect(emptyListKind({ hasChildren: false, filtered: true })).toBe('filtered')
+  })
+
+  it('자식도 필터도 없으면 none 이어야 한다', () => {
+    expect(emptyListKind({ hasChildren: false, filtered: false })).toBe('none')
   })
 })
 

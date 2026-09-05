@@ -24,7 +24,10 @@ export function documentSearchWhere(q: string): Prisma.DocumentWhereInput {
   }
 }
 
-/** 값이 없거나 배열이면 필터 없음. 잘못된 링크가 빈 화면 대신 전체 목록으로 떨어진다. */
+/** 값이 없거나 배열이면 필터 없음. 잘못된 링크가 빈 화면 대신 전체 목록으로 떨어진다.
+    직계만 보는 것이 의도다 — 자식 폴더의 문서는 여기 안 섞는다. 자식은
+    `FolderChildren` 이 따로 카드로 그린다(자손 합산은 채택하지 않은 대안 —
+    `MILESTONES.md` §'카테고리 폴더 본문'의 "하지 않는 것"). */
 export function folderFilterWhere(raw: string | string[] | undefined): Prisma.DocumentWhereInput {
   if (typeof raw !== 'string' || raw === '') return {}
   return { folderId: raw }
