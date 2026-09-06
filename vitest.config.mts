@@ -21,16 +21,23 @@ export default defineConfig({
     // 검증하며 throw 하므로 이게 없으면 env 를 거치는 모듈은 테스트가 아예 못 뜬다.
     // 실제 .env 를 읽게 하면 "체크아웃에 따라 .env 가 없다"는 문제를 테스트로 옮기는
     // 셈이고, CI 에서 값이 달라 결과가 흔들린다.
+    //
+    // **더미도 실제 형태를 지켜야 한다** (2026-09-06). env-schema.ts 가 길이·형식까지
+    // 보게 되면서 `test-guild-id` 같은 값이 튕겨 upload-token.test.ts 가 통째로 못 떴다.
+    // 형태가 틀린 더미는 스키마를 느슨하게 만들라는 압력이 된다 — 그 압력에 지면
+    // 이 스키마를 만든 이유(플레이스홀더를 걸러낸다)가 사라진다.
     env: {
       DATABASE_URL: 'postgresql://test:test@localhost:5432/test',
-      DISCORD_CLIENT_ID: 'test-client-id',
+      // 디스코드 스노플레이크는 17~20자리 숫자다.
+      DISCORD_CLIENT_ID: '1000000000000000001',
+      DISCORD_GUILD_ID: '1000000000000000002',
       DISCORD_CLIENT_SECRET: 'test-client-secret',
-      DISCORD_GUILD_ID: 'test-guild-id',
       AUTH_SECRET: 'test-auth-secret-at-least-32-characters',
       APP_URL: 'http://localhost:3002',
       AWS_REGION: 'ap-northeast-2',
       AWS_ACCESS_KEY_ID: 'test-access-key-id',
-      AWS_SECRET_ACCESS_KEY: 'test-secret-access-key',
+      // AWS 시크릿 키는 40자다.
+      AWS_SECRET_ACCESS_KEY: 'testSecretAccessKey000000000000000000000',
       S3_BUCKET: 'test-bucket',
       DISCORD_WEBHOOK_URL: '',
     },

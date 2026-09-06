@@ -1,8 +1,9 @@
 # DMS 셋업 가이드
 
 `.env`는 gitignore 대상이라 저장소에 없다. **새 체크아웃에서는 직접 만들어야 한다.**
-채울 변수는 11개고 형식은 `src/lib/env.ts`가 zod로 검증한다 — 하나라도 비었거나
-형식이 틀리면 앱이 안 뜨고 **어떤 변수가 문제인지 이름을 찍어준다.**
+채울 변수는 11개고 형식은 `src/lib/env-schema.ts`가 zod로 검증한다(`src/lib/env.ts`가
+앱 시작 시 그 스키마로 `process.env`를 파싱한다) — 하나라도 비었거나 형식이 틀리면 앱이
+안 뜨고 **어떤 변수가 문제인지 이름을 찍어준다.**
 
 ---
 
@@ -271,7 +272,8 @@ grafana가 3001을 이미 점유하고 있다. Next가 자동으로 밀리면 �
 
 | 증상 | 원인 |
 |---|---|
-| `환경 변수가 올바르지 않습니다: X` | X가 비었거나 형식 위반. `AUTH_SECRET`은 32자 이상, `APP_URL`은 URL 꼴 |
+| `환경 변수가 올바르지 않습니다: X` | X가 비었거나 형식 위반. 규칙은 `src/lib/env-schema.ts` 한 곳에 있다 — 길이 하한(`AUTH_SECRET` 32자·`AWS_SECRET_ACCESS_KEY` 30자)과 형식(`APP_URL` URL 꼴 · `DATABASE_URL` `postgres`로 시작 · `DISCORD_*_ID` 17~20자리 숫자 · `S3_BUCKET` AWS 버킷 명명 규칙) |
+| 빌드만 죽고 `npm run dev`는 멀쩡함 | `vercel env pull`이 만든 `.env.production` — 값이 전부 `[SENSITIVE]`다. 그 파일을 치우면 된다 (`CLAUDE.md` 함정 절) |
 | `Cannot find module '@/generated/prisma/client'` | `npx prisma generate` 안 돌림 (위 참조) |
 | 디스코드 에러 화면이 뜨고 앱으로 안 돌아옴 | 포털 `Redirects` 미등록, 또는 `APP_URL` 불일치(끝 슬래시) |
 | 돌아왔는데 "팀 디스코드 서버 멤버만 이용할 수 있습니다" | `DISCORD_GUILD_ID`가 틀림. `CLIENT_ID`와 바꿔 넣은 경우가 흔하다 (둘 다 18~19자리 숫자) |

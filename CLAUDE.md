@@ -87,6 +87,31 @@ RDS 인스턴스 설정(파라미터 그룹, 보안 그룹, 마스터 비밀번�
 `.env`는 gitignore 대상이고, `.gitignore`의 `!.env.example` 예외를 지우지 말 것
 (기본값 `.env*`가 예제 파일까지 무시한다).
 
+**`vercel env pull` 이 `npm run build` 를 죽인다** (2026-09-06 실측). 증상이 얄궂다 —
+**`next dev` 는 멀쩡히 뜨고 빌드만 죽는다.** 읽는 파일이 다르기 때문이다.
+
+| | 읽는 env 파일 |
+|---|---|
+| `next dev` | `.env.local` · `.env` |
+| `next build` | `.env.local` · **`.env.production`** · `.env` (앞이 이긴다) |
+
+Vercel 대시보드에서 **Sensitive 로 표시된 변수는 값 대신 리터럴 `[SENSITIVE]`** 로 내려온다.
+그 문자열이 `.env` 의 실값을 덮어 `env.ts` 가 던진다:
+`환경 변수가 올바르지 않습니다: AUTH_SECRET, APP_URL, DISCORD_WEBHOOK_URL`.
+
+`HANDOFF.md` 에 같은 현상의 **읽기 쪽 절반**이 이미 적혀 있다("운영 환경변수는 CLI 로 못
+읽는다") — 거기는 *운영 값을 되읽을 수 없다*는 얘기고, 여기는 *그 자리표시자가 로컬 빌드를
+죽인다*는 얘기다. 한쪽만 고치면 갈라진다.
+
+**조치는 `.env.production` 을 치우는 것 하나다.** Vercel 배포는 대시보드 값을 주입하므로
+이 파일이 없어도 아무 영향이 없다 (gitignore 대상이라 올라가지도 않는다). 치운 뒤 빌드가
+라우트 20개와 `ƒ Proxy (Middleware)` 를 찍으면 정상이다.
+
+> **에러에 3개만 뜨는 것이 함정이다.** 앱 환경변수 11개가 전부 `[SENSITIVE]` 인데
+> `z.string().min(1)` 을 쓰는 8개는 **통과한다**(11자니까). `AUTH_SECRET` 의 `min(32)` 와
+> URL 검사 둘이 우연히 걸어 준 것뿐이고, 그게 없었다면 **가짜 `DATABASE_URL` 로 빌드가
+> 그냥 진행됐다.** `src/lib/env.ts` 의 스키마가 "값이 있다"만 보고 "값이 값인지"는 안 본다.
+
 **개발 환경은 macOS 다** (2026-08-31 정정). 이 문단은 원래 *"Windows 개발 환경.
 git의 LF→CRLF 경고는 정상이다. 셸은 Git Bash"* 라고 적혀 있었다. 지금은 Darwin + zsh 다.
 경로가 갈리는 곳이 있으니 문서를 그대로 믿지 말 것 — 예: Playwright 브라우저는
