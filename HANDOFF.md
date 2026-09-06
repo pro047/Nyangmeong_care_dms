@@ -52,13 +52,38 @@
 > `_count` 를 처음 쓴 자리였고 **타입검사·린트·빌드가 원리상 못 잡는** 구간이었다.
 > groupBy 폴백은 필요 없다.
 >
-> **아직 안 끝난 것 셋.**
-> 1. **S7 — 운영 DB 소급 이동은 사람이 직접 돌린다.** dev 에서만 apply 했다.
->    절차와 롤백은 `MILESTONES.md` §'소급 이동'
+> **S7 — 운영 소급 이동도 끝났다** (2026-09-06). 운영 DB 는 폴더 20개(루트 4 + 2뎁스 16) ·
+> 활성 문서 28건 · **미분류 0건** · 껍데기 폴더 0개다. 적용 전후로 문서 총수가 28로 같아
+> **하나도 잃지 않았다.** 롤백 스냅샷은
+> `scripts/snapshots/reclassify-2026-09-06T07-33-48-636Z.json`
+> (되돌리기: `scripts/reclassify-rollback.mjs <스냅샷> --apply`).
+>
+> **선행 작업 2개는 UI 가 아니라 SQL 로 했다.** 앱 API 와 의미가 같음을 먼저 확인했다 —
+> `PATCH /api/folders/[id]` 는 `prisma.folder.update({ data: { name, aliases } })` 뿐이고
+> (`route.ts:44-47`), `DELETE` 는 문서가 있어도 막지 않으며(`route.ts:70`) FK 의 `SetNull` 에만
+> 의존한다. `Folder` 모델에는 `updatedAt` 이 없어(`schema.prisma:24-32`) raw SQL 이 놓치는
+> 필드가 0 이다. 스냅샷은 `scripts/snapshots/prep-2026-09-06T07-26-13-016Z.json`.
+>
+> **루트 카테고리는 소급 스크립트가 안 만든다.** `02_IA 구조도` 가 미분류로 남길래
+> **루트 폴더 `IA구조도` 를 먼저 만들어** 스크립트가 잡게 했다 — 스크립트를 고치지 않았다.
+> `classify` 는 이미 `IA 구조도` 를 제안하고 있었고, `normalizeForMatch`(`classify.ts:36-41`)가
+> 문자·숫자 이외를 지우므로 **폴더 이름의 공백 유무는 매칭에 무관하다.**
+>
+> **아직 안 끝난 것 둘.**
+> 1. **운영 화면을 눈으로 안 봤다.** `AUTH_SECRET` 이 Vercel 에서 Sensitive 라 세션을 못 만들어
+>    e2e 를 운영에 못 태운다. 확인한 것은 `/login` 200 · `/` 401(비로그인 차단)뿐이다.
+>    **`화면설계서` 가 직접 문서 0건 · 자식 9개라 이번 변경이 바로 그 화면이다** — 팀이 보기 전에
+>    사람이 한 번 열어 볼 것
 > 2. **미검증으로 남은 것: S6(낙관적 잠금) · B4(흡수 힌트).** 2뎁스 스트림의 잔여분이다
-> 3. **배포가 조용히 막힐 수 있다** — 이 맥의 git 전역 신원이 회사 계정이라 `pro047` 리포에서
->    커밋하면 Vercel 이 배포를 막는다. 이번 커밋들은 `--local` 로 `pro047` 을 맞춰 두고 찍었다.
->    확인: `gh api repos/pro047/Nyangmeong_care_dms/commits/<sha>/status --jq '.state'`
+>
+> **배포가 조용히 막힐 수 있다** — 이 맥의 git 전역 신원이 회사 계정이라 `pro047` 리포에서
+> 커밋하면 Vercel 이 배포를 막는다. 이번 커밋들은 `--local` 로 `pro047` 을 맞춰 두고 찍었다.
+> 확인: `gh api repos/pro047/Nyangmeong_care_dms/commits/<sha>/status --jq '.state'`
+>
+> **운영 환경변수는 CLI 로 못 읽는다** (2026-09-06 실측). `vercel env pull` 은
+> `DATABASE_URL`·`AUTH_SECRET`·`AWS_*`·`DISCORD_*`·`S3_BUCKET` 11개를 `[SENSITIVE]`
+> 자리표시자로 내려준다 — Sensitive 플래그는 쓰기 전용이라 대시보드에서도 되읽을 수 없다.
+> 운영 DB 에 붙어야 하면 **Neon 콘솔에서 연결 문자열을 뽑는다**(`vercel` 경유는 원리상 불가).
 >
 > **범위 밖 결함을 하나 봤고 안 고쳤다.** `app-sidebar.tsx:25` 가 `pathname === href` 로
 > 활성을 정하는데 `usePathname()` 은 쿼리스트링을 뺀다 → `/?folder=…` 에서 사이드바의
