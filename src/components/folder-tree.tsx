@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { ChevronRight, Folder, FolderPlus, Pencil, Trash2 } from 'lucide-react'
 import {
   buildFolderTree,
+  folderBreadcrumb,
   normalizeAliases,
   MAX_ALIASES_PER_FOLDER,
   MAX_ALIAS_LENGTH,
@@ -62,14 +63,29 @@ export function FolderTree({ folders }: { folders: FolderAliasRow[] }) {
   // (app) 전 구간이 force-dynamic 이라 Suspense 경계 없이도 서버 렌더에서 값이 온다.
   const activeId = searchParams.get('folder')
   const tree = buildFolderTree(folders)
-  const parentOfActive = folders.find((folder) => folder.id === activeId)?.parentId ?? null
+  // 활성 폴더의 조상 전부. 부모 하나만 보면 3뎁스에서 활성 항목이 안 보인다 —
+  // 깊이 상한은 관례일 뿐이고 folderCreateSchema·POST /api/folders 어디에도 검사가 없다.
+  const ancestorsOfActive =
+    activeId === null
+      ? []
+      : folderBreadcrumb(activeId, folders)
+          .slice(0, -1)
+          .map((folder) => folder.id)
 
   // 기본은 접힘이다. 폴더가 20개라 전부 펼쳐 두면 사이드바가 스크롤 없이는 안 담긴다.
-  // 초기값에 활성 폴더의 부모를 넣는 것은 주소로 바로 들어온 경우를 위한 것이다 —
-  // 하위 폴더 URL 을 새로 열었는데 사이드바에서 그 항목이 안 보이면 위치를 잃는다.
-  const [expanded, setExpanded] = useState<ReadonlySet<string>>(() =>
-    parentOfActive === null ? new Set() : new Set([parentOfActive]),
-  )
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set(ancestorsOfActive))
+
+  // 폴더가 바뀌면 그 조상을 펼친다. 파생값(`expanded.has(id) || 조상`)으로 합치지 않는
+  // 이유는 그러면 활성 폴더의 부모를 접을 수 없기 때문이다 — 셰브런을 눌러도 오른쪽이
+  // 계속 참이라 다시 열린다. useEffect 는 이 리포에서 lint 가 막는다
+  // (react-hooks/set-state-in-effect). 그래서 React 가 문서화한 "렌더 중 상태 조정"을 쓴다.
+  const [seenActive, setSeenActive] = useState(activeId)
+  if (activeId !== seenActive) {
+    setSeenActive(activeId)
+    if (ancestorsOfActive.some((id) => !expanded.has(id))) {
+      setExpanded(new Set([...expanded, ...ancestorsOfActive]))
+    }
+  }
 
   const toggle = (id: string) =>
     setExpanded((prev) => {
@@ -78,8 +94,6 @@ export function FolderTree({ folders }: { folders: FolderAliasRow[] }) {
       return next
     })
 
-  /** 폴더로 이동하면 그 폴더는 펼친다 — 본문에 뜬 자식 폴더 행을 눌러 들어갔을 때
-      사이드바가 접힌 채로 남으면 현재 위치가 사라진다. 접기는 셰브런이 맡는다. */
   const expand = (id: string) =>
     setExpanded((prev) => (prev.has(id) ? prev : new Set(prev).add(id)))
   // FolderNode 는 별칭을 안 들고 있다 — 이름변경 창을 채울 때만 원시 행에서 찾는다.
@@ -170,7 +184,13 @@ export function FolderTree({ folders }: { folders: FolderAliasRow[] }) {
     // 실패하면 토스트가 뜨는데 창이 이미 닫혀 있다. 이름 충돌(409)이 잦은 자리라
     // 창을 닫기 전에 결과를 보고, 실패면 입력을 남겨 고쳐 쓰게 한다.
     void send(fallback, request).then((ok) => {
-      if (ok) setNameDialog(null)
+      if (!ok) return
+      // 자식이 없던 폴더에 하위 폴더를 만들면 셰브런만 새로 생기고 정작 만든 폴더는
+      // 접힌 채로 숨는다 — 사용자 눈에는 아무 일도 안 일어난 것으로 보인다.
+      if (nameDialog.mode === 'create' && nameDialog.parentId !== null) {
+        expand(nameDialog.parentId)
+      }
+      setNameDialog(null)
     })
   }
 
