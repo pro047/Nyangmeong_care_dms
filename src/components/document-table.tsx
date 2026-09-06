@@ -30,13 +30,13 @@ const COLUMN_COUNT = 7
 export function DocumentTable({
   documents,
   folders = [],
-  latestIds,
+  supersededIds,
 }: {
   documents: DocumentListItem[]
   folders?: FolderChildCard[]
-  /** 폴더별 최신 문서 id. 화면에 그리는 집합이 아니라 전체 활성 문서에서 뽑은 것이라
-      태그 필터·검색으로 목록이 좁아져도 배지가 옮겨 다니지 않는다. */
-  latestIds?: ReadonlySet<string>
+  /** 같은 폴더에 더 최신인 문서가 있는 문서 id. 화면에 그리는 집합이 아니라 전체 활성
+      문서에서 뽑은 것이라 태그 필터·검색으로 목록이 좁아져도 판정이 흔들리지 않는다. */
+  supersededIds?: ReadonlySet<string>
 }) {
   return (
     <div className="overflow-hidden rounded-xl border border-border bg-surface">
@@ -83,9 +83,18 @@ export function DocumentTable({
           ))}
           {documents.map((doc) => {
             const latest = doc.versions[0]
+            // 구버전은 강조를 빼는 방식으로 구분한다 — 표시를 최신 쪽에 붙이면 거의 전
+            // 행에 달린다. 행 배경은 건드리지 않는다. 배경까지 바꾸면 휴지통 행처럼 읽힌다.
+            //
+            // 색을 개별로 낮추지 않고 opacity 로 셀을 통째로 내리는 이유: 이 표의 본문 색
+            // (#666666)이 이미 폴더·올린사람·크기·수정 열의 기본색이라, 제목만 그 색으로
+            // 바꾸면 "흐려졌다"가 아니라 "제목이 다른 열과 같아졌다"로 읽힌다. 대조는 행
+            // 단위로 생겨야 한다. 다운로드·삭제 칸에는 안 건다 — 구버전도 받아 갈 문서다.
+            const superseded = supersededIds?.has(doc.id) ?? false
+            const dim = superseded ? 'opacity-45' : ''
             return (
               <tr key={doc.id} className="border-b border-border last:border-0 hover:bg-canvas">
-                <td className="max-w-0 px-4 py-3">
+                <td className={`max-w-0 px-4 py-3 ${dim}`}>
                   {/* 제목은 상세로 간다. 바로 받고 싶으면 오른쪽 다운로드 아이콘. */}
                   <Link href={`/documents/${doc.id}`} className="flex items-center gap-2.5">
                     <span className="flex h-7 w-9 shrink-0 items-center justify-center rounded bg-canvas text-xs font-semibold text-ink-muted">
@@ -97,13 +106,6 @@ export function DocumentTable({
                         <span className="text-xs text-ink-subtle">v{latest.versionNo}</span>
                       )}
                     </span>
-                    {/* 제목이 아니라 배지가 잘리면 안 되므로 shrink-0. 태그 칩·확장자 칩이
-                        모두 연회색이라 배지는 반전시켜야 네 줄 중에서 눈에 걸린다. */}
-                    {latestIds?.has(doc.id) && (
-                      <span className="shrink-0 rounded bg-accent px-1.5 py-0.5 text-xs font-medium text-surface">
-                        최신
-                      </span>
-                    )}
                   </Link>
                   {/* 칩은 제목 링크 바깥에 둔다 — a 안에 a 는 유효하지 않다. */}
                   {doc.tags.length > 0 && (
@@ -120,16 +122,16 @@ export function DocumentTable({
                     </span>
                   )}
                 </td>
-                <td className="truncate-cell hidden w-28 px-3 py-3 text-ink-muted md:table-cell">
+                <td className={`truncate-cell hidden w-28 px-3 py-3 text-ink-muted md:table-cell ${dim}`}>
                   {doc.folder?.name ?? '—'}
                 </td>
-                <td className="truncate-cell hidden w-28 px-3 py-3 text-ink-muted lg:table-cell">
+                <td className={`truncate-cell hidden w-28 px-3 py-3 text-ink-muted lg:table-cell ${dim}`}>
                   {latest?.uploadedBy.username ?? '—'}
                 </td>
-                <td className="hidden w-20 px-3 py-3 whitespace-nowrap text-ink-muted sm:table-cell">
+                <td className={`hidden w-20 px-3 py-3 whitespace-nowrap text-ink-muted sm:table-cell ${dim}`}>
                   {latest ? formatBytes(latest.sizeBytes) : '—'}
                 </td>
-                <td className="w-24 px-3 py-3 whitespace-nowrap text-ink-muted">
+                <td className={`w-24 px-3 py-3 whitespace-nowrap text-ink-muted ${dim}`}>
                   {formatRelative(doc.updatedAt)}
                 </td>
                 <td className="px-4 py-3">
