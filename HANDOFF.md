@@ -322,6 +322,22 @@
 
 **남은 것은 S7(운영 소급 이동) 과 미검증 S6·B4 뿐이다.** 위 "현재 위치" 참조.
 
+**2026-09-06 에 머지·배포하고 브랜치를 전부 정리했다 — 원격에 `main` 하나만 남았다.**
+셋 다 `main` 의 조상임을 확인한 뒤 지웠다(잃은 커밋 0). 되살리려면
+`git push origin <sha>:refs/heads/<이름>` — SHA 는 main 히스토리에 살아 있다.
+워크트리 세 개(`../dms-folder-depth2` · `../dms-folder-depth2-pipeline-folder-children-view` ·
+`../dms-s3-orphan`)도 제거했고, **그 안의 `.pipeline/` 산출물은 지우기 전에 메인 리포의
+`.pipeline/` 로 복사해 뒀다**(gitignore 대상이라 커밋에는 안 들어간다).
+
+| 브랜치 | SHA | 비고 |
+|---|---|---|
+| `feature/folder-depth2` | `e162ab5` | 2뎁스 자동 분류 + 소급 이동 |
+| `pipeline/folder-children-view` | `9fa0093` | 위 브랜치를 품고 있었다 — 머지가 한 번으로 끝난 이유 |
+| `feature/s3-orphan-cleanup` | `633c7d7` | 이미 main 과 같은 지점이라 내용 없음 |
+
+**배포 확인은 커밋 status 로 한다** (실측: `9fa0093` → `Vercel: success`):
+`gh api repos/pro047/Nyangmeong_care_dms/commits/<sha>/status --jq '.state'`
+
 **이 스트림에서 얻은 상시 지식 셋** (다음 스트림도 밟는다):
 
 - **커밋 게이트의 `REVIEW_ACK` 은 워크트리에서 경로가 다르다.** `.git` 이 파일이라
