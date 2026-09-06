@@ -2,6 +2,7 @@ import { Search } from 'lucide-react'
 import { DocumentTable } from '@/components/document-table'
 import { prisma } from '@/lib/prisma'
 import { activeDocumentWhere } from '@/lib/trash'
+import { latestCandidateQuery, latestDocumentIds } from '@/lib/latest'
 import { documentSearchWhere, normalizeSearchQuery } from '@/lib/search'
 
 export const dynamic = 'force-dynamic'
@@ -44,7 +45,13 @@ export default async function SearchPage({
     )
   }
 
-  const documents = await searchDocuments(q)
+  // 검색 결과는 폴더를 가로지른다. 그래서 배지가 더 필요하다 — v0.3 과 v0.5 가 나란히
+  // 뜰 때 어느 쪽이 그 폴더의 최신본인지 목록에서 바로 보인다.
+  const [documents, latestRows] = await Promise.all([
+    searchDocuments(q),
+    prisma.document.findMany(latestCandidateQuery()),
+  ])
+  const latestIds = latestDocumentIds(latestRows)
 
   return (
     <div>
@@ -60,7 +67,7 @@ export default async function SearchPage({
           <p className="mt-1 text-sm text-ink-muted">제목·설명·태그에서만 찾습니다.</p>
         </div>
       ) : (
-        <DocumentTable documents={documents} />
+        <DocumentTable documents={documents} latestIds={latestIds} />
       )}
     </div>
   )

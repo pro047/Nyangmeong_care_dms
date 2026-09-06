@@ -11,6 +11,7 @@ import {
   folderBreadcrumb,
   folderSummaryLine,
 } from '@/lib/folder'
+import { latestCandidateQuery, latestDocumentIds } from '@/lib/latest'
 import { pageErrorMessage } from '@/lib/page-error'
 import type { Prisma } from '@/generated/prisma/client'
 
@@ -71,13 +72,19 @@ export default async function DocumentsPage({
   const documentCounts = new Map(folderRows.map((row) => [row.id, row._count.documents]))
   const activeFolder = folderId ? (folderRows.find((row) => row.id === folderId) ?? null) : null
 
-  const documents = await getDocuments({
-    AND: [
-      activeDocumentWhere(),
-      activeFolder ? folderFilterWhere(folder) : {},
-      tagFilterWhere(tag),
-    ],
-  })
+  // 배지 후보는 화면에 그릴 집합과 따로 읽는다(latest.ts 참고). 목록 조회와 서로
+  // 기다릴 이유가 없어 같이 보낸다 — 함수 리전이 서울이라 왕복 하나가 95ms 다.
+  const [documents, latestRows] = await Promise.all([
+    getDocuments({
+      AND: [
+        activeDocumentWhere(),
+        activeFolder ? folderFilterWhere(folder) : {},
+        tagFilterWhere(tag),
+      ],
+    }),
+    prisma.document.findMany(latestCandidateQuery()),
+  ])
+  const latestIds = latestDocumentIds(latestRows)
 
   const activeTag = typeof tag === 'string' && tag !== '' ? tag : null
   const filtered = activeFolder !== null || activeTag !== null
@@ -137,7 +144,7 @@ export default async function DocumentsPage({
       {/* 문서가 없어도 자식 폴더가 있으면 표를 그린다 — 자식이 있는데 점선 박스를 띄우면
           카테고리를 열었을 때 빈 화면이 나오던 그 증상 그대로다. */}
       {documents.length > 0 || emptyKind === 'children-only' ? (
-        <DocumentTable documents={documents} folders={children} />
+        <DocumentTable documents={documents} folders={children} latestIds={latestIds} />
       ) : (
         <div className="rounded-xl border border-dashed border-border-strong bg-surface py-20 text-center">
           <FileText className="mx-auto mb-3 h-8 w-8 text-ink-subtle" aria-hidden />

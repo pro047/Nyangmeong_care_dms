@@ -30,9 +30,13 @@ const COLUMN_COUNT = 7
 export function DocumentTable({
   documents,
   folders = [],
+  latestIds,
 }: {
   documents: DocumentListItem[]
   folders?: FolderChildCard[]
+  /** 폴더별 최신 문서 id. 화면에 그리는 집합이 아니라 전체 활성 문서에서 뽑은 것이라
+      태그 필터·검색으로 목록이 좁아져도 배지가 옮겨 다니지 않는다. */
+  latestIds?: ReadonlySet<string>
 }) {
   return (
     <div className="overflow-hidden rounded-xl border border-border bg-surface">
@@ -93,6 +97,13 @@ export function DocumentTable({
                         <span className="text-xs text-ink-subtle">v{latest.versionNo}</span>
                       )}
                     </span>
+                    {/* 제목이 아니라 배지가 잘리면 안 되므로 shrink-0. 태그 칩·확장자 칩이
+                        모두 연회색이라 배지는 반전시켜야 네 줄 중에서 눈에 걸린다. */}
+                    {latestIds?.has(doc.id) && (
+                      <span className="shrink-0 rounded bg-accent px-1.5 py-0.5 text-xs font-medium text-surface">
+                        최신
+                      </span>
+                    )}
                   </Link>
                   {/* 칩은 제목 링크 바깥에 둔다 — a 안에 a 는 유효하지 않다. */}
                   {doc.tags.length > 0 && (
