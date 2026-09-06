@@ -1,4 +1,7 @@
-// 카테고리 폴더 본문에 자식 폴더 카드를 그리는 변경의 실측 (DESIGN.md §7.3 의 B1~B9).
+// 카테고리 폴더 본문에 자식 폴더를 그리는 변경의 실측 (DESIGN.md §7.3 의 B1~B9).
+//
+// 2026-09-06 화면 실측 뒤 모양이 바뀌었다 — 별도 카드 격자가 아니라 **문서 표 안의 폴더 행**
+// 이고, 제목·브레드크럼은 크기를 안 섞는다. 이 파일의 셀렉터는 그 모양을 본다.
 //
 // build·lint·test 가 원리상 못 잡는 구간을 태운다. vitest 는 순수 함수만 지나가고
 // (`vitest.config.mts` 가 environment: 'node' · include: src/**/*.test.ts 라 .tsx 는 수집조차
@@ -37,18 +40,22 @@ const activeDocs = async (id) =>
     [id],
   )).n
 
-// 화면에 실제로 그려진 카드를 이름 → 숫자 문자열로 읽는다.
+// 폴더 행은 문서 표 안에서 colSpan 한 칸을 통째로 쓴다. 문서 행과 셀렉터가 갈리는 지점이다.
+const FOLDER_ROW = 'table tbody td[colspan] a'
+const DOC_ROW = 'table tbody tr a[href^="/documents/"]'
+
 const readCards = (page) =>
-  page.$$eval('section[aria-label="하위 폴더"] li a', (as) =>
+  page.$$eval(FOLDER_ROW, (as) =>
     as.map((a) => ({
       name: a.querySelector('span.truncate-cell')?.textContent?.trim(),
-      count: a.querySelector('span:last-child')?.textContent?.trim(),
+      count: [...a.querySelectorAll('span')].pop()?.textContent?.trim(),
       href: a.getAttribute('href'),
-      x: Math.round(a.getBoundingClientRect().x),
+      y: Math.round(a.getBoundingClientRect().y),
+      right: Math.round(a.getBoundingClientRect().right),
     })),
   )
-const cardSection = (page) => page.locator('section[aria-label="하위 폴더"]')
-const rowCount = (page) => page.locator('table tbody tr').count()
+const folderRowCount = (page) => page.locator(FOLDER_ROW).count()
+const rowCount = (page) => page.locator(DOC_ROW).count()
 const subtitle = (page) => page.locator('h1').locator('xpath=../following-sibling::p[1]').innerText()
 
 const root = async (name) =>
@@ -78,7 +85,7 @@ try {
 
   const cards1 = await readCards(page)
   check(
-    'B1 카드 수 = SQL 자식 수',
+    'B1 폴더 행 수 = SQL 자식 수',
     cards1.length === kids1.length,
     `화면=${cards1.length} SQL=${kids1.length}`,
   )
@@ -87,30 +94,34 @@ try {
     (c) => c.count !== (byName.get(c.name) > 0 ? `${byName.get(c.name)}개 문서` : '문서 없음'),
   )
   check(
-    'B1 카드 숫자 = SQL 활성 문서 수',
+    'B1 폴더 행 숫자 = SQL 활성 문서 수',
     wrong.length === 0,
     wrong.length ? JSON.stringify(wrong) : cards1.map((c) => `${c.name}:${c.count}`).join(' '),
   )
   check(
-    'B1 카드가 한국어 이름 오름차순',
+    'B1 폴더 행이 한국어 이름 오름차순',
     JSON.stringify(cards1.map((c) => c.name)) ===
       JSON.stringify([...cards1.map((c) => c.name)].sort((a, b) => a.localeCompare(b, 'ko'))),
     cards1.map((c) => c.name).join(' < '),
   )
   check('B1 제목이 폴더 이름', (await page.locator('h1').innerText()) === '화면설계서', await page.locator('h1').innerText())
   check('B1 부제가 하위 폴더 수', (await subtitle(page)) === `하위 폴더 ${kids1.length}개`, await subtitle(page))
-  check('B1 표가 없다', (await page.locator('table').count()) === 0, `table=${await page.locator('table').count()}`)
+  // 문서가 0건이어도 표는 그려야 한다 — 폴더 행이 그 표 안에 산다.
+  check('B1 표가 있다', (await page.locator('table').count()) === 1, `table=${await page.locator('table').count()}`)
+  check('B1 문서 행은 0', (await rowCount(page)) === 0, `문서행=${await rowCount(page)}`)
   // 이번에 고친 증상이 정확히 이것이다 — 자식이 있는데 점선 박스가 뜨는 것.
   check('B1 점선 박스가 없다', (await page.locator('.border-dashed').count()) === 0, `dashed=${await page.locator('.border-dashed').count()}`)
+  // 폴더 행이 문서 행과 같은 표 폭을 쓴다 — 다르면 목록 하나로 안 읽힌다.
+  const tableRight = Math.round((await page.locator('table').boundingBox()).width + (await page.locator('table').boundingBox()).x)
   check(
-    'B1 한 줄 안내가 있다',
-    (await page.getByText('이 폴더에 직접 담긴 문서는 없습니다').count()) === 1,
-    '',
+    'B1 폴더 행이 표 전체 폭을 쓴다',
+    cards1.every((c) => Math.abs(c.right - tableRight) <= 20),
+    `표 우변=${tableRight} 행 우변=${[...new Set(cards1.map((c) => c.right))].join(',')}`,
   )
   await page.screenshot({ path: 'test/e2e/shots/FCV-B1-category.png' })
 
   // ── B2 · 카드를 누르면 그 폴더로 들어간다 ──────────────────────────────
-  await page.locator('section[aria-label="하위 폴더"] li a', { hasText: '마이페이지' }).first().click()
+  await page.locator(FOLDER_ROW, { hasText: '마이페이지' }).first().click()
   await page.waitForURL(`**/?folder=${마이페이지.id}`)
   await page.waitForLoadState('networkidle')
   const docs2 = await activeDocs(마이페이지.id)
@@ -118,7 +129,16 @@ try {
   check('B2 제목이 마지막 세그먼트', (await page.locator('h1').innerText()) === '마이페이지', await page.locator('h1').innerText())
   const crumbLink = page.locator('nav[aria-label="폴더 경로"] a')
   check('B2 브레드크럼 조상이 링크', (await crumbLink.count()) === 1 && (await crumbLink.innerText()) === '화면설계서', `${await crumbLink.count()}개`)
-  check('B2 카드 영역 없음', (await cardSection(page).count()) === 0, '')
+  check('B2 폴더 행 없음', (await folderRowCount(page)) === 0, '')
+  // 제목과 조상의 글자 크기가 같아야 한다 (2026-09-06 요청 — 작은 쪽으로 통일).
+  const [crumbSize, titleSize] = await page.evaluate(() => {
+    const nav = document.querySelector('nav[aria-label="폴더 경로"]')
+    return [
+      getComputedStyle(nav.querySelector('a')).fontSize,
+      getComputedStyle(nav.querySelector('h1')).fontSize,
+    ]
+  })
+  check('B2 브레드크럼 글자 크기 통일', crumbSize === titleSize, `조상=${crumbSize} 제목=${titleSize}`)
   check('B2 표 행 수 = SQL', (await rowCount(page)) === docs2, `화면=${await rowCount(page)} SQL=${docs2}`)
   // 사이드바의 '전체 문서'는 usePathname() 이 쿼리스트링을 빼는 탓에 /?folder= 에서도 계속
   // aria-current 다 (app-sidebar.tsx:25, 이번 변경 밖의 기존 동작). 폴더 링크만 골라 본다.
@@ -141,16 +161,19 @@ try {
   const kids4 = await kidsOf(기능명세서.id)
   const docs4 = await activeDocs(기능명세서.id)
   await page.goto(`${APP}/?folder=${기능명세서.id}`, { waitUntil: 'networkidle' })
-  check('B4 카드 수 = SQL', (await readCards(page)).length === kids4.length, `${(await readCards(page)).length} vs ${kids4.length}`)
+  check('B4 폴더 행 수 = SQL', (await readCards(page)).length === kids4.length, `${(await readCards(page)).length} vs ${kids4.length}`)
   check('B4 표 행 수 = SQL', (await rowCount(page)) === docs4, `${await rowCount(page)} vs ${docs4}`)
   check('B4 부제가 둘 다 표기', (await subtitle(page)) === `하위 폴더 ${kids4.length}개 · ${docs4}개 문서`, await subtitle(page))
-  // 카드가 표보다 먼저 나와야 한다 (파일 탐색기 순서).
+  // 폴더가 문서보다 위여야 한다 (파일 탐색기 순서). 같은 표 안이므로 tbody 행 순서로 본다.
   const order = await page.evaluate(() => {
-    const s = document.querySelector('section[aria-label="하위 폴더"]')
-    const t = document.querySelector('table')
-    return s && t ? s.compareDocumentPosition(t) & Node.DOCUMENT_POSITION_FOLLOWING : null
+    const rows = [...document.querySelectorAll('table tbody tr')]
+    const isFolder = (tr) => tr.querySelector('td[colspan]') !== null
+    const lastFolder = rows.findLastIndex(isFolder)
+    const firstDoc = rows.findIndex((tr) => !isFolder(tr))
+    return { lastFolder, firstDoc, total: rows.length }
   })
-  check('B4 카드가 표보다 위', order > 0, `compareDocumentPosition=${order}`)
+  check('B4 폴더 행이 문서 행보다 위', order.lastFolder < order.firstDoc, JSON.stringify(order))
+  check('B4 표가 하나다 (테두리가 안 갈린다)', (await page.locator('table').count()) === 1, '')
   await page.screenshot({ path: 'test/e2e/shots/FCV-B4-mixed.png' })
 
   // ── B5 · 카드가 뜨면 안 되는 화면들 + 죽은 링크 회귀 ──────────────────
@@ -158,13 +181,13 @@ try {
   const anyTag = await one('select name from tags limit 1')
 
   await page.goto(`${APP}/`, { waitUntil: 'networkidle' })
-  check('B5 / 에 카드 없음', (await cardSection(page).count()) === 0, '')
+  check('B5 / 에 폴더 행 없음', (await folderRowCount(page)) === 0, '')
   if (anyTag) {
     await page.goto(`${APP}/?tag=${encodeURIComponent(anyTag.name)}`, { waitUntil: 'networkidle' })
-    check('B5 태그 화면에 카드 없음', (await cardSection(page).count()) === 0, `태그=${anyTag.name}`)
+    check('B5 태그 화면에 폴더 행 없음', (await folderRowCount(page)) === 0, `태그=${anyTag.name}`)
   }
   await page.goto(`${APP}/?folder=존재하지않는id`, { waitUntil: 'networkidle' })
-  check('B5 죽은 링크에 카드 없음', (await cardSection(page).count()) === 0, '')
+  check('B5 죽은 링크에 폴더 행 없음', (await folderRowCount(page)) === 0, '')
   // findUnique 를 없애고 folderRows.find 로 바꾼 D4 가 이 규칙을 깼는지 보는 자리다.
   check('B5 죽은 링크는 전체 목록으로 (빈 화면 아님)', (await rowCount(page)) === totalActive, `화면=${await rowCount(page)} 전체=${totalActive}`)
 
@@ -184,23 +207,23 @@ try {
     [`_실측_카드카운트_${Date.now()}`, 마이페이지.id, user.id, `e2e/fcv-${Date.now()}.txt`],
   )).id
 
-  const readCard = async () => {
+  const readFolderRow = async () => {
     await page.goto(`${APP}/?folder=${화면설계서.id}`, { waitUntil: 'networkidle' })
     return (await readCards(page)).find((c) => c.name === '마이페이지')?.count
   }
-  const seeded = await readCard()
-  check('B6-1 새 문서가 카드 숫자에 반영', seeded === `${before + 1}개 문서`, `${seeded} (기대 ${before + 1}개 문서)`)
+  const seeded = await readFolderRow()
+  check('B6-1 새 문서가 폴더 행 숫자에 반영', seeded === `${before + 1}개 문서`, `${seeded} (기대 ${before + 1}개 문서)`)
 
   await withDb((c) => c.query('update documents set deleted_at = now() where id = $1', [seededDoc]))
-  const trashed = await readCard()
+  const trashed = await readFolderRow()
   check(
-    'B6-2 휴지통에 넣으면 카드 숫자가 준다 (_count.where 런타임 적용)',
+    'B6-2 휴지통에 넣으면 폴더 행 숫자가 준다 (_count.where 런타임 적용)',
     trashed === `${before}개 문서`,
     `${trashed} (기대 ${before}개 문서 — 안 줄면 where 가 무시된 것이다)`,
   )
 
   await withDb((c) => c.query('update documents set deleted_at = null where id = $1', [seededDoc]))
-  const restored = await readCard()
+  const restored = await readFolderRow()
   check('B6-3 복구하면 되돌아온다', restored === `${before + 1}개 문서`, `${restored}`)
 
   // ── B7 · 업로드 다이얼로그 기본 폴더 회귀 ─────────────────────────────
@@ -219,17 +242,16 @@ try {
   // ── B8 · 반응형 ───────────────────────────────────────────────────────
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto(`${APP}/?folder=${화면설계서.id}`, { waitUntil: 'networkidle' })
-  const wide = new Set((await readCards(page)).map((c) => c.x)).size
-  check('B8 넓은 화면에서 3열', wide === 3, `열=${wide}`)
+  const wideRows = await readCards(page)
+  check('B8 넓은 화면에서 폴더가 한 줄에 하나씩', new Set(wideRows.map((r) => r.y)).size === wideRows.length, `행=${wideRows.length} y=${new Set(wideRows.map((r) => r.y)).size}`)
 
   await page.setViewportSize({ width: 600, height: 900 })
   await page.waitForTimeout(300)
-  const narrow = new Set((await readCards(page)).map((c) => c.x)).size
-  check('B8 좁은 화면에서 1열', narrow === 1, `열=${narrow}`)
-  const overflow = await page.$$eval('section[aria-label="하위 폴더"] .truncate-cell', (els) =>
-    els.some((el) => el.scrollWidth > el.getBoundingClientRect().width + 1),
-  )
-  check('B8 이름이 카드 밖으로 안 넘침', overflow === false || overflow === true, `잘림 발생=${overflow}`)
+  const narrowRows = await readCards(page)
+  check('B8 좁은 화면에서도 행 수가 같다', narrowRows.length === wideRows.length, `${narrowRows.length} vs ${wideRows.length}`)
+  // 좁아지면 이름이 잘려야 한다 — 잘리지 않고 밀면 표가 가로로 넘친다.
+  const bodyOverflow = await page.evaluate(() => document.body.scrollWidth > window.innerWidth + 1)
+  check('B8 좁은 화면에서 가로 스크롤이 안 생긴다', bodyOverflow === false, `bodyOverflow=${bodyOverflow}`)
   await page.screenshot({ path: 'test/e2e/shots/FCV-B8-narrow.png' })
   await page.setViewportSize({ width: 1440, height: 900 })
 
@@ -243,7 +265,7 @@ try {
     seededFolder = (await created.json()).id
     await page.goto(`${APP}/?folder=${마이페이지.id}`, { waitUntil: 'networkidle' })
     const cards9 = await readCards(page)
-    check('B9 3뎁스에서도 직계 카드 1장', cards9.length === 1, `카드=${cards9.length}`)
+    check('B9 3뎁스에서도 직계 폴더 행 1개', cards9.length === 1, `행=${cards9.length}`)
     check('B9 표도 같이 그려진다', (await rowCount(page)) === (await activeDocs(마이페이지.id)), `${await rowCount(page)}`)
   } else {
     check('B9 3뎁스 폴더 생성', false, `POST /api/folders ${created.status}`)

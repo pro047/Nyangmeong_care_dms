@@ -2,7 +2,6 @@ import { FileText } from 'lucide-react'
 import Link from 'next/link'
 import { UploadDialog } from '@/components/upload-dialog'
 import { DocumentTable } from '@/components/document-table'
-import { FolderChildren } from '@/components/folder-children'
 import { prisma } from '@/lib/prisma'
 import { activeDocumentWhere } from '@/lib/trash'
 import { folderFilterWhere, tagFilterWhere } from '@/lib/search'
@@ -52,7 +51,7 @@ export default async function DocumentsPage({
   // 빈 화면이 아니라 전체 목록으로 떨어지는 쪽이 덜 놀랍다.
   const folderId = typeof folder === 'string' && folder !== '' ? folder : null
 
-  // 업로드 모달의 셀렉트·자동 분류(aliases), 자식 폴더 카드(_count), 브레드크럼(parentId)이
+  // 업로드 모달의 셀렉트·자동 분류(aliases), 자식 폴더 행(_count), 브레드크럼(parentId)이
   // 전부 이 한 조회에서 나온다. 폴더 이름만 따로 읽던 findUnique 를 없앤 이유가 그것이다 —
   // 어차피 표를 통째로 읽는데 왕복을 하나 더 쓸 이유가 없고, 함수 리전이 서울이라 그 한 번이
   // 95ms 다 (`HANDOFF.md` "배포 성능 실측").
@@ -67,8 +66,8 @@ export default async function DocumentsPage({
     },
   })
 
-  // 카드가 행 모양을 모르게 Map 으로 넘긴다 — 카운트 조회 방식이 바뀌어도 순수 함수 쪽은
-  // 그대로다.
+  // 순수 함수가 조회 행의 모양을 모르게 Map 으로 넘긴다 — 카운트 조회 방식이 바뀌어도
+  // 그쪽은 안 깨진다.
   const documentCounts = new Map(folderRows.map((row) => [row.id, row._count.documents]))
   const activeFolder = folderId ? (folderRows.find((row) => row.id === folderId) ?? null) : null
 
@@ -98,7 +97,8 @@ export default async function DocumentsPage({
         <div className="min-w-0">
           {crumbs.length > 0 ? (
             // 조상은 링크로 두되 제목은 마지막 세그먼트만 담는다 — 경로 전체를 h1 에 넣으면
-            // 스크린리더가 읽는 제목이 길어진다.
+            // 스크린리더가 읽는 제목이 길어진다. 경로는 한 줄로 읽혀야 하므로 크기를 섞지
+            // 않고 굵기·색으로만 현재 위치를 구분한다.
             <nav aria-label="폴더 경로" className="flex min-w-0 flex-wrap items-center gap-1.5">
               {crumbs.slice(0, -1).map((crumb) => (
                 <span key={crumb.id} className="flex items-center gap-1.5 text-sm text-ink-muted">
@@ -111,12 +111,12 @@ export default async function DocumentsPage({
                   <span aria-hidden>›</span>
                 </span>
               ))}
-              <h1 className="truncate-cell text-xl font-semibold text-ink">
+              <h1 className="truncate-cell text-sm font-semibold text-ink">
                 {crumbs[crumbs.length - 1].name}
               </h1>
             </nav>
           ) : (
-            <h1 className="text-xl font-semibold text-ink">{heading}</h1>
+            <h1 className="text-sm font-semibold text-ink">{heading}</h1>
           )}
           <p className="mt-0.5 text-sm text-ink-muted">
             {summary ?? '최근 수정순으로 표시됩니다'}
@@ -134,15 +134,10 @@ export default async function DocumentsPage({
         </p>
       )}
 
-      {children.length > 0 && <FolderChildren cards={children} />}
-
-      {documents.length > 0 ? (
-        <DocumentTable documents={documents} />
-      ) : emptyKind === 'children-only' ? (
-        // 자식 폴더를 이미 그렸으니 점선 박스까지 띄우면 화면이 "비었다"로만 읽힌다.
-        <p className="text-sm text-ink-muted">
-          이 폴더에 직접 담긴 문서는 없습니다. 위 하위 폴더에서 찾아보세요.
-        </p>
+      {/* 문서가 없어도 자식 폴더가 있으면 표를 그린다 — 자식이 있는데 점선 박스를 띄우면
+          카테고리를 열었을 때 빈 화면이 나오던 그 증상 그대로다. */}
+      {documents.length > 0 || emptyKind === 'children-only' ? (
+        <DocumentTable documents={documents} folders={children} />
       ) : (
         <div className="rounded-xl border border-dashed border-border-strong bg-surface py-20 text-center">
           <FileText className="mx-auto mb-3 h-8 w-8 text-ink-subtle" aria-hidden />

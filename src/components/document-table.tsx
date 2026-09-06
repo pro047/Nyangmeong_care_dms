@@ -1,7 +1,8 @@
 import Link from 'next/link'
-import { Download } from 'lucide-react'
+import { ChevronRight, Download, Folder } from 'lucide-react'
 import { DocumentRowActions } from '@/components/document-row-actions'
 import { formatBytes, formatRelative, fileLabel } from '@/lib/format'
+import type { FolderChildCard } from '@/lib/folder'
 
 /** 목록·검색이 같은 표를 쓰므로 두 쿼리의 include 가 이 모양을 만족해야 한다. */
 export type DocumentListItem = {
@@ -18,7 +19,21 @@ export type DocumentListItem = {
   }[]
 }
 
-export function DocumentTable({ documents }: { documents: DocumentListItem[] }) {
+/** 열 수. 폴더 행이 전체 폭을 쓰려면 이 값이 thead 와 맞아야 한다. */
+const COLUMN_COUNT = 7
+
+/**
+ * folders 는 지금 열어 둔 폴더의 직계 자식이다. 문서 행 위에 같은 표로 그려서 탐색이
+ * 목록 하나로 끝나게 한다 — 별도 카드 영역을 두면 테두리가 둘로 갈린다.
+ * 검색 화면은 폴더 개념이 없어 넘기지 않는다.
+ */
+export function DocumentTable({
+  documents,
+  folders = [],
+}: {
+  documents: DocumentListItem[]
+  folders?: FolderChildCard[]
+}) {
   return (
     <div className="overflow-hidden rounded-xl border border-border bg-surface">
       <table className="w-full text-sm">
@@ -38,6 +53,30 @@ export function DocumentTable({ documents }: { documents: DocumentListItem[] }) 
           </tr>
         </thead>
         <tbody>
+          {folders.map((folder) => (
+            <tr key={folder.id} className="border-b border-border last:border-0 hover:bg-canvas">
+              {/* 폴더에는 올린 사람·크기·수정일이 없다. 빈 칸을 늘어놓는 대신 한 칸으로
+                  합치고 행 전체를 링크로 만든다. */}
+              <td colSpan={COLUMN_COUNT} className="p-0">
+                <Link
+                  href={`/?folder=${encodeURIComponent(folder.id)}`}
+                  className="flex items-center gap-2.5 px-4 py-3"
+                >
+                  {/* 문서 행의 확장자 배지와 같은 크기다 — 왼쪽 끝이 어긋나면 한 목록으로 안 읽힌다. */}
+                  <span className="flex h-7 w-9 shrink-0 items-center justify-center rounded bg-canvas text-ink-muted">
+                    <Folder className="h-4 w-4" />
+                  </span>
+                  <span className="truncate-cell min-w-0 flex-1 font-medium text-ink">
+                    {folder.name}
+                  </span>
+                  <span className="shrink-0 text-ink-muted">
+                    {folder.documentCount > 0 ? `${folder.documentCount}개 문서` : '문서 없음'}
+                  </span>
+                  <ChevronRight className="h-4 w-4 shrink-0 text-ink-subtle" aria-hidden />
+                </Link>
+              </td>
+            </tr>
+          ))}
           {documents.map((doc) => {
             const latest = doc.versions[0]
             return (

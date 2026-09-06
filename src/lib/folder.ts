@@ -75,7 +75,8 @@ export type FolderNode = FolderRow & { children: FolderNode[] }
     별칭이 필요 없는 조회까지 컬럼을 더 읽어야 한다. */
 export type FolderAliasRow = FolderRow & { aliases: string[] }
 
-/** 카드 한 장. documentCount 는 그 폴더에 직접 담긴 활성 문서 수다(손자는 안 센다). */
+/** 목록에 그릴 자식 폴더 한 줄. documentCount 는 그 폴더에 직접 담긴 활성 문서 수다
+    (손자는 안 센다). */
 export type FolderChildCard = { id: string; name: string; documentCount: number }
 
 /** 평면 행을 트리로 접는다. 같은 층은 이름 오름차순(한국어 정렬). */
@@ -107,8 +108,8 @@ export function buildFolderTree(rows: FolderRow[]): FolderNode[] {
 }
 
 /**
- * parentId 의 직계 자식만 카드로. 손자는 안 본다 — 화면은 한 층만 그리고 다음 층은
- * 카드를 눌러 들어가서 본다. 정렬은 buildFolderTree 와 같은 한국어 이름 오름차순.
+ * parentId 의 직계 자식만. 손자는 안 본다 — 화면은 한 층만 그리고 다음 층은 그 줄을 눌러
+ * 들어가서 본다. 정렬은 buildFolderTree 와 같은 한국어 이름 오름차순.
  * documentCounts 에 없는 id 는 0 으로 읽는다 — 카운트 조회 방식이 바뀌어도 여기가 안 깨진다.
  */
 export function childFolderCards(
