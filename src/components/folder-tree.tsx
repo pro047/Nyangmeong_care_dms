@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Folder, FolderPlus, Pencil, Trash2 } from 'lucide-react'
+import { ChevronRight, Folder, FolderPlus, Pencil, Trash2 } from 'lucide-react'
 import {
   buildFolderTree,
   normalizeAliases,
@@ -62,6 +62,26 @@ export function FolderTree({ folders }: { folders: FolderAliasRow[] }) {
   // (app) 전 구간이 force-dynamic 이라 Suspense 경계 없이도 서버 렌더에서 값이 온다.
   const activeId = searchParams.get('folder')
   const tree = buildFolderTree(folders)
+  const parentOfActive = folders.find((folder) => folder.id === activeId)?.parentId ?? null
+
+  // 기본은 접힘이다. 폴더가 20개라 전부 펼쳐 두면 사이드바가 스크롤 없이는 안 담긴다.
+  // 초기값에 활성 폴더의 부모를 넣는 것은 주소로 바로 들어온 경우를 위한 것이다 —
+  // 하위 폴더 URL 을 새로 열었는데 사이드바에서 그 항목이 안 보이면 위치를 잃는다.
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(() =>
+    parentOfActive === null ? new Set() : new Set([parentOfActive]),
+  )
+
+  const toggle = (id: string) =>
+    setExpanded((prev) => {
+      const next = new Set(prev)
+      if (!next.delete(id)) next.add(id)
+      return next
+    })
+
+  /** 폴더로 이동하면 그 폴더는 펼친다 — 본문에 뜬 자식 폴더 행을 눌러 들어갔을 때
+      사이드바가 접힌 채로 남으면 현재 위치가 사라진다. 접기는 셰브런이 맡는다. */
+  const expand = (id: string) =>
+    setExpanded((prev) => (prev.has(id) ? prev : new Set(prev).add(id)))
   // FolderNode 는 별칭을 안 들고 있다 — 이름변경 창을 채울 때만 원시 행에서 찾는다.
   const aliasesById = new Map(folders.map((folder) => [folder.id, folder.aliases]))
 
@@ -166,17 +186,39 @@ export function FolderTree({ folders }: { folders: FolderAliasRow[] }) {
   const renderNodes = (nodes: FolderNode[], depth: number) =>
     nodes.map((node) => {
       const active = activeId === node.id
+      const hasChildren = node.children.length > 0
+      const open = expanded.has(node.id)
       return (
         <li key={node.id}>
           <div
+            style={{ paddingLeft: `${2 + depth * 14}px` }}
             className={`group flex items-center rounded-lg pr-1 ${
               active ? 'bg-accent-soft text-accent' : 'text-ink-muted hover:bg-canvas'
             }`}
           >
+            {hasChildren ? (
+              // 링크와 분리한다 — a 안에 button 은 유효하지 않고, 펼치기가 이동을 겸하면
+              // 자식만 보려던 클릭이 매번 목록을 갈아 끼운다.
+              <button
+                type="button"
+                onClick={() => toggle(node.id)}
+                aria-expanded={open}
+                aria-label={`${node.name} 하위 폴더 ${open ? '접기' : '펼치기'}`}
+                className="flex h-6 w-5 shrink-0 items-center justify-center rounded text-ink-subtle hover:text-ink"
+              >
+                <ChevronRight
+                  className={`h-3.5 w-3.5 transition-transform ${open ? 'rotate-90' : ''}`}
+                />
+              </button>
+            ) : (
+              // 자식이 없는 폴더도 같은 자리에서 이름이 시작해야 한다 — 어긋나면 목록이
+              // 두 줄로 갈려 보인다.
+              <span className="h-6 w-5 shrink-0" aria-hidden />
+            )}
             <Link
               href={`/?folder=${encodeURIComponent(node.id)}`}
               aria-current={active ? 'page' : undefined}
-              style={{ paddingLeft: `${12 + depth * 14}px` }}
+              onClick={() => hasChildren && expand(node.id)}
               className={`flex min-w-0 flex-1 items-center gap-2 py-2 text-sm ${
                 active ? 'font-medium' : 'hover:text-ink'
               }`}
@@ -218,7 +260,7 @@ export function FolderTree({ folders }: { folders: FolderAliasRow[] }) {
               </button>
             </span>
           </div>
-          {node.children.length > 0 && <ul>{renderNodes(node.children, depth + 1)}</ul>}
+          {hasChildren && open && <ul>{renderNodes(node.children, depth + 1)}</ul>}
         </li>
       )
     })
