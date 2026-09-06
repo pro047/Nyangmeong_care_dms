@@ -41,7 +41,7 @@ export function normalizeForMatch(raw: string): string {
 }
 
 /** 확장자는 신호가 아니다 — `.html` 이 화면설계서와 와이어프레임 양쪽에 걸쳐 있다. */
-function stripExtension(fileName: string): string {
+export function stripExtension(fileName: string): string {
   const dot = fileName.lastIndexOf('.')
   return dot > 0 ? fileName.slice(0, dot) : fileName
 }
@@ -52,8 +52,11 @@ function stripExtension(fileName: string): string {
 const DUPLICATE_SUFFIX = /\s*(?:\(\d+\)|(?:[-–—]\s*)?복사본)/gu
 
 /** `v0.2` `v0_3` `v0_2b`. 구분자로 쪼개기 **전에** 원문에서 지워야 한다 — `v0_3` 을 먼저
-    밑줄로 쪼개면 `v0`·`3` 이 되어 못 잡는다. */
-const VERSION_TOKEN = /(?<=^|[\s_—–-])v\d+(?:[._]\d+)?[a-z]?(?=[\s_—–-]|$)/giu
+    밑줄로 쪼개면 `v0`·`3` 이 되어 못 잡는다.
+    캡처 그룹은 목록의 버전 열(`file-version.ts`)이 값을 읽으려고 얹은 것이다 —
+    여기서는 `.replace(…, '')` 라 그룹이 있든 없든 동작이 같다. 정규식을 두 벌 두면
+    한쪽 요구로 고칠 때 다른 쪽이 조용히 깨지므로 이 한 벌을 정본으로 쓴다. */
+export const VERSION_TOKEN = /(?<=^|[\s_—–-])v(\d+)(?:[._](\d+))?([a-z]?)(?=[\s_—–-]|$)/giu
 
 /** `2026_08_17` `2026.08.17` `20260819` `260817`. 버전과 같은 이유로 토큰화 전에 지운다. */
 const DATE_TOKEN = /(?<=^|[\s_—–-])(?:\d{4}[._-]\d{1,2}[._-]\d{1,2}|\d{8}|\d{6})(?=[\s_—–-]|$)/gu

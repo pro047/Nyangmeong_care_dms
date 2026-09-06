@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { ChevronRight, Download, Folder } from 'lucide-react'
 import { DocumentRowActions } from '@/components/document-row-actions'
+import { fileVersionLabel } from '@/lib/file-version'
 import { formatBytes, formatRelative, fileLabel } from '@/lib/format'
 import type { FolderChildCard } from '@/lib/folder'
 
@@ -20,7 +21,7 @@ export type DocumentListItem = {
 }
 
 /** 열 수. 폴더 행이 전체 폭을 쓰려면 이 값이 thead 와 맞아야 한다. */
-const COLUMN_COUNT = 7
+const COLUMN_COUNT = 8
 
 /**
  * folders 는 지금 열어 둔 폴더의 직계 자식이다. 문서 행 위에 같은 표로 그려서 탐색이
@@ -48,6 +49,8 @@ export function DocumentTable({
                 "01_요구사항 정의서_v0.3_2026_08_17" 처럼 뒤쪽(버전·날짜)에 구별점이 몰려 있어
                 잘리면 앞부분만 남아 서로 구분이 안 된다. */}
             <th scope="col" className="px-4 py-2.5 font-medium">문서</th>
+            {/* 숨기지 않는다 — 이 열을 보려고 만든 화면이고, 폭이 좁아 밀어내는 것도 없다. */}
+            <th scope="col" className="w-20 px-3 py-2.5 font-medium">버전</th>
             <th scope="col" className="hidden w-28 px-3 py-2.5 font-medium md:table-cell">폴더</th>
             <th scope="col" className="hidden w-28 px-3 py-2.5 font-medium lg:table-cell">올린 사람</th>
             <th scope="col" className="hidden w-20 px-3 py-2.5 font-medium sm:table-cell">크기</th>
@@ -102,9 +105,6 @@ export function DocumentTable({
                     </span>
                     <span className="min-w-0">
                       <span className="truncate-cell block font-medium text-ink">{doc.title}</span>
-                      {latest && latest.versionNo > 1 && (
-                        <span className="text-xs text-ink-subtle">v{latest.versionNo}</span>
-                      )}
                     </span>
                   </Link>
                   {/* 칩은 제목 링크 바깥에 둔다 — a 안에 a 는 유효하지 않다. */}
@@ -121,6 +121,14 @@ export function DocumentTable({
                       ))}
                     </span>
                   )}
+                </td>
+                {/* 파일명이 말하는 버전이다. 앱이 센 versionNo 가 아니다 — 팀은 v0.2 →
+                    v0.3 을 재업로드가 아니라 별개 문서로 올려서 versionNo 는 거의 전부 1
+                    이고, 목록에서 실제로 구분에 쓰이는 값은 이쪽이다. 두 숫자를 한 화면에
+                    두면 같은 이름으로 다른 말을 하므로 제목 아래 v{versionNo} 는 걷었다
+                    (재업로드 이력은 상세 페이지의 버전 타임라인이 정본). */}
+                <td className={`w-20 px-3 py-3 whitespace-nowrap text-ink-muted ${dim}`}>
+                  {(latest && fileVersionLabel(latest.fileName)) ?? '—'}
                 </td>
                 <td className={`truncate-cell hidden w-28 px-3 py-3 text-ink-muted md:table-cell ${dim}`}>
                   {doc.folder?.name ?? '—'}
