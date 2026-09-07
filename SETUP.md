@@ -1,7 +1,7 @@
 # DMS 셋업 가이드
 
 `.env`는 gitignore 대상이라 저장소에 없다. **새 체크아웃에서는 직접 만들어야 한다.**
-채울 변수는 11개고 형식은 `src/lib/env-schema.ts`가 zod로 검증한다(`src/lib/env.ts`가
+채울 변수는 **필수 10개 + 선택 2개**고 형식은 `src/lib/env-schema.ts`가 zod로 검증한다(`src/lib/env.ts`가
 앱 시작 시 그 스키마로 `process.env`를 파싱한다) — 하나라도 비었거나 형식이 틀리면 앱이
 안 뜨고 **어떤 변수가 문제인지 이름을 찍어준다.**
 
@@ -40,6 +40,7 @@ openssl rand -base64 32     # 출력을 AUTH_SECRET에 넣는다
 | `APP_URL` | `http://localhost:3002` — **끝 슬래시 금지** (리다이렉트 URI가 어긋난다) |
 | `AWS_REGION` | `ap-northeast-2` |
 | `DISCORD_WEBHOOK_URL` | 선택. 안 쓰면 `""` 그대로 둔다 |
+| `ADMIN_DISCORD_ID` | 선택. 남의 문서를 지울 수 있는 **유일한** 계정의 디스코드 id (17~20자리 숫자). 안 쓰면 `""` — **관리자가 없을 뿐 앱은 정상 기동한다.** 그래서 빠뜨려도 신호가 없다: 팀원이 나가면 그 사람 문서를 아무도 못 지운다 (`src/lib/ownership.ts`). **운영에 넣으려면 Vercel 대시보드에도 따로 넣어야 한다** |
 
 나머지 7개는 아래 1~4번에서 가져온다.
 

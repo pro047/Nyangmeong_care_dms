@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { ChevronRight, Download, Folder } from 'lucide-react'
 import { DocumentRowActions } from '@/components/document-row-actions'
 import { fileVersionLabel } from '@/lib/file-version'
+import { canDeleteRow, type DeletePermission } from '@/lib/ownership'
 import { formatBytes, formatRelative, fileLabel } from '@/lib/format'
 import type { FolderChildCard } from '@/lib/folder'
 
@@ -9,6 +10,8 @@ import type { FolderChildCard } from '@/lib/folder'
 export type DocumentListItem = {
   id: string
   title: string
+  /** 삭제 버튼을 그릴지 정한다 (ownership.ts). 두 쿼리 모두 include 라 이미 실려 온다. */
+  createdById: string
   updatedAt: Date
   folder: { name: string } | null
   tags: { tag: { name: string } }[]
@@ -32,12 +35,16 @@ export function DocumentTable({
   documents,
   folders = [],
   supersededIds,
+  permission,
 }: {
   documents: DocumentListItem[]
   folders?: FolderChildCard[]
   /** 같은 폴더에 더 최신인 문서가 있는 문서 id. 화면에 그리는 집합이 아니라 전체 활성
       문서에서 뽑은 것이라 태그 필터·검색으로 목록이 좁아져도 판정이 흔들리지 않는다. */
   supersededIds?: ReadonlySet<string>
+  /** 삭제 버튼 표시용. 실제 보호는 라우트의 denyIfNotOwner 가 한다 — 여기서 숨기는 것은
+      누를 수 없는 버튼을 안 보여주기 위한 것이지 방어선이 아니다. */
+  permission: DeletePermission
 }) {
   return (
     <div className="overflow-hidden rounded-xl border border-border bg-surface">
@@ -152,8 +159,12 @@ export function DocumentTable({
                   </a>
                 </td>
                 <td className="px-4 py-3">
-                  {/* 상세 페이지에도 같은 버튼이 있다. 목록에서도 바로 지울 수 있게 둔다. */}
-                  <DocumentRowActions id={doc.id} title={doc.title} />
+                  {/* 상세 페이지에도 같은 버튼이 있다. 목록에서도 바로 지울 수 있게 둔다.
+                      남의 문서면 칸을 비운다 — 비활성 버튼을 두면 누를 수 있어 보이고,
+                      매번 403 토스트를 띄우는 것보다 안 보이는 편이 조용하다. */}
+                  {canDeleteRow(permission, doc) && (
+                    <DocumentRowActions id={doc.id} title={doc.title} />
+                  )}
                 </td>
               </tr>
             )

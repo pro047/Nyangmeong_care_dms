@@ -1,5 +1,6 @@
 import { FileText } from 'lucide-react'
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { UploadDialog } from '@/components/upload-dialog'
 import { DocumentTable } from '@/components/document-table'
 import { prisma } from '@/lib/prisma'
@@ -13,6 +14,9 @@ import {
 } from '@/lib/folder'
 import { latestCandidateQuery, supersededDocumentIds } from '@/lib/latest'
 import { pageErrorMessage } from '@/lib/page-error'
+import { getSession } from '@/lib/session'
+import { deletePermission } from '@/lib/ownership'
+import { env } from '@/lib/env'
 import type { Prisma } from '@/generated/prisma/client'
 
 export const dynamic = 'force-dynamic'
@@ -44,6 +48,12 @@ export default async function DocumentsPage({
     tag?: string | string[]
   }>
 }) {
+  // 레이아웃도 같은 검사를 하지만 여기서 또 본다 — 삭제 버튼 표시에 세션이 필요하고,
+  // 없을 때 빈 permission 으로 그리면 "내 문서인데 버튼이 없다"가 된다.
+  const session = await getSession()
+  if (!session) redirect('/login')
+  const permission = deletePermission(session, env.ADMIN_DISCORD_ID)
+
   // 다운로드 라우트가 내비게이션 404 를 여기로 돌려보낸다. 아는 코드만 문구가 된다.
   const { error, folder, tag } = await searchParams
   const errorMessage = pageErrorMessage(error)
@@ -144,7 +154,12 @@ export default async function DocumentsPage({
       {/* 문서가 없어도 자식 폴더가 있으면 표를 그린다 — 자식이 있는데 점선 박스를 띄우면
           카테고리를 열었을 때 빈 화면이 나오던 그 증상 그대로다. */}
       {documents.length > 0 || emptyKind === 'children-only' ? (
-        <DocumentTable documents={documents} folders={children} supersededIds={supersededIds} />
+        <DocumentTable
+          documents={documents}
+          folders={children}
+          supersededIds={supersededIds}
+          permission={permission}
+        />
       ) : (
         <div className="rounded-xl border border-dashed border-border-strong bg-surface py-20 text-center">
           <FileText className="mx-auto mb-3 h-8 w-8 text-ink-subtle" aria-hidden />

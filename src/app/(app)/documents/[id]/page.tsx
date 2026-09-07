@@ -8,6 +8,9 @@ import { TagEditor } from '@/components/tag-editor'
 import { SpreadsheetPreview } from '@/components/spreadsheet-preview'
 import { VersionUploadDialog } from '@/components/version-upload-dialog'
 import { prisma } from '@/lib/prisma'
+import { getSession } from '@/lib/session'
+import { canDeleteDocument } from '@/lib/ownership'
+import { env } from '@/lib/env'
 import { formatBytes, formatDateTime, fileLabel } from '@/lib/format'
 import { activeDocumentWhere } from '@/lib/trash'
 import { buildFolderTree, flattenFolderTree } from '@/lib/folder'
@@ -34,12 +37,16 @@ async function getDocument(id: string) {
 export default async function DocumentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   // 폴더 목록은 이동 셀렉트의 선택지다. 문서 조회와 서로 기다릴 이유가 없다.
-  const [document, folders] = await Promise.all([
+  const [document, folders, session] = await Promise.all([
     getDocument(id),
     prisma.folder.findMany({ select: { id: true, name: true, parentId: true } }),
+    getSession(),
   ])
   // 휴지통 문서도 여기로 온다. 보여줘 봐야 다운로드가 전부 404라 깨진 페이지가 된다.
   if (!document) notFound()
+
+  // 세션이 없으면(레이아웃이 이미 막지만) 삭제 버튼을 그리지 않는다.
+  const canDelete = session !== null && canDeleteDocument(session, document, env.ADMIN_DISCORD_ID)
 
   const latest = document.versions[0]
   const folderOptions = flattenFolderTree(buildFolderTree(folders))
@@ -124,9 +131,11 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
             title={document.title}
             latestVersionNo={latest?.versionNo ?? 0}
           />
-          <div className="ml-auto">
-            <DocumentRowActions id={document.id} title={document.title} redirectTo="/" />
-          </div>
+          {canDelete && (
+            <div className="ml-auto">
+              <DocumentRowActions id={document.id} title={document.title} redirectTo="/" />
+            </div>
+          )}
         </div>
       </div>
 

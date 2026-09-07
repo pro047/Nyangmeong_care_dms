@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
 import { deleteObject } from '@/lib/s3'
+import { denyIfNotOwner } from '@/lib/ownership-guard'
 import {
   outcomeFromCount,
   purgeCandidateKeys,
@@ -21,11 +22,16 @@ export const dynamic = 'force-dynamic'
  * (HANDOFF "S3 고아 객체 정리").
  */
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  if (!(await getSession())) {
+  const session = await getSession()
+  if (!session) {
     return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 })
   }
 
   const { id } = await params
+
+  // 되돌릴 수 없는 경로라 S3 키를 읽기 전에 막는다.
+  const denial = await denyIfNotOwner(id, session)
+  if (denial) return denial
 
   // 지우기 전에 키를 확보한다. 삭제 후에는 버전 행이 없어서 무엇을 지울지 알 수 없다.
   const versions = await prisma.documentVersion.findMany({

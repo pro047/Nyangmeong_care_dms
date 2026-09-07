@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
+import { denyIfNotOwner } from '@/lib/ownership-guard'
 import {
   ACTIVE_DOCUMENT_NOT_FOUND,
   activeDocumentWhere,
@@ -56,14 +57,18 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
 /**
  * 소프트 삭제. deletedAt만 세팅하고 S3 객체와 버전은 그대로 둔다.
- * 전원 동등하므로 작성자 여부는 보지 않는다.
+ * 올린 사람과 관리자만 지운다 (2026-09-06).
  */
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  if (!(await getSession())) {
+  const session = await getSession()
+  if (!session) {
     return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 })
   }
 
   const { id } = await params
+
+  const denial = await denyIfNotOwner(id, session)
+  if (denial) return denial
 
   // updateMany + count: 조회 후 수정하면 그 사이에 남이 지울 수 있다. 한 쿼리로 끝낸다.
   const { count } = await prisma.document.updateMany({

@@ -1,29 +1,43 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
-import { PATCH } from './route'
-import { ACTIVE_DOCUMENT_NOT_FOUND } from '@/lib/trash'
+import { DELETE, PATCH } from './route'
+import { ACTIVE_DOCUMENT_NOT_FOUND, TRASH_NOT_FOUND } from '@/lib/trash'
 import { MOVE_FOLDER_NOT_FOUND } from '@/lib/document-edit'
+import { DELETE_FORBIDDEN } from '@/lib/ownership'
 
 // DB·쿠키는 테스트 환경에 없다. 라우트가 "무엇을 어떤 인자로 부르고
 // 무엇을 돌려주는가"만 본다 (download/route.test.ts 와 같은 패턴).
-const { getSession, updateMany } = vi.hoisted(() => ({
+const { getSession, updateMany, findUnique, envValues } = vi.hoisted(() => ({
   getSession: vi.fn(),
   updateMany: vi.fn(),
+  findUnique: vi.fn(),
+  // env.ts 는 import 시점에 process.env 를 검증하며 던지므로 통째로 갈아 끼운다.
+  envValues: { ADMIN_DISCORD_ID: undefined as string | undefined },
 }))
 vi.mock('@/lib/session', () => ({ getSession }))
-vi.mock('@/lib/prisma', () => ({ prisma: { document: { updateMany } } }))
+vi.mock('@/lib/prisma', () => ({ prisma: { document: { updateMany, findUnique } } }))
+vi.mock('@/lib/env', () => ({ env: envValues }))
 
 const BASE = 'http://localhost:3002/api/documents/doc_1'
 const PARAMS = { params: Promise.resolve({ id: 'doc_1' }) }
-const SESSION = { id: 'user_1', discordId: 'd1', username: 'u', avatarUrl: null }
+// discordId 는 실제 스노플레이크 모양이어야 한다 — 스키마가 ^\d{17,20}$ 만 받으므로
+// 'd1' 같은 값으로 관리자 경로를 태우면 런타임에 올 수 없는 값으로 통과시키는 셈이 된다.
+const ADMIN_ID = '375871831044915200'
+const SESSION = { id: 'user_1', discordId: ADMIN_ID, username: 'u', avatarUrl: null }
 
 function patch(body: unknown) {
   return new NextRequest(BASE, { method: 'PATCH', body: JSON.stringify(body) })
 }
 
+function del() {
+  return new NextRequest(BASE, { method: 'DELETE' })
+}
+
 beforeEach(() => {
   getSession.mockReset().mockResolvedValue(SESSION)
   updateMany.mockReset().mockResolvedValue({ count: 1 })
+  findUnique.mockReset().mockResolvedValue({ createdById: 'user_1' })
+  envValues.ADMIN_DISCORD_ID = undefined
 })
 
 describe('PATCH /api/documents/[id]', () => {
@@ -97,5 +111,67 @@ describe('PATCH /api/documents/[id]', () => {
     updateMany.mockRejectedValue(boom)
 
     await expect(PATCH(patch({ title: '제목' }), PARAMS)).rejects.toBe(boom)
+  })
+})
+
+describe('DELETE /api/documents/[id]', () => {
+  it('세션이 없으면 401 이고 소유자 조회조차 하지 않아야 한다', async () => {
+    getSession.mockResolvedValue(null)
+
+    const res = await DELETE(del(), PARAMS)
+
+    expect(res.status).toBe(401)
+    expect(findUnique).not.toHaveBeenCalled()
+    expect(updateMany).not.toHaveBeenCalled()
+  })
+
+  it('올린 사람이면 활성 문서를 휴지통으로 보내야 한다', async () => {
+    const res = await DELETE(del(), PARAMS)
+
+    const args = updateMany.mock.calls[0][0]
+    expect(args.where).toEqual({ id: 'doc_1', deletedAt: null })
+    expect(args.data.deletedAt).toBeInstanceOf(Date)
+    expect(res.status).toBe(200)
+  })
+
+  it('남의 문서면 403 이고 DB 를 건드리지 않아야 한다', async () => {
+    findUnique.mockResolvedValue({ createdById: 'user_2' })
+
+    const res = await DELETE(del(), PARAMS)
+
+    expect(res.status).toBe(403)
+    expect(await res.json()).toEqual({ error: DELETE_FORBIDDEN })
+    expect(updateMany).not.toHaveBeenCalled()
+  })
+
+  it('관리자는 남의 문서도 지울 수 있어야 한다', async () => {
+    findUnique.mockResolvedValue({ createdById: 'user_2' })
+    envValues.ADMIN_DISCORD_ID = ADMIN_ID
+
+    const res = await DELETE(del(), PARAMS)
+
+    expect(res.status).toBe(200)
+    expect(updateMany).toHaveBeenCalled()
+  })
+
+  // 관리자 설정이 없을 때 전원이 통과하는 사고를 막는다.
+  it('관리자 id 가 없으면 남의 문서는 여전히 403 이어야 한다', async () => {
+    findUnique.mockResolvedValue({ createdById: 'user_2' })
+    envValues.ADMIN_DISCORD_ID = ''
+
+    const res = await DELETE(del(), PARAMS)
+
+    expect(res.status).toBe(403)
+  })
+
+  // 소유자 판정은 "없음"을 대신 판정하지 않는다 — 그건 count 가 한다.
+  it('없는 문서는 403 이 아니라 404 로 떨어져야 한다', async () => {
+    findUnique.mockResolvedValue(null)
+    updateMany.mockResolvedValue({ count: 0 })
+
+    const res = await DELETE(del(), PARAMS)
+
+    expect(res.status).toBe(404)
+    expect(await res.json()).toEqual({ error: TRASH_NOT_FOUND })
   })
 })

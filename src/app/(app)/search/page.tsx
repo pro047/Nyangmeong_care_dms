@@ -1,6 +1,10 @@
 import { Search } from 'lucide-react'
+import { redirect } from 'next/navigation'
 import { DocumentTable } from '@/components/document-table'
 import { prisma } from '@/lib/prisma'
+import { getSession } from '@/lib/session'
+import { deletePermission } from '@/lib/ownership'
+import { env } from '@/lib/env'
 import { activeDocumentWhere } from '@/lib/trash'
 import { latestCandidateQuery, supersededDocumentIds } from '@/lib/latest'
 import { documentSearchWhere, normalizeSearchQuery } from '@/lib/search'
@@ -28,6 +32,11 @@ export default async function SearchPage({
 }: {
   searchParams: Promise<{ q?: string | string[] }>
 }) {
+  // 목록 페이지와 같은 이유로 여기서도 세션을 본다 (삭제 버튼 표시).
+  const session = await getSession()
+  if (!session) redirect('/login')
+  const permission = deletePermission(session, env.ADMIN_DISCORD_ID)
+
   const { q: raw } = await searchParams
   const q = normalizeSearchQuery(raw)
 
@@ -67,7 +76,11 @@ export default async function SearchPage({
           <p className="mt-1 text-sm text-ink-muted">제목·설명·태그에서만 찾습니다.</p>
         </div>
       ) : (
-        <DocumentTable documents={documents} supersededIds={supersededIds} />
+        <DocumentTable
+          documents={documents}
+          supersededIds={supersededIds}
+          permission={permission}
+        />
       )}
     </div>
   )

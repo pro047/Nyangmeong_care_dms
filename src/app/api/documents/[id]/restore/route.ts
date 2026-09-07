@@ -1,17 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
+import { denyIfNotOwner } from '@/lib/ownership-guard'
 import { outcomeFromCount, RESTORE_NOT_FOUND, trashedDocumentWhere } from '@/lib/trash'
 
 export const dynamic = 'force-dynamic'
 
-/** 휴지통에서 되돌린다. @updatedAt 때문에 수정 시각이 갱신되며, 이는 의도한 동작이다. */
+/**
+ * 휴지통에서 되돌린다. @updatedAt 때문에 수정 시각이 갱신되며, 이는 의도한 동작이다.
+ * 삭제와 같은 소유자 검사를 받는다 — 남이 지운 내 문서를 되살리는 것도 내 권한이다.
+ */
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  if (!(await getSession())) {
+  const session = await getSession()
+  if (!session) {
     return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 })
   }
 
   const { id } = await params
+
+  const denial = await denyIfNotOwner(id, session)
+  if (denial) return denial
 
   const { count } = await prisma.document.updateMany({
     where: { id, ...trashedDocumentWhere() },

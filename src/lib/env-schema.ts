@@ -36,4 +36,9 @@ export const envSchema = z.object({
   S3_BUCKET: z.string().regex(/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/),
 
   DISCORD_WEBHOOK_URL: z.url().optional().or(z.literal('')),
+
+  // 남의 문서를 지울 수 있는 유일한 계정. 팀원이 나가면 그 사람 문서를 아무도 못 지우게
+  // 되는 것에 대한 탈출구다 (ownership.ts). **optional 인 것이 안전한 기본값이다** —
+  // 빠뜨리면 관리자가 없을 뿐 권한이 새지 않는다.
+  ADMIN_DISCORD_ID: z.string().regex(/^\d{17,20}$/).optional().or(z.literal('')),
 })

@@ -14,7 +14,14 @@ const VALID = {
   AWS_SECRET_ACCESS_KEY: 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY',
   S3_BUCKET: 'nyangmeong-dms',
   DISCORD_WEBHOOK_URL: 'https://discord.com/api/webhooks/123/abc',
+  ADMIN_DISCORD_ID: '375871831044915200',
 }
+
+/**
+ * 없거나 빈 문자열이어도 되는 키. 아래 두 스윕이 이걸 빼고 돈다 —
+ * **`VALID` 에 키를 더할 때 여기도 같이 본다.** 빠뜨리면 스윕이 "모든 키"를 못 덮는다.
+ */
+const OPTIONAL_KEYS = ['DISCORD_WEBHOOK_URL', 'ADMIN_DISCORD_ID']
 
 describe('envSchema', () => {
   it('정상 값을 통과시켜야 한다', () => {
@@ -44,10 +51,25 @@ describe('envSchema', () => {
 
   it('빈 문자열을 필수 키에서 거부해야 한다', () => {
     const survived = Object.keys(VALID)
-      .filter((key) => key !== 'DISCORD_WEBHOOK_URL')
+      .filter((key) => !OPTIONAL_KEYS.includes(key))
       .filter((key) => envSchema.safeParse({ ...VALID, [key]: '' }).success)
 
     expect(survived).toEqual([])
+  })
+
+  // 관리자가 없는 상태가 정상이다 — 빠뜨리면 특권이 없을 뿐 앱은 떠야 한다.
+  it('ADMIN_DISCORD_ID 는 없거나 빈 문자열이어도 된다 (선택 항목)', () => {
+    const withoutAdmin: Record<string, string> = { ...VALID }
+    delete withoutAdmin.ADMIN_DISCORD_ID
+    expect(envSchema.safeParse(withoutAdmin).success).toBe(true)
+    expect(envSchema.safeParse({ ...VALID, ADMIN_DISCORD_ID: '' }).success).toBe(true)
+  })
+
+  // 선택 항목이라고 아무 문자열이나 받으면 오타 난 id 가 조용히 앉는다.
+  it('ADMIN_DISCORD_ID 가 스노플레이크 형식이 아니면 거부해야 한다', () => {
+    for (const bad of ['[SENSITIVE]', '375871831044915200 ', 'abc', '123']) {
+      expect(envSchema.safeParse({ ...VALID, ADMIN_DISCORD_ID: bad }).success).toBe(false)
+    }
   })
 
   it('AWS 리전은 다른 파티션도 받아야 한다', () => {

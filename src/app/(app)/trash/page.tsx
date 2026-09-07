@@ -1,14 +1,23 @@
 import { Trash2 } from 'lucide-react'
+import { redirect } from 'next/navigation'
 import { TrashRowActions } from '@/components/trash-row-actions'
 import { prisma } from '@/lib/prisma'
+import { getSession } from '@/lib/session'
+import { trashOwnerWhere, type Viewer } from '@/lib/ownership'
+import { env } from '@/lib/env'
 import { formatBytes, formatRelative, fileLabel } from '@/lib/format'
 import { trashedDocumentWhere, trashOrderBy } from '@/lib/trash'
 
 export const dynamic = 'force-dynamic'
 
-async function getTrashedDocuments() {
+/**
+ * 내가 올린 문서만 보여준다 — 복구·영구삭제가 소유자 전용이 된 뒤로 남의 행은 손댈 수
+ * 없는 노이즈다. 조건은 "지운 사람"이 아니라 "소유자"라, 권한이 없던 시절에 남이 지운
+ * 내 문서도 여기 남는다. 관리자는 전체를 본다.
+ */
+async function getTrashedDocuments(viewer: Viewer) {
   return prisma.document.findMany({
-    where: trashedDocumentWhere(),
+    where: { ...trashedDocumentWhere(), ...trashOwnerWhere(viewer, env.ADMIN_DISCORD_ID) },
     orderBy: trashOrderBy(),
     include: {
       versions: {
@@ -20,7 +29,9 @@ async function getTrashedDocuments() {
 }
 
 export default async function TrashPage() {
-  const documents = await getTrashedDocuments()
+  const session = await getSession()
+  if (!session) redirect('/login')
+  const documents = await getTrashedDocuments(session)
 
   return (
     <div>

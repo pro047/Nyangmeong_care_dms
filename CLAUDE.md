@@ -23,6 +23,11 @@ Next.js 16 · React 19 · TypeScript · Tailwind 4 · Prisma 7 + PostgreSQL(RDS)
 - **파일은 앱 서버를 거치지 않는다.** 업로드는 presigned PUT으로 브라우저 → S3 직접,
   다운로드는 presigned GET. 서버로 받아 중계하는 방식으로 바꾸지 말 것.
 - **접근 제어는 디스코드 길드 멤버십 하나뿐.** 역할·권한 개념을 추가하지 않는다.
+  - **삭제는 2026-09-06 에 연 예외다.** 문서 삭제 3종(소프트 삭제·복구·영구삭제)만
+    **올린 사람**(`Document.createdById`)과 `ADMIN_DISCORD_ID` 계정에게 준다
+    (`src/lib/ownership.ts`). 조회·다운로드·수정·태그·재업로드·폴더는 **여전히 전원 동등**이다 —
+    범위를 넓히지 말 것. 소유자는 `DocumentVersion.uploadedById`(그 판을 올린 사람)가
+    **아니다**; 그쪽을 쓰면 남의 문서에 재업로드하는 순간 소유권이 조용히 넘어간다.
 - **보호 구간은 이중으로 검사한다.** `proxy.ts`는 낙관적 확인이고, 실제 보호는
   서버 컴포넌트의 `getSession()`이 한다.
 
