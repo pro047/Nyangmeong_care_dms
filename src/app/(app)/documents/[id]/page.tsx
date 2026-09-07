@@ -9,7 +9,7 @@ import { SpreadsheetPreview } from '@/components/spreadsheet-preview'
 import { VersionUploadDialog } from '@/components/version-upload-dialog'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/session'
-import { canDeleteDocument } from '@/lib/ownership'
+import { canManageDocument } from '@/lib/ownership'
 import { env } from '@/lib/env'
 import { formatBytes, formatDateTime, fileLabel } from '@/lib/format'
 import { activeDocumentWhere } from '@/lib/trash'
@@ -45,8 +45,9 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
   // 휴지통 문서도 여기로 온다. 보여줘 봐야 다운로드가 전부 404라 깨진 페이지가 된다.
   if (!document) notFound()
 
-  // 세션이 없으면(레이아웃이 이미 막지만) 삭제 버튼을 그리지 않는다.
-  const canDelete = session !== null && canDeleteDocument(session, document, env.ADMIN_DISCORD_ID)
+  // 세션이 없으면(레이아웃이 이미 막지만) 소유자 전용 버튼을 그리지 않는다.
+  // 삭제와 새 버전이 같은 경계를 쓴다 (ownership.ts).
+  const canManage = session !== null && canManageDocument(session, document, env.ADMIN_DISCORD_ID)
 
   const latest = document.versions[0]
   const folderOptions = flattenFolderTree(buildFolderTree(folders))
@@ -126,12 +127,14 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
               다운로드
             </a>
           )}
-          <VersionUploadDialog
-            documentId={document.id}
-            title={document.title}
-            latestVersionNo={latest?.versionNo ?? 0}
-          />
-          {canDelete && (
+          {canManage && (
+            <VersionUploadDialog
+              documentId={document.id}
+              title={document.title}
+              latestVersionNo={latest?.versionNo ?? 0}
+            />
+          )}
+          {canManage && (
             <div className="ml-auto">
               <DocumentRowActions id={document.id} title={document.title} redirectTo="/" />
             </div>

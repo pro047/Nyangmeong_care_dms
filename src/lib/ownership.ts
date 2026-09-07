@@ -14,6 +14,7 @@
  */
 
 export const DELETE_FORBIDDEN = '올린 사람만 지울 수 있습니다.'
+export const VERSION_FORBIDDEN = '올린 사람만 새 버전을 올릴 수 있습니다.'
 
 export type Viewer = {
   /** users.id */
@@ -49,7 +50,14 @@ export function canDeleteRow(
   return permission.isAdmin || permission.viewerId === document.createdById
 }
 
-export function canDeleteDocument(
+/**
+ * 소유자 판정의 정본. 삭제 3종과 **새 버전 올리기**가 같은 경계를 쓴다 (2026-09-07).
+ *
+ * 둘을 가르지 않는 이유: 재업로드는 그 문서의 "현재 파일"을 바꾸는 행위라, 지울 수 없는
+ * 사람이 내용을 갈아 끼울 수 있으면 삭제를 막은 의미가 절반 없어진다. 제목·설명·태그
+ * 수정은 여전히 전원 동등이다 — 그쪽은 파일을 안 건드리고 되돌릴 수 있다.
+ */
+export function canManageDocument(
   viewer: Viewer,
   document: { createdById: string },
   adminDiscordId: string | undefined,

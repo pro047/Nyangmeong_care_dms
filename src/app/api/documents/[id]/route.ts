@@ -17,7 +17,8 @@ import {
 export const dynamic = 'force-dynamic'
 
 /**
- * 제목·설명·폴더 수정. 삭제와 같은 이유로 작성자를 보지 않고, 같은 updateMany + count 패턴을 쓴다.
+ * 제목·설명·폴더 수정. **아래 DELETE 와 달리 작성자를 보지 않는다** — 파일을 안 건드리고
+ * 되돌릴 수 있어서다 (2026-09-07, ownership.ts). updateMany + count 패턴은 삭제와 같다.
  * @updatedAt 이 함께 갱신돼 목록(최근 수정순) 위로 올라온다 — "수정"이므로 의도한 동작이다.
  */
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {

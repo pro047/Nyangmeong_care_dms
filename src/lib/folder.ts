@@ -79,6 +79,27 @@ export type FolderAliasRow = FolderRow & { aliases: string[] }
     (손자는 안 센다). */
 export type FolderChildCard = { id: string; name: string; documentCount: number }
 
+/**
+ * 폴더 삭제 확인에 쓸 하위 폴더 총 개수. **자식의 자식까지 센다** —
+ * 스키마의 onDelete: Cascade(parent → children)가 재귀적으로 지우기 때문이다.
+ * 직계만 세면 2뎁스에서 실제로 사라지는 수보다 적게 말한다.
+ */
+export function descendantFolderCount(node: FolderNode): number {
+  return node.children.reduce((sum, child) => sum + 1 + descendantFolderCount(child), 0)
+}
+
+/**
+ * 삭제 확인 문구. 개수를 문장에 넣는 것이 이 함수의 존재 이유다 — 예전 문구는 하위
+ * 폴더가 없을 때도 "하위 폴더도 함께 삭제되고"라고 말해서, 실제로 9개가 사라지는
+ * 경우와 0개인 경우가 화면에서 구분되지 않았다.
+ */
+export function folderDeleteWarning(node: FolderNode): string {
+  const count = descendantFolderCount(node)
+  const target =
+    count > 0 ? `“${node.name}” 폴더와 하위 폴더 ${count}개를` : `“${node.name}” 폴더를`
+  return `${target} 삭제합니다. 안에 있던 문서는 미분류로 남습니다.`
+}
+
 /** 평면 행을 트리로 접는다. 같은 층은 이름 오름차순(한국어 정렬). */
 export function buildFolderTree(rows: FolderRow[]): FolderNode[] {
   const byId = new Map<string, FolderNode>()

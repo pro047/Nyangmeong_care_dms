@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { canDeleteDocument, isAdmin, trashOwnerWhere, type Viewer } from '@/lib/ownership'
+import { canManageDocument, isAdmin, trashOwnerWhere, type Viewer } from '@/lib/ownership'
 
 const ADMIN = '375871831044915200'
 
@@ -9,22 +9,22 @@ const admin: Viewer = { id: 'u_admin', discordId: ADMIN }
 
 const doc = { createdById: 'u_owner' }
 
-describe('canDeleteDocument', () => {
-  it('올린 사람은 지울 수 있어야 한다', () => {
-    expect(canDeleteDocument(owner, doc, ADMIN)).toBe(true)
+describe('canManageDocument', () => {
+  it('올린 사람은 지우고 새 버전을 올릴 수 있어야 한다', () => {
+    expect(canManageDocument(owner, doc, ADMIN)).toBe(true)
   })
 
-  it('남은 지울 수 없어야 한다', () => {
-    expect(canDeleteDocument(other, doc, ADMIN)).toBe(false)
+  it('남은 지우지도 새 버전을 올리지도 못해야 한다', () => {
+    expect(canManageDocument(other, doc, ADMIN)).toBe(false)
   })
 
-  it('관리자는 남의 문서도 지울 수 있어야 한다', () => {
-    expect(canDeleteDocument(admin, doc, ADMIN)).toBe(true)
+  it('관리자는 남의 문서도 다룰 수 있어야 한다', () => {
+    expect(canManageDocument(admin, doc, ADMIN)).toBe(true)
   })
 
   // 소유자 판정은 users.id 로 한다. discordId 가 같아도 다른 사람의 문서면 안 된다.
   it('discordId 가 관리자와 같아도 id 가 다르면 소유자가 아니어야 한다', () => {
-    expect(canDeleteDocument({ id: 'u_x', discordId: ADMIN }, doc, undefined)).toBe(false)
+    expect(canManageDocument({ id: 'u_x', discordId: ADMIN }, doc, undefined)).toBe(false)
   })
 })
 

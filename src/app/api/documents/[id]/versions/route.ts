@@ -7,6 +7,8 @@ import { verifyUploadToken } from '@/lib/upload-token'
 import { S3_KEY_ALREADY_USED } from '@/lib/upload-guard'
 import { ACTIVE_DOCUMENT_NOT_FOUND, activeDocumentWhere } from '@/lib/trash'
 import { retitleOnReupload } from '@/lib/title'
+import { denyIfNotOwner } from '@/lib/ownership-guard'
+import { VERSION_FORBIDDEN } from '@/lib/ownership'
 import {
   nextVersionNo,
   toChangeNote,
@@ -31,6 +33,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!parsed.success) {
     return NextResponse.json({ error: '요청 형식이 올바르지 않습니다.' }, { status: 400 })
   }
+
+  const { id } = await params
+
+  // 삭제와 같은 경계다 (ownership.ts). 여기서 막아도 S3 고아는 안 남는다 —
+  // 클라이언트의 create 실패 경로가 uploads/discard 를 쏜다 (upload-flow.ts).
+  // 그래서 presign 단계로 앞당기지 않았다: presign 은 대상 문서를 모르고,
+  // documentId 를 받게 고쳐도 그걸 빼고 부르면 그만이라 여기 검사는 어차피 남는다.
+  const denial = await denyIfNotOwner(id, session, VERSION_FORBIDDEN)
+  if (denial) return denial
 
   const { s3Key, keyToken, fileName, mimeType, changeNote } = parsed.data
 
@@ -61,8 +72,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       { status: 400 },
     )
   }
-
-  const { id } = await params
 
   // ③ 다음 번호는 "최신 + 1"이다. 활성 문서만 보므로 없는 문서와 휴지통 문서가 함께 걸린다.
   const latest = await prisma.documentVersion.findFirst({

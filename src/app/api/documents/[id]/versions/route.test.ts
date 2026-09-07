@@ -4,29 +4,45 @@ import { POST } from './route'
 import { ACTIVE_DOCUMENT_NOT_FOUND } from '@/lib/trash'
 import { S3_KEY_ALREADY_USED } from '@/lib/upload-guard'
 import { VERSION_CONFLICT } from '@/lib/version-create'
+import { VERSION_FORBIDDEN } from '@/lib/ownership'
 
 // DB·S3·디스코드는 테스트 환경에 없다. 라우트가 "무엇을 어떤 인자로 부르고
 // 무엇을 돌려주는가"만 본다 (download/route.test.ts 와 같은 패턴).
-const { getSession, findFirst, update, verifyUploadToken, headObjectSize, notifyUpload } =
-  vi.hoisted(() => ({
-    getSession: vi.fn(),
-    findFirst: vi.fn(),
-    update: vi.fn(),
-    verifyUploadToken: vi.fn(),
-    headObjectSize: vi.fn(),
-    notifyUpload: vi.fn(),
-  }))
+const {
+  getSession,
+  findFirst,
+  findUnique,
+  update,
+  verifyUploadToken,
+  headObjectSize,
+  notifyUpload,
+  envValues,
+} = vi.hoisted(() => ({
+  getSession: vi.fn(),
+  findFirst: vi.fn(),
+  // 소유자 가드가 쓰는 조회. documentVersion.findFirst 와 다른 모델이다.
+  findUnique: vi.fn(),
+  update: vi.fn(),
+  verifyUploadToken: vi.fn(),
+  headObjectSize: vi.fn(),
+  notifyUpload: vi.fn(),
+  // env.ts 는 import 시점에 process.env 를 검증하며 던지므로 통째로 갈아 끼운다.
+  envValues: { ADMIN_DISCORD_ID: undefined as string | undefined },
+}))
 vi.mock('@/lib/session', () => ({ getSession }))
 vi.mock('@/lib/prisma', () => ({
-  prisma: { documentVersion: { findFirst }, document: { update } },
+  prisma: { documentVersion: { findFirst }, document: { update, findUnique } },
 }))
+vi.mock('@/lib/env', () => ({ env: envValues }))
 vi.mock('@/lib/s3', () => ({ MAX_UPLOAD_BYTES: 100 * 1024 * 1024, headObjectSize }))
 vi.mock('@/lib/upload-token', () => ({ verifyUploadToken }))
 vi.mock('@/lib/discord', () => ({ notifyUpload }))
 
 const BASE = 'http://localhost:3002/api/documents/doc_1/versions'
 const PARAMS = { params: Promise.resolve({ id: 'doc_1' }) }
-const SESSION = { id: 'user_1', discordId: 'd1', username: 'u', avatarUrl: null }
+// discordId 는 실제 스노플레이크 모양이어야 한다 — 스키마가 ^\d{17,20}$ 만 받는다.
+const ADMIN_ID = '375871831044915200'
+const SESSION = { id: 'user_1', discordId: ADMIN_ID, username: 'u', avatarUrl: null }
 const BODY = {
   s3Key: 'documents/abc.pdf',
   keyToken: 'token_1',
@@ -56,6 +72,8 @@ beforeEach(() => {
   headObjectSize.mockReset().mockResolvedValue(1234)
   findFirst.mockReset()
   mockVersionLookups(LATEST)
+  findUnique.mockReset().mockResolvedValue({ createdById: 'user_1' })
+  envValues.ADMIN_DISCORD_ID = undefined
   update.mockReset().mockResolvedValue({ id: 'doc_1', title: '문서' })
   notifyUpload.mockReset().mockResolvedValue(undefined)
 })
@@ -77,6 +95,28 @@ describe('POST /api/documents/[id]/versions — 차단 순서', () => {
     expect(res.status).toBe(400)
     expect(await res.json()).toEqual({ error: '요청 형식이 올바르지 않습니다.' })
     expect(verifyUploadToken).not.toHaveBeenCalled()
+  })
+
+  it('남의 문서면 403 이고 S3 를 건드리지 않아야 한다', async () => {
+    findUnique.mockResolvedValue({ createdById: 'user_2' })
+
+    const res = await POST(post(BODY), PARAMS)
+
+    expect(res.status).toBe(403)
+    expect(await res.json()).toEqual({ error: VERSION_FORBIDDEN })
+    // 고아 객체 정리는 클라이언트가 한다. 서버는 S3 를 아예 안 만져야 한다.
+    expect(headObjectSize).not.toHaveBeenCalled()
+    expect(update).not.toHaveBeenCalled()
+  })
+
+  it('관리자면 남의 문서에도 새 버전을 올릴 수 있어야 한다', async () => {
+    findUnique.mockResolvedValue({ createdById: 'user_2' })
+    envValues.ADMIN_DISCORD_ID = ADMIN_ID
+
+    const res = await POST(post(BODY), PARAMS)
+
+    expect(res.status).toBe(201)
+    expect(update).toHaveBeenCalled()
   })
 
   it('토큰 검증에 실패하면 400 이고 S3 를 조회하지 않아야 한다', async () => {

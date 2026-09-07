@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { env } from '@/lib/env'
-import { canDeleteDocument, DELETE_FORBIDDEN, type Viewer } from '@/lib/ownership'
+import { canManageDocument, DELETE_FORBIDDEN, type Viewer } from '@/lib/ownership'
 
 /**
- * 삭제 계열 라우트(소프트 삭제·복구·영구삭제)가 공유하는 소유자 검사.
+ * 삭제 3종(소프트 삭제·복구·영구삭제)과 새 버전 올리기가 공유하는 소유자 검사.
  * 막을 때만 응답을 돌려주고, 통과하면 null 이라 호출부의 흐름이 안 바뀐다.
  *
  * **조회를 한 번 더 내는 대신 403 을 낸다.** 이 리포의 다른 변경 라우트는 조건을 전부
@@ -21,6 +21,8 @@ import { canDeleteDocument, DELETE_FORBIDDEN, type Viewer } from '@/lib/ownershi
 export async function denyIfNotOwner(
   documentId: string,
   viewer: Viewer,
+  /** 막을 때 보일 문구. 경계는 하나지만 사용자가 하려던 일이 달라서 문구는 갈린다. */
+  forbiddenMessage: string = DELETE_FORBIDDEN,
 ): Promise<NextResponse | null> {
   const document = await prisma.document.findUnique({
     where: { id: documentId },
@@ -28,8 +30,8 @@ export async function denyIfNotOwner(
   })
   if (!document) return null
 
-  if (!canDeleteDocument(viewer, document, env.ADMIN_DISCORD_ID)) {
-    return NextResponse.json({ error: DELETE_FORBIDDEN }, { status: 403 })
+  if (!canManageDocument(viewer, document, env.ADMIN_DISCORD_ID)) {
+    return NextResponse.json({ error: forbiddenMessage }, { status: 403 })
   }
   return null
 }

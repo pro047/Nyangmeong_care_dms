@@ -7,6 +7,7 @@ import { ChevronRight, Folder, FolderPlus, Pencil, Trash2 } from 'lucide-react'
 import {
   buildFolderTree,
   folderBreadcrumb,
+  folderDeleteWarning,
   normalizeAliases,
   MAX_ALIASES_PER_FOLDER,
   MAX_ALIAS_LENGTH,
@@ -370,10 +371,10 @@ export function FolderTree({ folders }: { folders: FolderAliasRow[] }) {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>폴더를 삭제할까요?</AlertDialogTitle>
-            {/* 문서가 같이 지워지지 않는다는 것을 반드시 알린다 — 여기서 겁먹고 못 지운다. */}
+            {/* 문서가 같이 지워지지 않는다는 것을 반드시 알린다 — 여기서 겁먹고 못 지운다.
+                하위 폴더는 개수를 말한다. cascade 라 2뎁스에서는 한 번에 여럿이 사라진다. */}
             <AlertDialogDescription>
-              &ldquo;{deleting?.name}&rdquo; 폴더를 삭제합니다. 하위 폴더도 함께 삭제되고, 안에
-              있던 문서는 미분류로 남습니다.
+              {deleting && folderDeleteWarning(deleting)}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

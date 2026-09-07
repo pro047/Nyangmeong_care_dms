@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest'
 import {
   buildFolderTree,
   childFolderCards,
+  descendantFolderCount,
   emptyListKind,
   flattenFolderTree,
   folderBreadcrumb,
   folderCreateSchema,
+  folderDeleteWarning,
   folderMutationFailure,
   folderNameError,
   folderPatchSchema,
@@ -17,6 +19,7 @@ import {
   MAX_ALIASES_PER_FOLDER,
   normalizeAliases,
   PARENT_FOLDER_NOT_FOUND,
+  type FolderNode,
   type FolderRow,
 } from '@/lib/folder'
 
@@ -408,5 +411,55 @@ describe('folderMutationFailure', () => {
     expect(folderMutationFailure(withCode('P9999'))).toBeNull()
     expect(folderMutationFailure(null)).toBeNull()
     expect(folderMutationFailure(undefined)).toBeNull()
+  })
+})
+
+describe('descendantFolderCount', () => {
+  const leaf = (id: string): FolderNode => ({ id, name: id, parentId: 'root', children: [] })
+
+  it('자식이 없으면 0 이어야 한다', () => {
+    expect(descendantFolderCount(leaf('a'))).toBe(0)
+  })
+
+  it('손자까지 세야 한다', () => {
+    // cascade 는 재귀적이라 직계만 세면 실제로 사라지는 수보다 적게 말한다.
+    const tree: FolderNode = {
+      id: 'root',
+      name: '화면설계서',
+      parentId: null,
+      children: [
+        { id: 'c1', name: '마이페이지', parentId: 'root', children: [leaf('g1'), leaf('g2')] },
+        leaf('c2'),
+      ],
+    }
+
+    expect(descendantFolderCount(tree)).toBe(4)
+  })
+})
+
+describe('folderDeleteWarning', () => {
+  it('하위 폴더가 없으면 개수를 말하지 않아야 한다', () => {
+    const node: FolderNode = { id: 'a', name: '기타', parentId: null, children: [] }
+
+    expect(folderDeleteWarning(node)).toBe(
+      '“기타” 폴더를 삭제합니다. 안에 있던 문서는 미분류로 남습니다.',
+    )
+  })
+
+  it('하위 폴더가 있으면 총 개수를 말해야 한다', () => {
+    const node: FolderNode = {
+      id: 'a',
+      name: '화면설계서',
+      parentId: null,
+      children: [
+        { id: 'c1', name: '로그인', parentId: 'a', children: [
+          { id: 'g1', name: '회원가입', parentId: 'c1', children: [] },
+        ] },
+      ],
+    }
+
+    expect(folderDeleteWarning(node)).toBe(
+      '“화면설계서” 폴더와 하위 폴더 2개를 삭제합니다. 안에 있던 문서는 미분류로 남습니다.',
+    )
   })
 })
