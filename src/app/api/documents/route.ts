@@ -8,8 +8,43 @@ import { verifyUploadToken } from '@/lib/upload-token'
 import { S3_KEY_ALREADY_USED } from '@/lib/upload-guard'
 import { isS3KeyConflict } from '@/lib/version-create'
 import { TITLE_MAX_LENGTH } from '@/lib/title'
+import { activeDocumentWhere } from '@/lib/trash'
+import { documentListOrderBy } from '@/lib/latest'
 
 export const dynamic = 'force-dynamic'
+
+/**
+ * 문서 목록. 사내 정합성 저장소(scripts/dms_sync.py)가 "이 문서의 최신 판이 몇 번인가"를
+ * 읽어 가는 읽기 전용 경로다. 화면은 서버 컴포넌트가 직접 조회하므로 이 라우트를 쓰지 않는다.
+ *
+ * **페이지네이션을 넣지 말 것.** 소비자는 응답 한 번을 전량으로 보고 자기 목록의 문서를
+ * 그 안에서 찾는다 — 잘라 보내면 빠진 문서가 조용히 "DMS 에 없음"으로 잘못 분류된다.
+ */
+export async function GET() {
+  // 프록시가 이미 세션을 보지만(proxy.ts) 보호는 이중으로 한다.
+  if (!(await getSession())) {
+    return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 })
+  }
+
+  const documents = await prisma.document.findMany({
+    where: activeDocumentWhere(),
+    select: {
+      id: true,
+      title: true,
+      folderId: true,
+      // 최신 판 하나면 충분하다 — 소비자는 versions 안에서 versionNo 최댓값을 고른다.
+      // take: 1 이어도 배열 형태는 유지된다. 그게 계약이다.
+      versions: {
+        orderBy: { versionNo: 'desc' },
+        take: 1,
+        select: { versionNo: true, fileName: true },
+      },
+    },
+    orderBy: documentListOrderBy(),
+  })
+
+  return NextResponse.json({ documents })
+}
 
 const bodySchema = z.object({
   title: z.string().min(1).max(TITLE_MAX_LENGTH),
