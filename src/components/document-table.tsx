@@ -12,7 +12,8 @@ export type DocumentListItem = {
   title: string
   /** 삭제 버튼을 그릴지 정한다 (ownership.ts). 두 쿼리 모두 include 라 이미 실려 온다. */
   createdById: string
-  updatedAt: Date
+  /** 정렬 기준과 같은 값이어야 한다 — updatedAt 을 그리면 보이는 날짜와 행 순서가 어긋난다. */
+  createdAt: Date
   folder: { name: string } | null
   tags: { tag: { name: string } }[]
   versions: {
@@ -61,7 +62,7 @@ export function DocumentTable({
             <th scope="col" className="hidden w-28 px-3 py-2.5 font-medium md:table-cell">폴더</th>
             <th scope="col" className="hidden w-28 px-3 py-2.5 font-medium lg:table-cell">올린 사람</th>
             <th scope="col" className="hidden w-20 px-3 py-2.5 font-medium sm:table-cell">크기</th>
-            <th scope="col" className="w-24 px-3 py-2.5 font-medium">수정</th>
+            <th scope="col" className="w-24 px-3 py-2.5 font-medium">올린 날짜</th>
             <th scope="col" className="w-12 px-4 py-2.5"><span className="sr-only">다운로드</span></th>
             <th scope="col" className="w-12 px-4 py-2.5"><span className="sr-only">삭제</span></th>
           </tr>
@@ -97,7 +98,7 @@ export function DocumentTable({
             // 행에 달린다. 행 배경은 건드리지 않는다. 배경까지 바꾸면 휴지통 행처럼 읽힌다.
             //
             // 색을 개별로 낮추지 않고 opacity 로 셀을 통째로 내리는 이유: 이 표의 본문 색
-            // (#666666)이 이미 폴더·올린사람·크기·수정 열의 기본색이라, 제목만 그 색으로
+            // (#666666)이 이미 폴더·올린사람·크기·날짜 열의 기본색이라, 제목만 그 색으로
             // 바꾸면 "흐려졌다"가 아니라 "제목이 다른 열과 같아졌다"로 읽힌다. 대조는 행
             // 단위로 생겨야 한다. 다운로드·삭제 칸에는 안 건다 — 구버전도 받아 갈 문서다.
             const superseded = supersededIds?.has(doc.id) ?? false
@@ -147,7 +148,7 @@ export function DocumentTable({
                   {latest ? formatBytes(latest.sizeBytes) : '—'}
                 </td>
                 <td className={`w-24 px-3 py-3 whitespace-nowrap text-ink-muted ${dim}`}>
-                  {formatRelative(doc.updatedAt)}
+                  {formatRelative(doc.createdAt)}
                 </td>
                 <td className="px-4 py-3">
                   <a

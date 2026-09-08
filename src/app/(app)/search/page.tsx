@@ -6,7 +6,11 @@ import { getSession } from '@/lib/session'
 import { deletePermission } from '@/lib/ownership'
 import { env } from '@/lib/env'
 import { activeDocumentWhere } from '@/lib/trash'
-import { latestCandidateQuery, supersededDocumentIds } from '@/lib/latest'
+import {
+  documentListOrderBy,
+  latestCandidateQuery,
+  supersededDocumentIds,
+} from '@/lib/latest'
 import { documentSearchWhere, normalizeSearchQuery } from '@/lib/search'
 
 export const dynamic = 'force-dynamic'
@@ -14,7 +18,7 @@ export const dynamic = 'force-dynamic'
 async function searchDocuments(q: string) {
   return prisma.document.findMany({
     where: { AND: [activeDocumentWhere(), documentSearchWhere(q)] },
-    orderBy: { updatedAt: 'desc' },
+    orderBy: documentListOrderBy(),
     include: {
       folder: { select: { name: true } },
       tags: { include: { tag: true }, orderBy: { tag: { name: 'asc' } } },

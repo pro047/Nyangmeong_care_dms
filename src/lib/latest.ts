@@ -1,4 +1,21 @@
+import type { Prisma } from '@/generated/prisma/client'
 import { activeDocumentWhere } from '@/lib/trash'
+
+/**
+ * 목록·검색의 문서 정렬. **구버전 판정과 같은 컬럼을 본다** — 여기 있는 이유가 그것이다.
+ *
+ * 기준이 갈리면 화면이 자기모순에 빠진다. 정렬만 updatedAt 이던 시절에는 구버전으로
+ * 흐려진 행이 선명한 최신본보다 **위에** 놓일 수 있었다(2026-09-08, 사람이 신고).
+ * 두 규칙을 한 파일에 두는 것은 취향이 아니라 그 재발을 막는 장치다.
+ *
+ * 대가를 알고 받는다 — **제목·설명을 고쳐도 그 문서는 위로 올라오지 않는다.** 첫 화면을
+ * "최근 수정순"으로 정한 원래 결정(MILESTONES 표)을 사람이 뒤집었다. 이 팀에서 문서는
+ * 고쳐지기보다 새 판으로 다시 올라오므로(활성 28건 중 27건이 versionNo=1) 시간축을
+ * "마지막으로 건드린 때"가 아니라 "새 판이 들어온 때"로 읽는 쪽이 실제 사용과 맞는다.
+ */
+export function documentListOrderBy(): Prisma.DocumentOrderByWithRelationInput {
+  return { createdAt: 'desc' }
+}
 
 /**
  * 구버전 판정에 필요한 최소 컬럼. 목록 조회와 달리 조인이 없다.

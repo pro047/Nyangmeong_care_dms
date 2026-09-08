@@ -12,7 +12,11 @@ import {
   folderBreadcrumb,
   folderSummaryLine,
 } from '@/lib/folder'
-import { latestCandidateQuery, supersededDocumentIds } from '@/lib/latest'
+import {
+  documentListOrderBy,
+  latestCandidateQuery,
+  supersededDocumentIds,
+} from '@/lib/latest'
 import { pageErrorMessage } from '@/lib/page-error'
 import { getSession } from '@/lib/session'
 import { deletePermission } from '@/lib/ownership'
@@ -24,7 +28,7 @@ export const dynamic = 'force-dynamic'
 async function getDocuments(where: Prisma.DocumentWhereInput) {
   return prisma.document.findMany({
     where,
-    orderBy: { updatedAt: 'desc' },
+    orderBy: documentListOrderBy(),
     include: {
       folder: { select: { name: true } },
       // 순서를 정해 두지 않으면 같은 문서의 칩 순서가 요청마다 흔들린다.
@@ -136,7 +140,7 @@ export default async function DocumentsPage({
             <h1 className="text-sm font-semibold text-ink">{heading}</h1>
           )}
           <p className="mt-0.5 text-sm text-ink-muted">
-            {summary ?? '최근 수정순으로 표시됩니다'}
+            {summary ?? '최근 올린 순으로 표시됩니다'}
           </p>
         </div>
         {/* 폴더를 열어 둔 채 업로드하면 그 폴더가 기본값이 된다. activeFolder 로 가드하는

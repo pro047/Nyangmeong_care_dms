@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { latestCandidateQuery, supersededDocumentIds, type LatestCandidate } from '@/lib/latest'
+import {
+  documentListOrderBy,
+  latestCandidateQuery,
+  supersededDocumentIds,
+  type LatestCandidate,
+} from '@/lib/latest'
 
 const at = (iso: string) => new Date(iso)
 
@@ -88,5 +93,19 @@ describe('supersededDocumentIds', () => {
 describe('latestCandidateQuery', () => {
   it('휴지통 문서를 비교 대상에서 빼야 한다', () => {
     expect(latestCandidateQuery().where).toEqual({ deletedAt: null })
+  })
+})
+
+describe('documentListOrderBy', () => {
+  it('목록 정렬은 구버전 판정과 같은 컬럼을 봐야 한다', () => {
+    // 두 규칙이 갈리면 흐려진 구버전이 최신본보다 위에 놓인다 (2026-09-08 회귀).
+    const orderKey = Object.keys(documentListOrderBy())[0]
+    const candidateKeys = Object.keys(latestCandidateQuery().select)
+
+    expect(candidateKeys).toContain(orderKey)
+  })
+
+  it('최근 올린 순이어야 한다', () => {
+    expect(documentListOrderBy()).toEqual({ createdAt: 'desc' })
   })
 })
