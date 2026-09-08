@@ -1,7 +1,15 @@
 import { activeDocumentWhere } from '@/lib/trash'
 
-/** 구버전 판정에 필요한 최소 컬럼. 목록 조회와 달리 조인이 없다. */
-export type LatestCandidate = { id: string; folderId: string | null; updatedAt: Date }
+/**
+ * 구버전 판정에 필요한 최소 컬럼. 목록 조회와 달리 조인이 없다.
+ *
+ * **updatedAt 을 넣지 말 것** (2026-09-08). 그 컬럼은 `@updatedAt` 이라 제목·설명·폴더를
+ * 고치기만 해도 갱신된다 — 파일이 새 것인지와 아무 상관이 없다. 실제로 v0.4 의 제목을
+ * 수정하자 v0.4 가 폴더 내 최댓값이 되어 **더 새 판인 v0.5 쪽에 구버전 표시가 붙었다.**
+ * 목록 정렬(page.tsx)이 updatedAt 을 쓰는 것은 "최근 수정순"이 의도라 맞지만, 같은 값을
+ * 버전 판정에 재사용하면 안 된다. 두 화면이 같은 컬럼을 봐도 묻는 질문이 다르다.
+ */
+export type LatestCandidate = { id: string; folderId: string | null; createdAt: Date }
 
 /**
  * 판정 대상 조회 인자. 목록과 검색이 같은 규칙을 쓰도록 한곳에서 만든다.
@@ -13,7 +21,7 @@ export type LatestCandidate = { id: string; folderId: string | null; updatedAt: 
 export function latestCandidateQuery() {
   return {
     where: activeDocumentWhere(),
-    select: { id: true, folderId: true, updatedAt: true },
+    select: { id: true, folderId: true, createdAt: true },
   } as const
 }
 
@@ -54,6 +62,6 @@ export function supersededDocumentIds(rows: LatestCandidate[]): Set<string> {
 
 /** 같은 시각이면 id 로 가른다 — 조회 순서에 따라 표시가 옮겨 다니면 안 된다. */
 function isNewer(row: LatestCandidate, current: LatestCandidate): boolean {
-  const diff = row.updatedAt.getTime() - current.updatedAt.getTime()
+  const diff = row.createdAt.getTime() - current.createdAt.getTime()
   return diff > 0 || (diff === 0 && row.id < current.id)
 }
