@@ -53,10 +53,15 @@ const DUPLICATE_SUFFIX = /\s*(?:\(\d+\)|(?:[-–—]\s*)?복사본)/gu
 
 /** `v0.2` `v0_3` `v0_2b`. 구분자로 쪼개기 **전에** 원문에서 지워야 한다 — `v0_3` 을 먼저
     밑줄로 쪼개면 `v0`·`3` 이 되어 못 잡는다.
+
+    **minor 는 3자리까지만 받는다** (2026-09-09). 상한이 없으면 뒤따르는 날짜를 삼킨다 —
+    `보고서_v1_2026_08_17` 이 `minor=2026` 이 되어 목록에 `v1.2026` 으로 찍히고, 비교를
+    붙이면 `v2_20260819` 가 `v2.1` 보다 새 판으로 판정된다. 운영 32건에는 해당 파일이
+    0건이라(2026-09-09 실측) 이 수정으로 기존 분류 결과는 바뀌지 않는다.
     캡처 그룹은 목록의 버전 열(`file-version.ts`)이 값을 읽으려고 얹은 것이다 —
     여기서는 `.replace(…, '')` 라 그룹이 있든 없든 동작이 같다. 정규식을 두 벌 두면
     한쪽 요구로 고칠 때 다른 쪽이 조용히 깨지므로 이 한 벌을 정본으로 쓴다. */
-export const VERSION_TOKEN = /(?<=^|[\s_—–-])v(\d+)(?:[._](\d+))?([a-z]?)(?=[\s_—–-]|$)/giu
+export const VERSION_TOKEN = /(?<=^|[\s_—–-])v(\d+)(?:[._](\d{1,3}))?([a-z]?)(?=[\s_—–-]|$)/giu
 
 /** `2026_08_17` `2026.08.17` `20260819` `260817`. 버전과 같은 이유로 토큰화 전에 지운다. */
 const DATE_TOKEN = /(?<=^|[\s_—–-])(?:\d{4}[._-]\d{1,2}[._-]\d{1,2}|\d{8}|\d{6})(?=[\s_—–-]|$)/gu
@@ -88,7 +93,17 @@ const PRODUCT_TOKENS = ['냥멍케어'].map(normalizeForMatch)
  * 노이즈만 걷어낸 토큰열. 카테고리 구간 제거를 토큰 단위로 해야 표기(공백·대소문자)가
  * 보존된다 — 정규화 문자열에서 잘라내면 `로그인회원가입` 같은 붙임말이 나온다.
  */
-export function coreTokens(fileName: string): string[] {
+export function coreTokens(
+  fileName: string,
+  /**
+   * 말미 코드(`HLT`)를 남길지. 기본은 폴더용이라 뗀다.
+   *
+   * **문서를 구별하는 쪽은 남겨야 한다** (2026-09-09). 폴더 이름을 지을 때 `HLT` 를 빼는
+   * 것은 맞지만(문서 1건짜리 폴더가 생긴다), 문서 식별에서는 그게 바로 구별의 근거다 —
+   * 떼면 `건강기록_와이어프레임_HLT` 와 `..._PAY` 가 같은 문서가 된다.
+   */
+  { keepTrailingCode = false }: { keepTrailingCode?: boolean } = {},
+): string[] {
   const withoutNoise = stripExtension(fileName)
     .replace(DUPLICATE_SUFFIX, '')
     .replace(VERSION_TOKEN, '')
@@ -98,7 +113,8 @@ export function coreTokens(fileName: string): string[] {
   if (tokens.length > 0 && NUMBER_PREFIX.test(tokens[0])) tokens.shift()
 
   // 토큰이 1개 남으면 멈춘다 — `WF.html` 이 빈 제안이 되면 폴더를 아예 못 얻는다.
-  while (tokens.length > 1 && TRAILING_CODE.test(tokens[tokens.length - 1])) tokens.pop()
+  while (!keepTrailingCode && tokens.length > 1 && TRAILING_CODE.test(tokens[tokens.length - 1]))
+    tokens.pop()
 
   // 제품명을 걷는다. 전부 제품명이면 그대로 둔다 — 빈 이름보다는 나쁜 이름이 낫다.
   const isProduct = (token: string) =>
