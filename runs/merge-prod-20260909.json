@@ -1,0 +1,223 @@
+{
+  "plan": "merge-plan-prod.json",
+  "applied": true,
+  "at": "2026-09-09T14:27:29.546Z",
+  "groups": [
+    {
+      "keepId": "cmttgeff3000504jpeyrjyy17",
+      "before": [
+        {
+          "id": "cmttgdp8a000304jphmxx7sf9",
+          "title": "06_정책결정관리서_v0.1_2026_09_09",
+          "description": null
+        },
+        {
+          "id": "cmttgeff3000504jpeyrjyy17",
+          "title": "06_정책결정관리서_v0.2_2026_09_09",
+          "description": null
+        }
+      ],
+      "order": [
+        {
+          "id": "cmttgdp8a000304jphmxx7sf9",
+          "fileName": "06_정책결정관리서_v0.1_2026_09_09.xlsx",
+          "label": "v0.1"
+        },
+        {
+          "id": "cmttgeff3000504jpeyrjyy17",
+          "fileName": "06_정책결정관리서_v0.2_2026_09_09.xlsx",
+          "label": "v0.2"
+        }
+      ],
+      "movingTags": []
+    },
+    {
+      "keepId": "cmtrysbjs000204jrz79h47dz",
+      "before": [
+        {
+          "id": "cmt8bkjfu000004jqpk0y24np",
+          "title": "01_요구사항 정의서_v0.3_2026_08_17",
+          "description": null
+        },
+        {
+          "id": "cmtrys6vp000004jrsbsc86n2",
+          "title": "01_요구사항정의서_v0.4_2026_08_31",
+          "description": null
+        },
+        {
+          "id": "cmtrysbjs000204jrz79h47dz",
+          "title": "01_요구사항정의서_v0.5_2026_09_06",
+          "description": null
+        }
+      ],
+      "order": [
+        {
+          "id": "cmt8bkjfu000004jqpk0y24np",
+          "fileName": "01_요구사항 정의서_v0.3_2026_08_17.xlsx",
+          "label": "v0.3"
+        },
+        {
+          "id": "cmtrys6vp000004jrsbsc86n2",
+          "fileName": "01_요구사항정의서_v0_4_2026_08_31.xlsx",
+          "label": "v0.4"
+        },
+        {
+          "id": "cmtrysbjs000204jrz79h47dz",
+          "fileName": "01_요구사항정의서_v0.5_2026_09_06.xlsx",
+          "label": "v0.5"
+        }
+      ],
+      "movingTags": []
+    },
+    {
+      "keepId": "cmtgnjhvi000004jp8um1i6mr",
+      "before": [
+        {
+          "id": "cmt87x3hd000004l3v7farlcy",
+          "title": "냥멍케어 화면설계서 — 건강기록 (HLT) v0.2",
+          "description": null
+        },
+        {
+          "id": "cmt9n3ltd000004l1mg41nmiy",
+          "title": "냥멍케어_화면설계서_건강기록_HLT_v0.3",
+          "description": null
+        },
+        {
+          "id": "cmtgnjhvi000004jp8um1i6mr",
+          "title": "03_건강기록_화면설계서_HLT_v0_5_2026-08-31",
+          "description": null
+        }
+      ],
+      "order": [
+        {
+          "id": "cmt87x3hd000004l3v7farlcy",
+          "fileName": "냥멍케어 화면설계서 — 건강기록 (HLT) v0.2.html",
+          "label": "v0.2"
+        },
+        {
+          "id": "cmt9n3ltd000004l1mg41nmiy",
+          "fileName": "냥멍케어_화면설계서_건강기록_HLT_v0.3.html",
+          "label": "v0.3"
+        },
+        {
+          "id": "cmtgnjhvi000004jp8um1i6mr",
+          "fileName": "03_건강기록_화면설계서_HLT_v0_5_2026-08-31.html",
+          "label": "v0.5"
+        }
+      ],
+      "movingTags": []
+    },
+    {
+      "keepId": "cmt9oj5yx000604l8r6c3y9qr",
+      "before": [
+        {
+          "id": "cmt9oj5yf000604jrujsix57k",
+          "title": "03_공통레이아웃_화면설계서_v0.1_2026_08_15",
+          "description": null
+        },
+        {
+          "id": "cmt9oj5yx000604l8r6c3y9qr",
+          "title": "03_공통레이아웃_화면설계서_v0.2_2026_08_26",
+          "description": null
+        }
+      ],
+      "order": [
+        {
+          "id": "cmt9oj5yf000604jrujsix57k",
+          "fileName": "03_공통레이아웃_화면설계서_v0.1_2026_08_15.html",
+          "label": "v0.1"
+        },
+        {
+          "id": "cmt9oj5yx000604l8r6c3y9qr",
+          "fileName": "03_공통레이아웃_화면설계서_v0.2_2026_08_26.html",
+          "label": "v0.2"
+        }
+      ],
+      "movingTags": []
+    },
+    {
+      "keepId": "cmt9oixlu000404l8wnn4k3jq",
+      "before": [
+        {
+          "id": "cmt9oixlk000404jr655e8t7t",
+          "title": "03_AI매니저_화면설계서_v0.1_2026_08_17",
+          "description": null
+        },
+        {
+          "id": "cmt9oixlu000404l8wnn4k3jq",
+          "title": "03_AI매니저_화면설계서_v0.2_2026_08_26",
+          "description": null
+        }
+      ],
+      "order": [
+        {
+          "id": "cmt9oixlk000404jr655e8t7t",
+          "fileName": "03_AI매니저_화면설계서_v0.1_2026_08_17.html",
+          "label": "v0.1"
+        },
+        {
+          "id": "cmt9oixlu000404l8wnn4k3jq",
+          "fileName": "03_AI매니저_화면설계서_v0.2_2026_08_26.html",
+          "label": "v0.2"
+        }
+      ],
+      "movingTags": []
+    },
+    {
+      "keepId": "cmt9nuuwh000004jr2yqopg2v",
+      "before": [
+        {
+          "id": "cmt88h3nt000404l5q36rkcec",
+          "title": "03_마이페이지_화면설계서_v0_3_260817",
+          "description": null
+        },
+        {
+          "id": "cmt9nuuwh000004jr2yqopg2v",
+          "title": "03_마이페이지_화면설계서_v0_4_260825",
+          "description": null
+        }
+      ],
+      "order": [
+        {
+          "id": "cmt88h3nt000404l5q36rkcec",
+          "fileName": "03_마이페이지_화면설계서_v0_3_260817.html",
+          "label": "v0.3"
+        },
+        {
+          "id": "cmt9nuuwh000004jr2yqopg2v",
+          "fileName": "03_마이페이지_화면설계서_v0_4_260825.html",
+          "label": "v0.4"
+        }
+      ],
+      "movingTags": []
+    },
+    {
+      "keepId": "cmt9naqxk000204l1oosigunf",
+      "before": [
+        {
+          "id": "cmt88is1i000804l5sl4y1eo0",
+          "title": "03_메인페이지_화면설계서_v0.3_20260819",
+          "description": null
+        },
+        {
+          "id": "cmt9naqxk000204l1oosigunf",
+          "title": "03_메인페이지_화면설계서_v0.6_20260826",
+          "description": null
+        }
+      ],
+      "order": [
+        {
+          "id": "cmt88is1i000804l5sl4y1eo0",
+          "fileName": "03_메인페이지_화면설계서_v0.3_20260819.html",
+          "label": "v0.3"
+        },
+        {
+          "id": "cmt9naqxk000204l1oosigunf",
+          "fileName": "03_메인페이지_화면설계서_v0.6_20260826.html",
+          "label": "v0.6"
+        }
+      ],
+      "movingTags": []
+    }
+  ]
+}
