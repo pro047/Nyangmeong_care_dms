@@ -1,0 +1,145 @@
+{
+  "generatedAt": "2026-09-09T14:16:34.044Z",
+  "source": "GET /api/documents (운영)",
+  "totalDocuments": 34,
+  "groups": [
+    {
+      "keepId": "cmttgeff3000504jpeyrjyy17",
+      "keepFileName": "06_정책결정관리서_v0.2_2026_09_09.xlsx",
+      "folderId": "cmttgd4oy000004jphofdeis2",
+      "order": [
+        {
+          "id": "cmttgdp8a000304jphmxx7sf9",
+          "fileName": "06_정책결정관리서_v0.1_2026_09_09.xlsx",
+          "label": "v0.1"
+        },
+        {
+          "id": "cmttgeff3000504jpeyrjyy17",
+          "fileName": "06_정책결정관리서_v0.2_2026_09_09.xlsx",
+          "label": "v0.2"
+        }
+      ]
+    },
+    {
+      "keepId": "cmtrysbjs000204jrz79h47dz",
+      "keepFileName": "01_요구사항정의서_v0.5_2026_09_06.xlsx",
+      "folderId": "cmt7za5dw0000gcuxw7kpv9k3",
+      "order": [
+        {
+          "id": "cmt8bkjfu000004jqpk0y24np",
+          "fileName": "01_요구사항 정의서_v0.3_2026_08_17.xlsx",
+          "label": "v0.3"
+        },
+        {
+          "id": "cmtrys6vp000004jrsbsc86n2",
+          "fileName": "01_요구사항정의서_v0_4_2026_08_31.xlsx",
+          "label": "v0.4"
+        },
+        {
+          "id": "cmtrysbjs000204jrz79h47dz",
+          "fileName": "01_요구사항정의서_v0.5_2026_09_06.xlsx",
+          "label": "v0.5"
+        }
+      ]
+    },
+    {
+      "keepId": "cmtgnjhvi000004jp8um1i6mr",
+      "keepFileName": "03_건강기록_화면설계서_HLT_v0_5_2026-08-31.html",
+      "folderId": "59ae0981-f5cd-4038-80b5-9a3c0cd813e0",
+      "order": [
+        {
+          "id": "cmt87x3hd000004l3v7farlcy",
+          "fileName": "냥멍케어 화면설계서 — 건강기록 (HLT) v0.2.html",
+          "label": "v0.2"
+        },
+        {
+          "id": "cmt9n3ltd000004l1mg41nmiy",
+          "fileName": "냥멍케어_화면설계서_건강기록_HLT_v0.3.html",
+          "label": "v0.3"
+        },
+        {
+          "id": "cmtgnjhvi000004jp8um1i6mr",
+          "fileName": "03_건강기록_화면설계서_HLT_v0_5_2026-08-31.html",
+          "label": "v0.5"
+        }
+      ]
+    },
+    {
+      "keepId": "cmt9oj5yx000604l8r6c3y9qr",
+      "keepFileName": "03_공통레이아웃_화면설계서_v0.2_2026_08_26.html",
+      "folderId": "1fb0583e-f472-4125-b0cb-ec3960570e6e",
+      "order": [
+        {
+          "id": "cmt9oj5yf000604jrujsix57k",
+          "fileName": "03_공통레이아웃_화면설계서_v0.1_2026_08_15.html",
+          "label": "v0.1"
+        },
+        {
+          "id": "cmt9oj5yx000604l8r6c3y9qr",
+          "fileName": "03_공통레이아웃_화면설계서_v0.2_2026_08_26.html",
+          "label": "v0.2"
+        }
+      ]
+    },
+    {
+      "keepId": "cmt9oixlu000404l8wnn4k3jq",
+      "keepFileName": "03_AI매니저_화면설계서_v0.2_2026_08_26.html",
+      "folderId": "b660fb06-43ac-43f0-a068-e24e29c70cc4",
+      "order": [
+        {
+          "id": "cmt9oixlk000404jr655e8t7t",
+          "fileName": "03_AI매니저_화면설계서_v0.1_2026_08_17.html",
+          "label": "v0.1"
+        },
+        {
+          "id": "cmt9oixlu000404l8wnn4k3jq",
+          "fileName": "03_AI매니저_화면설계서_v0.2_2026_08_26.html",
+          "label": "v0.2"
+        }
+      ]
+    },
+    {
+      "keepId": "cmt9nuuwh000004jr2yqopg2v",
+      "keepFileName": "03_마이페이지_화면설계서_v0_4_260825.html",
+      "folderId": "768b6958-427b-4790-ade9-f3b749debfbf",
+      "order": [
+        {
+          "id": "cmt88h3nt000404l5q36rkcec",
+          "fileName": "03_마이페이지_화면설계서_v0_3_260817.html",
+          "label": "v0.3"
+        },
+        {
+          "id": "cmt9nuuwh000004jr2yqopg2v",
+          "fileName": "03_마이페이지_화면설계서_v0_4_260825.html",
+          "label": "v0.4"
+        }
+      ]
+    },
+    {
+      "keepId": "cmt9naqxk000204l1oosigunf",
+      "keepFileName": "03_메인페이지_화면설계서_v0.6_20260826.html",
+      "folderId": "475edcee-5c49-4e65-979a-3e1e77cd0834",
+      "order": [
+        {
+          "id": "cmt88is1i000804l5sl4y1eo0",
+          "fileName": "03_메인페이지_화면설계서_v0.3_20260819.html",
+          "label": "v0.3"
+        },
+        {
+          "id": "cmt9naqxk000204l1oosigunf",
+          "fileName": "03_메인페이지_화면설계서_v0.6_20260826.html",
+          "label": "v0.6"
+        }
+      ]
+    }
+  ],
+  "skipped": [
+    {
+      "reason": "판번호 없는 문서가 섞여 순서를 정할 수 없음",
+      "files": [
+        "06_로그인_회원가입_와이어프레임_v0.2_260826.html",
+        "06_로그인_회원가입_와이어프레임.html"
+      ]
+    }
+  ]
+}
