@@ -20,7 +20,8 @@
     "test:e2e:trash": "node --env-file=.env test/e2e/trash-row-layout.mjs",
     "test:e2e:preview": "node --env-file=.env test/e2e/html-preview.mjs",
     "test:e2e:orphan": "node --env-file=.env test/e2e/orphan-cleanup.mjs",
-    "test:e2e:children": "node --env-file=.env test/e2e/folder-children-view.mjs"
+    "test:e2e:children": "node --env-file=.env test/e2e/folder-children-view.mjs",
+    "test:e2e:attach": "node --env-file=.env test/e2e/attach-version.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1114.0",

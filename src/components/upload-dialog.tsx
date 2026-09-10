@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Upload, X, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react'
+import { Upload, X, CheckCircle2, AlertCircle, Loader2, GitBranch } from 'lucide-react'
 import { toast } from 'sonner'
 import { formatBytes } from '@/lib/format'
 import { runUploadFlow, type UploadBatch } from '@/lib/upload-flow'
@@ -17,6 +17,13 @@ import {
 import { classifyFileName, type ClassifyResult } from '@/lib/classify'
 import { titleFromFileName } from '@/lib/title'
 import {
+  attachVersionWarning,
+  uploadTarget,
+  type UploadTarget,
+} from '@/lib/attach-plan'
+import { findSimilarDocuments, type SimilarCandidate } from '@/lib/similar-document'
+import type { DeletePermission } from '@/lib/ownership'
+import {
   createPlannedFolders,
   defaultDestination,
   emptyCreatedFolders,
@@ -27,7 +34,9 @@ import {
   type FolderCreateOutcome,
 } from '@/lib/classify-plan'
 
-type ItemStatus = 'pending' | 'uploading' | 'done' | 'error'
+// 'waiting' 는 후보가 잡혀 사람의 선택을 기다리는 상태다. 'pending' 과 나누는 이유는
+// 화면 문구와 close() 의 확인 프롬프트가 "올라가는 중"과 "아직 안 올라감"을 갈라야 해서다.
+type ItemStatus = 'waiting' | 'pending' | 'uploading' | 'done' | 'error'
 
 type Item = {
   id: string
@@ -40,6 +49,8 @@ type Item = {
   dest?: Destination
   /** 개별 셀렉트로 직접 고른 건은 "만들지 않음" 체크가 덮지 않는다. */
   destTouched?: boolean
+  /** 새 판으로 붙일 문서 id. undefined 가 기본값(새 문서)이다 — 붙이기는 되돌릴 수 없다. */
+  attachTo?: string
 }
 
 const MAX_PARALLEL = 3
@@ -57,9 +68,14 @@ async function errorMessage(res: Response, fallback: string) {
 export function UploadDialog({
   defaultFolderId,
   folders,
+  candidates,
+  permission,
 }: {
   defaultFolderId: string | null
   folders: FolderAliasRow[]
+  /** 활성 문서 전량의 최소 정보. 판정은 findSimilarDocuments 가 폴더·키·소유자로 좁힌다. */
+  candidates: SimilarCandidate[]
+  permission: DeletePermission
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
@@ -89,16 +105,28 @@ export function UploadDialog({
   const autoPreview = mode === AUTO && folders.length > 0
   const previewing = autoPreview && !started && items.length > 0
 
+  // 선택을 기다리는 건은 "업로드 중"이 아니다 — 아직 아무것도 안 나갔다.
+  const waitingCount = items.filter((i) => i.status === 'waiting').length
   const uploading =
     !previewing && items.some((i) => i.status === 'uploading' || i.status === 'pending')
-  const finished = !previewing && items.length > 0 && !uploading
+  const finished = !previewing && items.length > 0 && !uploading && waitingCount === 0
 
   const update = useCallback((id: string, patch: Partial<Item>) => {
     setItems((prev) => prev.map((i) => (i.id === id ? { ...i, ...patch } : i)))
   }, [])
 
+  /**
+   * 이 파일을 새 판으로 붙일 만한 기존 문서들. 목적지 폴더가 정해져야 판정할 수 있다 —
+   * 미분류(null)와 아직 없는 새 폴더는 원리상 후보가 없다(findSimilarDocuments 가 거른다).
+   */
+  const candidatesFor = useCallback(
+    (fileName: string, folderId: string | null) =>
+      findSimilarDocuments(fileName, folderId, candidates, permission),
+    [candidates, permission],
+  )
+
   const uploadOne = useCallback(
-    async (item: Item, batch: UploadBatch, folderId: string | null) => {
+    async (item: Item, batch: UploadBatch, target: UploadTarget) => {
       const { file } = item
       const contentType = file.type || 'application/octet-stream'
       update(item.id, { status: 'uploading', progress: 0 })
@@ -123,21 +151,44 @@ export function UploadDialog({
             (xhr) => inFlight.current.add(xhr),
             () => batch.cancelled,
           ),
+        // 여기서만 두 갈래다. 앞 단계(presign·PUT)는 대상과 무관하게 같은 객체를 올리므로
+        // 갈래를 create 로 미룬다 — presign 이 문서 id 를 알 필요가 없다.
         create: async ({ key, keyToken }) => {
-          const res = await fetch('/api/documents', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              title: titleFromFileName(file.name),
-              // 서버 스키마는 처음부터 folderId 를 받았다. 미분류는 키 자체를 뺀다.
-              ...(folderId ? { folderId } : {}),
-              s3Key: key,
-              keyToken,
-              fileName: file.name,
-              mimeType: contentType,
-            }),
-          })
-          if (!res.ok) throw new Error(await errorMessage(res, '문서 저장 실패'))
+          const res =
+            target.kind === 'attach'
+              ? await fetch(`/api/documents/${target.documentId}/versions`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  // 폴더·제목을 안 보낸다. 붙이는 쪽의 folderId 는 그 문서 것이고,
+                  // 제목은 서버의 retitleOnReupload 가 정한다 (사람이 고친 제목은 안 덮는다).
+                  body: JSON.stringify({
+                    s3Key: key,
+                    keyToken,
+                    fileName: file.name,
+                    mimeType: contentType,
+                  }),
+                })
+              : await fetch('/api/documents', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    title: titleFromFileName(file.name),
+                    // 서버 스키마는 처음부터 folderId 를 받았다. 미분류는 키 자체를 뺀다.
+                    ...(target.folderId ? { folderId: target.folderId } : {}),
+                    s3Key: key,
+                    keyToken,
+                    fileName: file.name,
+                    mimeType: contentType,
+                  }),
+                })
+          if (!res.ok) {
+            throw new Error(
+              await errorMessage(
+                res,
+                target.kind === 'attach' ? '새 버전을 저장하지 못했습니다.' : '문서 저장 실패',
+              ),
+            )
+          }
         },
         // 문서가 되지 못한 객체를 서버가 지운다. 결과는 보지 않는다 — 지울지 말지는
         // 서버가 참조 수로 정하고, 실패해도 사용자에게 알릴 것이 없다.
@@ -175,7 +226,7 @@ export function UploadDialog({
   )
 
   const runBatch = useCallback(
-    (batch: UploadBatch, jobs: { item: Item; folderId: string | null }[], createdIds: string[]) => {
+    (batch: UploadBatch, jobs: { item: Item; target: UploadTarget }[], createdIds: string[]) => {
       // 문서가 실제로 들어간 폴더. React state 가 아니라 이 클로저에 둬야 한다 —
       // close() 가 items 를 비운 뒤에도 settle 시점에 정확한 수가 필요하다.
       const usedFolderIds: string[] = []
@@ -186,8 +237,11 @@ export function UploadDialog({
         // 대기 중이던 파일들이 계속 올라갔다.
         while (!batch.cancelled && cursor < jobs.length) {
           const job = jobs[cursor++]
-          const outcome = await uploadOne(job.item, batch, job.folderId)
-          if (outcome.kind === 'done' && job.folderId) usedFolderIds.push(job.folderId)
+          const outcome = await uploadOne(job.item, batch, job.target)
+          // 붙이기는 폴더를 새로 쓰지 않는다 — 그 문서가 이미 들어 있는 폴더다.
+          if (outcome.kind === 'done' && job.target.kind === 'new' && job.target.folderId) {
+            usedFolderIds.push(job.target.folderId)
+          }
         }
       }
       void Promise.all(Array.from({ length: MAX_PARALLEL }, worker)).finally(() => {
@@ -202,12 +256,17 @@ export function UploadDialog({
     (fileList: FileList | null) => {
       if (!fileList?.length) return
 
+      const folderId = mode === AUTO || mode === '' ? null : mode
+
       const added: Item[] = Array.from(fileList).map((file) => {
         const result = autoPreview ? classifyFileName(file.name, folders) : undefined
+        // 자동 모드는 목적지가 미리보기에서 정해지므로 여기서는 후보를 볼 수 없다 —
+        // 어차피 전건이 시작 버튼을 기다리므로 물어볼 자리는 그쪽 행이다.
+        const waiting = !autoPreview && candidatesFor(file.name, folderId).length > 0
         return {
           id: crypto.randomUUID(),
           file,
-          status: 'pending' as const,
+          status: waiting ? ('waiting' as const) : ('pending' as const),
           progress: 0,
           result,
           dest: result ? defaultDestination(result) : undefined,
@@ -219,18 +278,45 @@ export function UploadDialog({
       // 사람이 미리보기를 확인하고 시작 버튼을 눌러야 시작한다.
       if (autoPreview) return
 
+      // 후보가 잡힌 건만 붙잡는다. 나머지는 지금까지처럼 담는 즉시 올라간다 —
+      // 후보 없는 평범한 업로드에까지 클릭을 하나 더 붙이지 않는 것이 이 화면의 전제다.
+      const jobs = added.filter((item) => item.status === 'pending')
+      if (jobs.length === 0) return
+
       // 동시 업로드 수를 제한해 브라우저 커넥션과 S3 요청이 몰리지 않게 한다.
       const batch: UploadBatch = { cancelled: false }
       batches.current.add(batch)
-      const folderId = mode === AUTO || mode === '' ? null : mode
       runBatch(
         batch,
-        added.map((item) => ({ item, folderId })),
+        jobs.map((item) => ({ item, target: { kind: 'new', folderId } as UploadTarget })),
         [],
       )
     },
-    [autoPreview, folders, mode, runBatch],
+    [autoPreview, candidatesFor, folders, mode, runBatch],
   )
+
+  /** 붙잡아 둔 건을 사람이 고른 대로 올린다. 수동 모드에만 있다(자동은 startAuto 가 겸한다). */
+  const handleStartWaiting = useCallback(() => {
+    const folderId = mode === AUTO || mode === '' ? null : mode
+    const jobs = items.filter((item) => item.status === 'waiting')
+    if (jobs.length === 0) return
+
+    const batch: UploadBatch = { cancelled: false }
+    batches.current.add(batch)
+    // 선택 UI 를 먼저 걷는다. MAX_PARALLEL 때문에 뒤쪽 건은 실제 시작이 늦는데,
+    // 그 사이에 셀렉트가 살아 있으면 이미 확정된 선택을 바꿀 수 있는 것처럼 보인다.
+    setItems((prev) =>
+      prev.map((item) => (item.status === 'waiting' ? { ...item, status: 'pending' } : item)),
+    )
+    runBatch(
+      batch,
+      jobs.map((item) => ({
+        item,
+        target: uploadTarget(item.attachTo, folderId, candidatesFor(item.file.name, folderId)),
+      })),
+      [],
+    )
+  }, [items, mode, candidatesFor, runBatch])
 
   /** 화면에 보이는 목적지. "만들지 않음"은 직접 고르지 않은 제안 건에만 걸린다. */
   const effectiveDest = useCallback(
@@ -309,10 +395,26 @@ export function UploadDialog({
 
     runBatch(
       batch,
-      jobItems.map((item, i) => ({ item, folderId: resolveDestination(dests[i], created) })),
+      jobItems.map((item, i) => {
+        const folderId = resolveDestination(dests[i], created)
+        // 확정된 목적지로 후보를 다시 판정한다 — 선택한 뒤에 폴더를 바꿨으면 그 선택은
+        // 여기서 버려진다(uploadTarget). 화면의 선택을 그대로 믿으면 다른 폴더의 문서에 붙는다.
+        return {
+          item,
+          target: uploadTarget(item.attachTo, folderId, candidatesFor(item.file.name, folderId)),
+        }
+      }),
       createdIds,
     )
-  }, [items, effectiveDest, folders, createFolder, cleanupCreatedFolders, runBatch])
+  }, [
+    items,
+    effectiveDest,
+    folders,
+    createFolder,
+    cleanupCreatedFolders,
+    runBatch,
+    candidatesFor,
+  ])
 
   const close = useCallback(() => {
     // 예전엔 uploading 이면 그냥 return 해서 탈출구가 없었다. PUT 이 응답 없이 멈추면
@@ -366,7 +468,9 @@ export function UploadDialog({
         : value === ''
           ? { kind: 'none' }
           : { kind: 'folder', folderId: value }
-    update(item.id, { dest, destTouched: true })
+    // 폴더가 바뀌면 후보 목록이 통째로 갈린다. 선택을 남겨 두면 셀렉트가 목록에 없는
+    // 값을 가리켜 화면이 거짓말을 한다 (실제 붙이기는 uploadTarget 이 한 번 더 막는다).
+    update(item.id, { dest, destTouched: true, attachTo: undefined })
   }
 
   const destValue = (dest: Destination) =>
@@ -406,6 +510,52 @@ export function UploadDialog({
           <p className="mt-1 text-xs text-ink-muted">
             기존 폴더 &lsquo;{existingName}&rsquo;와 같아 그 폴더로 들어갑니다
           </p>
+        )}
+      </div>
+    )
+  }
+
+  /**
+   * "새 문서 / 기존 문서의 새 판" 선택칸. 후보가 없으면 아무것도 그리지 않는다.
+   *
+   * **기본값은 항상 새 문서다.** 새 문서로 잘못 간 것은 나중에 붙이면 되지만, 잘못 붙인
+   * 판을 떼는 화면은 앱에 없다(버전 롤백은 범위 밖). 그 비대칭이 이 기본값의 전부다.
+   */
+  const renderAttachChoice = (item: Item, folderId: string | null) => {
+    const found = candidatesFor(item.file.name, folderId)
+    if (found.length === 0) return null
+
+    const target = found.find((c) => c.id === item.attachTo)
+    const warning = target ? attachVersionWarning(item.file.name, target.latestFileName) : null
+
+    return (
+      <div className="mt-2">
+        <select
+          value={item.attachTo ?? ''}
+          aria-label={`${item.file.name} 올리는 방식`}
+          onChange={(e) =>
+            update(item.id, { attachTo: e.target.value === '' ? undefined : e.target.value })
+          }
+          className="w-full rounded-lg border border-border bg-surface py-1.5 pr-8 pl-2.5 text-xs text-ink outline-none focus:border-accent"
+        >
+          <option value="">새 문서로 올리기</option>
+          {/* 제목이 아니라 **파일명**으로 보여준다. 여기서 묻는 것은 "이 파일이 저 파일의
+              다음 판인가"이고, 제목은 사람이 고칠 수 있어 파일과 어긋나 있을 수 있다. */}
+          {found.map((c) => (
+            <option key={c.id} value={c.id}>
+              ‘{c.latestFileName}’ 의 새 판으로 붙이기
+            </option>
+          ))}
+        </select>
+        {warning !== null && (
+          <p
+            className={`mt-1 text-xs ${warning.level === 'danger' ? 'text-danger' : 'text-ink-muted'}`}
+          >
+            {warning.message}
+          </p>
+        )}
+        {target !== undefined && (
+          <p className="mt-1 text-xs text-ink-muted">붙인 판은 나중에 뗄 수 없습니다.</p>
         )}
       </div>
     )
@@ -455,6 +605,7 @@ export function UploadDialog({
                 ))}
               </select>
               {dest.kind === 'new' && renderNameEditor(item, dest)}
+              {renderAttachChoice(item, dest.kind === 'folder' ? dest.folderId : null)}
             </li>
           ))}
         </ul>
@@ -647,6 +798,9 @@ export function UploadDialog({
                           {item.status === 'error' && (
                             <AlertCircle className="h-4 w-4 text-danger" />
                           )}
+                          {item.status === 'waiting' && (
+                            <GitBranch className="h-4 w-4 text-accent" />
+                          )}
                           {(item.status === 'uploading' || item.status === 'pending') && (
                             <Loader2 className="h-4 w-4 animate-spin text-ink-subtle" />
                           )}
@@ -667,6 +821,8 @@ export function UploadDialog({
                           />
                         </div>
                       )}
+                      {item.status === 'waiting' &&
+                        renderAttachChoice(item, mode === AUTO || mode === '' ? null : mode)}
                       {item.error && <p className="mt-1.5 text-xs text-danger">{item.error}</p>}
                     </li>
                   ))}
@@ -682,21 +838,27 @@ export function UploadDialog({
                     : `${items.length}건 · 올리기 전에 확인하세요`
                   : items.length === 0
                     ? ' '
-                    : uploading
-                      ? `업로드 중… ${doneCount}/${items.length}`
-                      : `완료 ${doneCount}건${errorCount > 0 ? ` · 실패 ${errorCount}건` : ''}`}
+                    : waitingCount > 0
+                      ? `${waitingCount}건이 기존 문서의 새 판일 수 있습니다`
+                      : uploading
+                        ? `업로드 중… ${doneCount}/${items.length}`
+                        : `완료 ${doneCount}건${errorCount > 0 ? ` · 실패 ${errorCount}건` : ''}`}
               </p>
               <div className="flex shrink-0 items-center gap-2">
                 <button
                   type="button"
                   onClick={close}
                   className={
-                    previewing
+                    previewing || waitingCount > 0
                       ? 'rounded-lg border border-border px-4 py-2 text-sm font-medium text-ink transition-colors hover:bg-canvas'
                       : 'rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-hover'
                   }
                 >
-                  {previewing ? '취소' : uploading ? '취소' : finished ? '완료' : '닫기'}
+                  {previewing || uploading || waitingCount > 0
+                    ? '취소'
+                    : finished
+                      ? '완료'
+                      : '닫기'}
                 </button>
                 {previewing && (
                   <button
@@ -706,6 +868,15 @@ export function UploadDialog({
                     className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-hover disabled:opacity-60"
                   >
                     업로드 시작
+                  </button>
+                )}
+                {!previewing && waitingCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleStartWaiting}
+                    className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-hover"
+                  >
+                    선택 확정하고 올리기
                   </button>
                 )}
               </div>

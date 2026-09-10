@@ -18,6 +18,7 @@ import {
   supersededDocumentIds,
 } from '@/lib/latest'
 import { pageErrorMessage } from '@/lib/page-error'
+import { similarCandidateQuery, toSimilarCandidates } from '@/lib/similar-document'
 import { getSession } from '@/lib/session'
 import { deletePermission } from '@/lib/ownership'
 import { env } from '@/lib/env'
@@ -88,7 +89,14 @@ export default async function DocumentsPage({
 
   // 구버전 판정은 화면에 그릴 집합과 따로 읽는다(latest.ts 참고). 목록 조회와 서로
   // 기다릴 이유가 없어 같이 보낸다 — 함수 리전이 서울이라 왕복 하나가 95ms 다.
-  const [documents, latestRows] = await Promise.all([
+  // 붙이기 후보도 같이 읽는다. 업로드 모달이 파일을 담는 순간 판정해야 하는데, 그 시점에
+  // 왕복을 하나 내면 사람이 기다린다 — 활성 25건이라 페이로드는 무시할 수 있다.
+  // **필터와 무관하게 전량을 내린다.** 폴더를 열어 둬도 다른 폴더 문서의 파일명이 HTML 에
+  // 실린다는 뜻인데, 조회는 전원 동등이고 createdById 는 이미 표에 내려가 있어 새 노출이
+  // 아니다. 후보를 화면에 그린 집합에서 뽑으면 필터가 좁힌 만큼 판정이 빠진다.
+  // 구버전 판정(latestCandidateQuery)과 조회를 합치지 않는 이유는 latest.ts 주석에 있다:
+  // 두 판정이 한 조회를 공유하면 한쪽 요구로 컬럼을 고칠 때 다른 쪽이 조용히 따라 바뀐다.
+  const [documents, latestRows, similarRows] = await Promise.all([
     getDocuments({
       AND: [
         activeDocumentWhere(),
@@ -97,6 +105,7 @@ export default async function DocumentsPage({
       ],
     }),
     prisma.document.findMany(latestCandidateQuery()),
+    prisma.document.findMany(similarCandidateQuery()),
   ])
   const supersededIds = supersededDocumentIds(latestRows)
 
@@ -146,7 +155,12 @@ export default async function DocumentsPage({
         {/* 폴더를 열어 둔 채 업로드하면 그 폴더가 기본값이 된다. activeFolder 로 가드하는
             이유는 위에서 없는 폴더면 필터를 안 걸기 때문이다 — 죽은 링크에서 올린 문서가
             존재하지 않는 폴더를 참조해 FK 위반이 나면 안 된다. */}
-        <UploadDialog defaultFolderId={activeFolder ? folderId : null} folders={folderRows} />
+        <UploadDialog
+          defaultFolderId={activeFolder ? folderId : null}
+          folders={folderRows}
+          candidates={toSimilarCandidates(similarRows)}
+          permission={permission}
+        />
       </div>
 
       {errorMessage && (
