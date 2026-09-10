@@ -2,13 +2,23 @@
 // 일회성이고 UI 버튼을 만들지 않는다 — 갈라진 문서는 붙이기 기능이 들어가면 더 안 생긴다.
 //
 //   node --env-file=.env scripts/merge-versions.mjs --plan <계획.json> [--dry-run|--apply]
-//                                                   [--out <스냅샷 경로>]
+//                                                   [--out <스냅샷 경로>] [--mapping-sent]
 //
 // --dry-run 이 기본이다. --apply 를 명시하지 않으면 아무것도 쓰지 않는다.
 //
 // **되돌릴 수 없다.** 사라지는 Document 의 id 는 영영 없어진다. 정합성 저장소가 그 id 를
 // manifest 에 적기 전에 돌려야 한다 — 적은 뒤에 돌리면 저쪽이 그 문서를 "DMS에 없음"으로
 // 오분류한다.
+//
+// **--apply 는 --mapping-sent 없이는 안 돈다** (순서 계약 A, 2026-09-09 확정). 없으면
+// 사라질 id → keepId 매핑을 찍고 exit 4 로 멈춘다 — 실패가 아니라 승인 대기다.
+// 두 단계로 나눈 이유: 플래그 하나로는 아무것도 못 막지만, **전달해야 할 매핑을 게이트
+// 자신이 만들어 주므로** 그것을 손에 넣으려면 반드시 이 화면을 한 번 읽게 된다.
+// 잊는 것을 막는 장치이지 권한 장치가 아니다.
+//
+// 계기: 2026-09-09 운영 합치기에서 문서 id 9개가 사후 통지로 나갔다. 그때는 저쪽
+// manifest 의 dms_id 가 전부 비어 있어 무해했지만, 채운 뒤였다면 자동 수급이 그 문서를
+// 건너뛰고 **exit 0 으로 성공한 척** 했을 것이다 (저쪽 실측, 0909 회신 §2).
 //
 // 계획 파일은 판정 함수(src/lib/similar-document.ts)가 만든다. 이 스크립트는 판정하지
 // 않고, 계획이 지금 DB 와 맞는지 **확인**한 뒤 적용만 한다 — 판정을 두 벌 두지 않기
@@ -19,6 +29,7 @@ import pg from 'pg'
 
 const argv = process.argv.slice(2)
 const apply = argv.includes('--apply')
+const mappingSent = argv.includes('--mapping-sent')
 const planFlag = argv.indexOf('--plan')
 const outFlag = argv.indexOf('--out')
 
@@ -33,10 +44,39 @@ const snapshotPath =
     : path.join('runs', `merge-versions-${new Date().toISOString().slice(0, 19).replaceAll(':', '')}.json`)
 
 const plan = JSON.parse(await readFile(planPath, 'utf8'))
+
+// 순서 계약 게이트. DB 에 붙기 전에 끊는다 — 여기서 멈출 것이면 커넥션을 쓸 이유가 없다
+// (공유 인스턴스의 max_connections 가 79뿐이다).
+if (apply && !mappingSent) {
+  const pairs = plan.groups.flatMap((g) =>
+    g.order.filter((row) => row.id !== g.keepId).map((row) => ({ ...row, keepId: g.keepId })),
+  )
+  console.error('┌─ 순서 계약 게이트 ─────────────────────────────────────')
+  console.error('│ 아래 id 는 적용과 동시에 영영 없어진다. 정합성 저장소')
+  console.error('│ (~/orca/Nyangmeong_care) 가 manifest 의 dms_id 를 keepId 로')
+  console.error('│ 갱신한 **뒤에** 적용해야 한다.')
+  console.error('│')
+  console.error(`│ 사라질 문서 ${pairs.length}건:`)
+  for (const p of pairs) console.error(`│   ${p.id}  →  ${p.keepId}   ${p.fileName}`)
+  console.error('│')
+  console.error('│ 전달했으면 --mapping-sent 를 붙여 다시 실행한다.')
+  console.error('└───────────────────────────────────────────────────────')
+  // 4 = 승인 대기. 파이프라인 종료 코드 규약과 같은 뜻이다 (실패가 아니다).
+  process.exit(4)
+}
+
 const client = new pg.Client({ connectionString: process.env.DATABASE_URL })
 await client.connect()
 
-const snapshot = { plan: planPath, applied: apply, at: new Date().toISOString(), groups: [] }
+const snapshot = {
+  plan: planPath,
+  applied: apply,
+  // 매핑을 전달했다고 사람이 선언한 실행인지 스냅샷에 남긴다 — 나중에 저쪽 판정이
+  // 어긋났을 때 "통지가 먼저였나"를 이 파일 하나로 가릴 수 있어야 한다.
+  mappingSent,
+  at: new Date().toISOString(),
+  groups: [],
+}
 const report = []
 let merged = 0
 let skipped = 0
@@ -163,4 +203,7 @@ console.log(
   `\n${apply ? '적용함' : 'dry-run (아무것도 쓰지 않음)'} — 합침 ${merged}그룹 · 건너뜀 ${skipped}그룹`,
 )
 console.log(`스냅샷: ${snapshotPath}`)
-if (!apply) console.log('실제로 적용하려면 --apply 를 붙인다.')
+if (!apply) {
+  console.log('실제로 적용하려면 --apply 를 붙인다 — 사라질 id 매핑을 정합성 저장소에')
+  console.log('전달한 뒤 --mapping-sent 까지 붙여야 실제로 돈다 (순서 계약 A).')
+}
