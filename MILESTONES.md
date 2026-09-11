@@ -56,6 +56,9 @@
 | 파일명 판번호 표기 (2026-09-10) | **강제하지 않는다.** 업로드에 파일명 형식 검증을 붙이지 않는다 | 저쪽이 *"`v0.4` 형태로 강제해 달라"* 고 요청했으나 **전제가 실측으로 뒤집혔다** — 못 읽는다던 4건을 `fileVersionLabel()` 에 넣으니 전부 읽었다(`v0_4`→`v0.4`, 밑줄로 끝나는 `v0_2_`, 접미사 `v0_2b` 포함). 근본 원인은 파일명이 아니라 저쪽 정규식(`dms_sync.py:150`)이고, 파일명을 강제해도 **이미 올라간 25건은 그대로**라 저쪽은 어차피 파서를 고쳐야 한다. 그리고 이 트레이드오프는 이미 결정돼 있었다 — `similar-document.ts` 주석의 *"그 습관을 못 바꾸므로 앱이 먼저 알아보고 물어보는 쪽으로 간다."* 7인 사내 도구에서 파일명 규칙으로 업로드를 막는 것은 제품 원칙(*빨리 쓸 수 있는 쪽*)과 반대다. **열린 대안**: `GET /api/documents` 에 정규화 라벨을 얹으면 파서가 한 벌이 된다 — 공개 API 계약 변경이라 사람 결정 대기 |
 | 붙이기의 기본값과 확인 시점 (2026-09-09) | **기본값은 항상 "새 문서"이고, 후보가 잡힌 건만 업로드를 멈춘다. 판번호가 뒤로 가도 막지 않고 경고만 한다** | **비대칭이 기본값의 전부다** — 새 문서로 잘못 간 것은 나중에 붙이면 되지만, 잘못 붙인 판을 떼는 화면은 앱에 없다(버전 롤백은 명시적 범위 밖). 확인을 **후보가 있을 때만** 거는 이유: 전건 미리보기로 통일하면 후보 없는 평범한 업로드에도 클릭이 하나 늘어 *"판단이 갈리면 빨리 쓸 수 있는 쪽"* 이라는 제품 원칙과 반대로 간다. **막지 않고 경고만 하는 이유**: 기본값이 이미 안전한 쪽이라 여기까지 온 것은 사람의 명시적 선택이고, 판번호 없는 파일이 실데이터에 있어(`06_로그인_회원가입_와이어프레임.html`) 차단하면 정상 업로드가 막힌다. 대신 등급을 둘로 나눈다 — 판번호를 읽어 **낮다고 판정한 것**(빨강)과 판번호가 없어 **판정하지 못한 것**(회색)은 사람이 할 일이 다르다. 후보 전달은 **서버 컴포넌트 prop** 이다(새 API 0개) — 필터와 무관하게 전량을 내리는데, 조회는 전원 동등이고 `createdById` 는 이미 표에 내려가 있어 새 노출이 아니다 |
 | 테스트·계층 규칙 정렬 (2026-09-09, **미룸**) | 전역 규칙(`~/.claude/rules/`)의 **"DB 모킹 금지·테스트 DB 사용"** 과 **"로직은 서비스 계층"** 에 리포 전체를 맞춘다 — **별도 리팩터링 스트림으로 미룬다** | 현재 라우트 테스트 8개가 전부 `vi.mock('@/lib/prisma')` 이고, 라우트는 prisma 쿼리를 핸들러에 직접 쓴다. 사람이 **3번(전부 맞춤)** 을 골랐다 — 예외 선언이나 신규만 적용이 아니라 전부 고친다. 선행 작업이 **테스트 DB 셋업(현재 없음)** 이고 그 뒤 라우트 8개와 테스트를 다시 쓴다. 이번 스트림에서 새로 만든 `file-version`·`similar-document` 는 순수 함수라 DB 를 안 쓰므로 이미 규칙에 맞고, 테스트명도 `"~하면 ~해야 한다"` 형식으로 맞췄다 |
+| MCP 접근 — 인가 서버 (2026-09-11) | **앱이 OAuth 2.1 인가 서버가 된다** (DCR + PKCE S256 · 동의 화면 · `mcp-handler@^2` + `@modelcontextprotocol/server@^2` 추가). 개인 API 토큰 화면은 만들지 않는다 | claude.ai·ChatGPT 커넥터는 OAuth 아니면 무인증뿐이라(Bearer 칸이 없다) 웹에서 쓰려면 이 길뿐이고, CLI 도 같은 OAuth 로 붙으므로 인증 경로가 하나로 통일된다. **접근 제어는 여전히 길드 멤버십 하나다** — 토큰은 세션이 있는 사람에게만 나가고 사용자 확인은 기존 로그인이 한다. 패키지를 들이는 이유는 JSON-RPC 프레이밍·프로토콜 두 세대·RFC 9728 챌린지를 손으로 쓰는 것이 범위 밖이라서다. 설계 전문은 §'MCP 서버 · 설계' |
+| MCP 접근 — 토큰 상태 (2026-09-11) | **무상태 JWT.** client_id · 인가 코드 · 액세스 · 리프레시 전부 `AUTH_SECRET` 서명 JWT 이고 `aud` 로 가른다. 스키마 변경 없음 | 세션이 이미 무효화 불가 30일 JWT 라(HANDOFF 미룬 항목 `session.ts:6`) 같은 노출을 같은 방식으로 받고 같은 계기("팀원 이탈")로 함께 고친다. 테이블 3개는 1회용 코드·개별 취소를 주지만 운영 SQL 1회 + 코드 3배다. **받는 대가**: 코드가 60초 안에 재사용될 수 있고(PKCE 가 가로채기를 막는다), 리프레시 토큰 개별 취소 불가(전역 무효화는 `AUTH_SECRET` 교체) |
+| MCP 접근 — 파일 경로 (2026-09-11) | **도구는 URL 만 준다.** 파일 바이트가 앱 서버를 지나는 도구는 없다. 웹 클라이언트는 샌드박스가 S3 에 직접 붙는 것(A)을 **먼저 실측**하고, 서버 중계(B)는 열지 않는다 | "파일은 앱 서버를 거치지 않는다"를 MCP 에도 그대로 적용한다. B 는 그 원칙을 깨고 Vercel 응답 상한(4.5MB)에 걸리며 업로드는 원리상 안 된다(모델이 base64 로 넘겨야 한다). A 가 안 되면 **그때** B 를 읽기 전용·작은 파일 예외로 다시 올린다 |
 
 명시적으로 안 물어보고 정한 것 (이견 있으면 알려줄 것):
 - 파일 크기 상한 **100MB**
@@ -1604,6 +1607,230 @@ select created_by, count(*), min(created_at), max(created_at) from documents gro
 >
 > **되돌릴 조건**: 상업적 용도가 되면 Hobby 티어를 못 쓴다. 그때는 Railway·Render
 > 같은 컨테이너 호스팅이나 원래의 EC2 를 다시 본다 (`hymn.pem` 확보가 선행).
+
+---
+
+## MCP 서버 · 설계 완료 (2026-09-11) — 착수 전 · 사람 결정 3건 **확정**
+
+Claude Code·Codex CLI 와 claude.ai·ChatGPT 웹에서 DMS 문서를 **찾아 읽고, 분석 결과를
+새 문서나 새 판으로 올리게** 한다. 존재 이유 셋 중 "어디 있는지 못 찾는다"의 연장이다 —
+문서를 찾는 자리가 브라우저에서 에이전트로 넓어진다.
+
+### 결정 사항 — 2026-09-11 사람이 셋 다 추천대로 확정 (위 '확정된 설계 결정' 표의 MCP 행 3개)
+
+| # | 결정 | 확정 | 대안과 이유 |
+|---|---|---|---|
+| ① | npm 패키지 2개 추가 — `mcp-handler@^2.1` · `@modelcontextprotocol/server@^2` | **추가** | JSON-RPC 프레이밍 · 2026-07-28/2025 프로토콜 이중 지원 · RFC 9728 `WWW-Authenticate` 챌린지를 손으로 쓰는 것은 범위 밖. peer 요구(`next>=13` · `zod ^4.2`)를 이 리포가 이미 충족한다 (실측 `npm view mcp-handler@2.1.1`) |
+| ② | OAuth 상태를 어디 두나 — **무상태 JWT**(스키마 변경 없음) vs 테이블 3개(client·code·token) | **무상태** | 세션이 이미 무효화 불가 30일 JWT 다(HANDOFF 미룬 항목 `session.ts:6`). 같은 노출을 같은 방식으로 받고 같은 계기("팀원 이탈")로 함께 고친다. 테이블은 개별 취소를 주지만 운영 SQL 1회 + 코드가 3배다 |
+| ③ | 웹 클라이언트의 파일 경로 — **A** 샌드박스가 presigned URL 로 S3 직접 vs **B** 서버가 내용 중계 | **A 를 먼저 실측**, B 는 열지 않는다 | B 는 "파일은 앱 서버를 거치지 않는다"를 깨고 Vercel 응답 상한(4.5MB)에 걸린다. A 가 안 되면 그때 B 를 **읽기 전용·작은 파일** 예외로 다시 올린다 |
+
+### 아키텍처 — 인가 서버를 앱 안에 둔다
+
+```
+[클라이언트]                                 [DMS]
+POST /api/mcp (토큰 없음) ──────────────▶ 401 + WWW-Authenticate: resource_metadata=…
+GET /.well-known/oauth-protected-resource ▶ { authorization_servers: [APP_URL] }
+GET /.well-known/oauth-authorization-server ▶ 엔드포인트 목록 · S256 · DCR
+POST /api/oauth/register ───────────────▶ client_id (redirect_uris 를 담은 서명 JWT)
+브라우저 GET /oauth/authorize?… ─────────▶ 세션 없음 → /api/auth/login?returnTo=… → 디스코드 → 콜백 → 다시 여기
+                                           세션 있음 → 동의 화면 ("Claude 가 DMS 에 접근합니다")
+브라우저 POST /api/oauth/authorize ──────▶ code(60초 JWT) 를 redirect_uri 로
+POST /api/oauth/token (+ PKCE verifier) ─▶ access(1시간) + refresh(30일)
+POST /api/mcp  Bearer access ───────────▶ 도구 실행 (사용자 = JWT 의 sub)
+```
+
+**왜 디스코드 OAuth 를 그대로 건네지 않나.** claude.ai·ChatGPT 는 **우리 서버가 인가
+서버**이길 요구한다 — 커넥터 설정에 OAuth client id/secret 칸만 있고 Bearer 칸이 없다
+(2026-09-11 공식 문서·이슈 #112 확인). 콜백 URL 이 저쪽 것이라 디스코드 앱에 등록할 수도
+없고, 디스코드 토큰을 MCP 토큰으로 쓰면 길드 검사를 매 요청 디스코드에 물어야 한다.
+사용자 확인은 기존 로그인이 하고, 우리는 **그 세션 위에서** 코드·토큰만 발급한다.
+**접근 제어는 여전히 길드 멤버십 하나다** — 토큰은 세션이 있는 사람(= 로그인 때 길드를
+통과한 사람)에게만 나간다. 역할·권한은 늘지 않는다. CLI(Claude Code·Codex)도 같은
+OAuth 로 붙으므로 **토큰 발급 화면을 따로 만들지 않는다** — 인증 경로가 하나다.
+
+**토큰은 전부 `AUTH_SECRET` 으로 서명한 JWT 이고 `aud` 로 용도를 가른다.**
+`upload-token.ts` 가 세션과 갈라 둔 것과 같은 이유다 — 섞이면 세션 쿠키가 액세스 토큰
+자리에 들어간다.
+
+| aud | 담는 것 | TTL |
+|---|---|---|
+| `dms:oauth-client` | redirect_uris · client_name (이 JWT 자체가 client_id) | 없음 |
+| `dms:oauth-code` | sub · client_id 해시 · redirect_uri · code_challenge | 60초 |
+| `dms:mcp` | sub · discordId · username · client_id 해시 | 1시간 |
+| `dms:mcp-refresh` | sub · client_id 해시 | 30일 |
+
+**무상태의 대가 (② 를 무상태로 정하면 받는 것).** 인가 코드가 60초 안에 재사용될 수
+있다 — 1회용을 강제할 저장소가 없다. PKCE 가 붙어 있어 코드를 가로챈 쪽은 verifier 없이
+못 바꾸고, 같은 클라이언트의 재사용은 같은 사용자의 토큰 하나 더일 뿐이다. 리프레시
+토큰은 개별 취소가 안 된다 — 세션과 같은 창(30일)이고 전역 무효화는 `AUTH_SECRET`
+교체다. **HANDOFF 미룬 리뷰 항목 `session.ts:6` 행에 이 토큰을 같이 적는다.**
+
+**redirect_uri 는 등록 시점에 허용 목록으로 거른다** — 아무 주소나 받으면 인가 코드가
+그리로 나간다. 목록은 코드 상수다(env 로 빼면 `[SENSITIVE]` 함정에 한 줄 더 걸린다):
+
+- `https://claude.ai/api/mcp/auth_callback` · `https://claude.com/api/mcp/auth_callback` (문서가 이전을 예고)
+- `https://chatgpt.com/connector_platform_oauth_redirect` · `https://chatgpt.com/oauth/callback` · `https://chat.openai.com/oauth/callback`
+- `http://localhost:<아무 포트>/…` · `http://127.0.0.1:<아무 포트>/…` — CLI 가 임시 포트로 받는다. 루프백은 **포트만 가변**, https 는 **완전일치** (RFC 8252 §7.3)
+
+**동의 화면을 둔다.** 세션이 있다고 바로 코드를 내면 로그인된 브라우저를 어디로든
+보내기만 해도 토큰이 나간다. 어느 클라이언트인지 보여주고 버튼 하나를 누르게 한다.
+POST 는 `sameSite: lax` 쿠키라 다른 사이트의 폼으로는 세션이 안 실린다.
+
+### 기존 코드에 닿는 자리 — 셋뿐
+
+1. **`src/proxy.ts:10` `PUBLIC_PATHS`** 에 `/.well-known/` · `/oauth/` · `/api/oauth/` ·
+   `/api/mcp` 를 더한다. `/api/mcp` 는 쿠키가 아니라 Bearer 로 인증하므로 프록시를
+   지나야 하고, 실제 방어는 라우트 안의 `withMcpAuth` 가 한다 — 이중 검사 원칙은
+   "프록시 낙관 + 라우트 실제"로 그대로다. `/oauth/authorize` 는 세션이 필요하지만
+   프록시가 `/login` 으로 보내면 returnTo 를 잃으므로 통과시키고 페이지가 직접 검사한다.
+   프록시 matcher(`proxy.ts:41`)가 `.well-known` 도 잡는다는 것을 확인했다.
+2. **`api/auth/login/route.ts` · `callback/route.ts:43`** — `?returnTo=` 를
+   `dms_return_to` 쿠키(600초)에 담고, 콜백이 `/` 대신 그리로 보낸다. **`/oauth/authorize?`
+   로 시작하는 상대 경로만 받는다** (`src/lib/oauth/return-to.ts`, 순수 함수) —
+   `//evil` · 절대 URL · 그 밖의 경로는 전부 `/` 로 떨어진다. 오픈 리다이렉트를 여는
+   대신 목적지를 하나로 못박는다.
+3. **`api/documents/route.ts:74-133` POST 와 `[id]/versions/route.ts:48-124` POST 의
+   본문을 `src/lib/upload-commit.ts` 로 뺀다.** 두 라우트가 같은 6단계(토큰 → 재사용 →
+   HeadObject → 크기 → 생성/붙이기 → 알림)를 이미 두 벌 갖고 있고, MCP 도구가 세 번째
+   벌을 만들면 셋이 갈린다. 두 라우트는 `{ status, body }` 를 받아 `NextResponse.json`
+   만 하는 껍데기가 된다. **라우트 시그니처·응답 계약은 안 바뀐다** — 기존 두
+   `route.test.ts` 가 그대로 통과하는 것이 그 증거다. `denyIfNotOwner` 는 `NextResponse`
+   를 돌려주므로 여기서는 `canManageDocument` 를 직접 부른다.
+
+### MCP 도구 (v1 · 9개)
+
+사용자 = 액세스 토큰의 `sub`. 모든 조회는 `activeDocumentWhere()` 를 탄다(휴지통 제외).
+`GET /api/documents`(정합성 저장소 계약, 페이지네이션 금지)는 **건드리지 않는다** —
+도구는 `src/lib` 를 직접 부른다.
+
+| 도구 | 입력 | 출력 | 재사용 |
+|---|---|---|---|
+| `search_documents` | `q?` `folderId?` `tag?` `take?`(≤50) | id · title · folder · 최신 판(fileName·versionNo·sizeBytes·mimeType) · tags · createdBy · createdAt | `documentSearchWhere` `folderFilterWhere` `tagFilterWhere` `documentListOrderBy` |
+| `list_folders` | — | 트리 (id·name·parentId·문서 수) | `folder.ts` 트리 조립 |
+| `get_document` | `id` | 메타 + 버전 전체(`versionNo desc`) | — |
+| `get_download_url` | `id` `versionNo?` | `{ url(5분), fileName, mimeType, sizeBytes }` | `presignDownload` |
+| `find_similar_documents` | `fileName` `folderId` | 새 판 후보 + 판번호 경고 | `findSimilarDocuments` `attachVersionWarning` |
+| `request_upload` | `fileName` `contentType` `size` | `{ s3Key, url(5분), keyToken, contentType, method:'PUT' }` + 안내문 | `buildS3Key` `presignUpload` `signUploadToken` |
+| `create_document` | `s3Key` `keyToken` `fileName` `mimeType` `title?` `description?` `folderId?` `ignoreSimilar?` | `{ id, title }` | `upload-commit.createDocument` |
+| `add_version` | `documentId` `s3Key` `keyToken` `fileName` `mimeType` `changeNote?` | `{ id, versionNo }` | `upload-commit.addVersion` (소유자 검사 포함) |
+| `discard_upload` | `s3Key` `keyToken` | `{ deleted }` | `uploads/discard` 와 같은 판정 |
+
+**`create_document` 는 후보가 있으면 거절한다.** `folderId` 가 있고
+`find_similar_documents` 가 후보를 내는데 `ignoreSimilar: true` 가 없으면 후보 목록과
+함께 오류로 돌려보낸다. 붙이기 스트림이 방금 닫은 갈라짐(운영 7그룹)을 MCP 경로가
+다시 열지 않게 하는 **서버 쪽 방어선**이다 — 에이전트의 프롬프트에 기대지 않는다.
+기본값이 "새 문서"인 것은 화면과 같지만, 화면은 후보를 *보여주고* 묻는데 도구는 그걸
+오류 응답으로 한다. `title` 을 안 주면 `titleFromFileName` (화면과 동일).
+
+**`request_upload` 안내문에 Content-Type 을 박는다.** `presignUpload` 가 `ContentType`
+까지 서명한다(`s3.ts:30`) — 에이전트가 다른 헤더로 PUT 하면 S3 가 403 을 내고 이유가
+안 보인다.
+
+**파일은 도구를 안 지난다.** `get_download_url`·`request_upload` 는 URL 만 준다.
+에이전트가 S3 와 직접 주고받는다 — CLI 는 셸(`curl`)로, 웹은 샌드박스로(③ A).
+서버 응답에 파일 바이트가 실리는 도구는 없다.
+
+### 데이터 흐름 — 에이전트가 문서를 분석해 새 판으로 올리기
+
+```
+search_documents(q:"화면설계서")            → 후보 3건
+get_download_url(id)                       → presigned GET
+(에이전트) curl -o 로컬 → 읽고 분석
+request_upload(fileName, type, size)       → presigned PUT + keyToken
+(에이전트) curl -T 파일 -H "Content-Type: <같은 값>" <url>
+find_similar_documents(fileName, folderId) → 후보 1건 + 판번호 경고
+add_version(documentId, s3Key, keyToken, …) → v2   (소유자 아니면 403 문구)
+```
+
+실패 지점마다 `discard_upload` 로 고아를 그 자리에서 지운다 (`upload-flow.ts` 와 같은
+원칙 — 만든 쪽이 그 자리에서 지운다).
+
+### 웹 클라이언트 (③)
+
+claude.ai 는 코드 실행 샌드박스의 네트워크를 "Package managers and specific domains" 로
+바꾸고 S3 호스트(`<S3_BUCKET>.s3.<AWS_REGION>.amazonaws.com`)를 더하면 presigned URL 을
+열 수 있어야 한다 — **추정**(공식 문서 기준, 미적용 버그 리포트가 있다). 1단계가 끝난 뒤
+실측한다. 되면 서버 변경 0 이다. ChatGPT 샌드박스는 확인된 바 없다.
+
+### 하지 않는 것
+
+- 서버가 파일 내용을 읽어 돌려주는 도구 (③ B) — 실측 전에는 안 연다
+- 자동 분류(`classify-plan`)를 도구로 — 에이전트는 `list_folders` 로 고른다. 필요가 보이면 다음
+- 삭제·복구·영구삭제·태그·폴더 생성 — 읽기와 올리기가 목적이다. 나머지는 화면에서
+- CIMD(client_id 가 URL) — 2026-07-28 스펙이 DCR 대신 미는 방식. claude.ai·ChatGPT·CLI 가 아직 DCR 을 받으므로 v1 은 DCR. 메타데이터에 `client_id_metadata_document_supported: false`
+- 스코프 세분화 — 스코프 하나(`dms`)
+- 토큰 개별 취소 — ② 의 대가. 계기는 세션과 같다
+
+### 변경 파일
+
+신규:
+
+```
+src/app/.well-known/oauth-authorization-server/route.ts   RFC 8414 메타데이터
+src/app/.well-known/oauth-protected-resource/route.ts     mcp-handler protectedResourceHandler
+src/app/api/oauth/register/route.ts                       DCR → client_id JWT
+src/app/api/oauth/authorize/route.ts                      POST 동의 → code
+src/app/api/oauth/token/route.ts                          code · refresh → 토큰
+src/app/oauth/authorize/page.tsx                          동의 화면 ((app) 밖 — login 과 같은 층)
+src/app/api/mcp/route.ts                                  createMcpHandler + withMcpAuth
+src/lib/oauth/client.ts             client_id 발급·검증
+src/lib/oauth/redirect-uri.ts       허용 목록 · 루프백 포트 비교          [순수]
+src/lib/oauth/pkce.ts               S256 검증                              [순수]
+src/lib/oauth/return-to.ts          returnTo 검증                          [순수]
+src/lib/oauth/tokens.ts             code · access · refresh 발급·검증
+src/lib/oauth/authorize-request.ts  파라미터 zod 스키마 · 오류→redirect     [순수]
+src/lib/mcp/server.ts               도구 등록 (prisma · s3 는 인자로 주입)
+src/lib/mcp/auth.ts                 Bearer → AuthInfo
+src/lib/upload-commit.ts            문서 생성 · 새 판 붙이기 (라우트와 도구가 공유)
+```
+
+수정: `src/proxy.ts` · `api/auth/login/route.ts` · `api/auth/callback/route.ts` ·
+`api/documents/route.ts` · `api/documents/[id]/versions/route.ts` · `package.json`(①) ·
+`SETUP.md`(클라이언트 연결 절) · `CLAUDE.md`(인증 절에 MCP 토큰 한 줄) · `HANDOFF.md`
+
+테스트: `src/lib/oauth/*.test.ts`(pkce · redirect-uri · return-to · authorize-request ·
+tokens 왕복) · `src/lib/upload-commit.test.ts`(deps 주입 — 기존 두 `route.test.ts` 의
+케이스를 옮긴다) · `src/lib/mcp/server.test.ts`(도구 입력 스키마 · `create_document` 의
+후보 거절 분기)
+
+### 검증 기준
+
+**[테스트 가능]** PKCE S256 일치/불일치 · 루프백은 포트만 달라도 통과, https 는
+완전일치만 · returnTo 가 `/oauth/authorize?` 외 전부 `/` · **토큰 aud 를 섞어 넣으면
+전부 실패**(세션 쿠키를 액세스 토큰 자리에, 코드를 리프레시 자리에) · 만료 코드 거부 ·
+`create_document` 후보 있음 + `ignoreSimilar` 없음 → 거절, 있음 → 생성 · `add_version`
+남의 문서 → 403 문구 · **기존 두 라우트 테스트 그대로 통과**(껍데기화가 계약을 안
+바꿨다는 증거) · `npm run build` 에 `/.well-known/*` `/api/oauth/*` `/api/mcp` + `ƒ Proxy`
+
+**[사람 확인 필요]** ⓐ Claude Code `claude mcp add --transport http dms <APP_URL>/api/mcp`
+→ 브라우저 동의 → `search_documents` 응답 ⓑ Codex `[mcp_servers.dms] url=…` 같은 흐름
+ⓒ claude.ai 커스텀 커넥터 등록(DCR) → 도구 목록 ⓓ 다운로드 URL 로 curl 200 · 업로드
+PUT 200 → `add_version` 201 → 화면에 v2 · 디스코드 알림 1건 ⓔ 리프레시(액세스 만료
+1시간 뒤) ⓕ ③ A 샌드박스 실측 ⓖ 길드 아닌 계정으로 동의 화면 진입 불가
+
+### 순서 — 3단계, 단계마다 배포
+
+1. OAuth + 읽기 도구 4개(search · list · get · download_url) — ⓐⓑⓒ와 ⓓ(다운로드) 실측
+2. `upload-commit` 추출 + 올리기 도구 5개 — ⓓ(업로드)
+3. ③ A 실측 → 결과로 B 를 열지 정한다
+
+### 근거
+
+- **실측** `npm view mcp-handler@2.1.1`: peer `@modelcontextprotocol/server ^2.0.0` ·
+  `next >=13`. README "Next.js Route Handlers" · `withMcpAuth` `protectedResourceHandler`
+  시그니처(`dist/index.d.ts:74,103`) · `resourceMetadataPath` 기본값
+  `/.well-known/oauth-protected-resource`(`dist/index.js:143`). 도구 콜백의 사용자는
+  `ctx.http?.authInfo` (README "Migrating from 1.x")
+- **코드확인** Next 16 이 `.well-known` 라우트 핸들러를 허용:
+  `node_modules/next/dist/docs/01-app/02-guides/backend-for-frontend.md:116`
+- **코드확인** 재사용 대상: `search.ts:17,31,37` · `similar-document.ts:114` ·
+  `attach-plan.ts:51` · `s3.ts:24,30,42` · `upload-token.ts:20,35` · `ownership.ts:60` ·
+  `title.ts:9` · `trash.ts:13` · `latest.ts:16`
+- **코드확인** 라우트 본문 중복: `api/documents/route.ts:74-133` 과
+  `[id]/versions/route.ts:48-124` 가 같은 6단계
+- **공식 문서** (2026-09-11 검색): claude.ai 커넥터는 OAuth/무인증만 · 콜백
+  `https://claude.ai/api/mcp/auth_callback`(claude.com 이전 예고) · DCR 지원. ChatGPT 는
+  OAuth 필수 · DCR/CIMD · 콜백 3개. claude.ai 샌드박스에 "specific domains" 네트워크 설정 존재
 
 ---
 
