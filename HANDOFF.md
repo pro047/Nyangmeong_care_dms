@@ -847,9 +847,15 @@ UI 작업은 터널 없이도 진행할 수 있다.
    표의 MCP 행 3개(① 패키지 추가 ② 무상태 JWT ③ 파일은 URL 만·샌드박스 A 먼저 실측).
    1단계 = OAuth 인가 서버(DCR+PKCE, 동의 화면) + 읽기 도구 4개. 테스트 663건·lint·빌드
    통과. 브랜치 `feature/mcp`(파이프라인 worktree `pipeline/mcp-read` 를 합침).
-   **남은 것**: 배포 → `MILESTONES.md` 의 사람 확인 ⓐ~ⓖ + ①(동의 POST 가 302 인지) →
+   **남은 것 (순서대로)**: ⓪ **`/code-review` 를 아직 안 돌렸다** — 파이프라인 verify 가
+   BLOCKED 로 끝나 세션이 직접 마무리했고(302 수정), 그 뒤 리뷰 없이 푸시했다(2026-09-11,
+   토큰 부족). `main` 에 합치기 전에 `feature/mcp` 대상으로 돌릴 것 → 배포 →
+   `MILESTONES.md` 의 사람 확인 ⓐ~ⓖ + ①(동의 POST 가 302 인지) →
    2단계(`upload-commit.ts` 추출 + 올리기 도구 5개) → 3단계(claude.ai 샌드박스 S3 실측).
    **`CLAUDE.md` 인증 절에 MCP 한 줄은 아직 안 넣었다**(보호 파일 — 사람이 세션에서).
+   worktree `../Nyangmeong_care_dms-pipeline-mcp-read` 와 브랜치 `pipeline/mcp-read` 는
+   `feature/mcp` 에 합쳐졌으므로 지워도 된다(`.pipeline/mcp-read/` 산출물은 git 밖 —
+   VERIFY.md 의 사람 체크리스트 전문이 거기 있다).
 
 **다음 스트림은 관찰 결과로 고른다.** 1·2 번은 2026-09-10 에 둘 다 닫혔다
 (팀이 쓴다 · 유일 제약 적용됨). **3 만 남았고 그건 계기 대기다** — 즉 이 목록에
