@@ -16,10 +16,14 @@ function tokenResponse(body: unknown, status: number) {
   return NextResponse.json(body, { status, headers: { 'Cache-Control': 'no-store' } })
 }
 
-async function issueTokens(user: { id: string; discordId: string; username: string; avatarUrl: string | null }, cid: string) {
+async function issueTokens(
+  user: { id: string; discordId: string; username: string; avatarUrl: string | null },
+  cid: string,
+  authTime: number,
+) {
   const [accessToken, refreshToken] = await Promise.all([
     signAccessToken({ user, clientIdHash: cid }),
-    signRefreshToken({ userId: user.id, clientIdHash: cid }),
+    signRefreshToken({ userId: user.id, clientIdHash: cid, authTime }),
   ])
   return {
     access_token: accessToken,
@@ -59,7 +63,7 @@ async function handleAuthorizationCode(form: FormData) {
   const user = await prisma.user.findUnique({ where: { id: payload.userId } })
   if (!user) return tokenResponse({ error: 'invalid_grant' }, 400)
 
-  return tokenResponse(await issueTokens(user, cid), 200)
+  return tokenResponse(await issueTokens(user, cid, Math.floor(Date.now() / 1000)), 200)
 }
 
 async function handleRefreshToken(form: FormData) {
@@ -80,7 +84,7 @@ async function handleRefreshToken(form: FormData) {
   const user = await prisma.user.findUnique({ where: { id: payload.userId } })
   if (!user) return tokenResponse({ error: 'invalid_grant' }, 400)
 
-  return tokenResponse(await issueTokens(user, payload.clientIdHash), 200)
+  return tokenResponse(await issueTokens(user, payload.clientIdHash, payload.authTime), 200)
 }
 
 /**
@@ -88,7 +92,9 @@ async function handleRefreshToken(form: FormData) {
  * (사람이 받기로 함 — HANDOFF.md 미룬 항목).
  */
 export async function POST(req: NextRequest) {
-  const form = await req.formData()
+  // form 이 아닌 Content-Type 이면 formData() 가 던진다 — 500 이 아니라 400 이다.
+  const form = await req.formData().catch(() => null)
+  if (!form) return tokenResponse({ error: 'invalid_request' }, 400)
   const grantType = form.get('grant_type')
 
   if (grantType === 'authorization_code') return handleAuthorizationCode(form)

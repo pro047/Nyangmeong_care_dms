@@ -75,6 +75,19 @@ describe('POST /api/oauth/authorize — client_id·redirect_uri 오류는 redire
     expect(res.status).toBe(400)
     expect(res.headers.get('location')).toBeNull()
   })
+
+  it('본문이 form 이 아니면 500 이 아니라 400 이어야 한다', async () => {
+    const res = await POST(
+      new NextRequest(BASE, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ client_id: clientId }),
+      }),
+    )
+
+    expect(res.status).toBe(400)
+    expect(res.headers.get('location')).toBeNull()
+  })
 })
 
 describe('POST /api/oauth/authorize — redirect_uri 로 돌려보내는 결과', () => {

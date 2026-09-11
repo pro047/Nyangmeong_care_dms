@@ -26,7 +26,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 })
   }
 
-  const form = await req.formData()
+  // form 이 아닌 Content-Type 이면 formData() 가 던진다 — 500 이 아니라 400 이다.
+  const form = await req.formData().catch(() => null)
+  if (!form) {
+    return NextResponse.json({ error: '요청 형식이 올바르지 않습니다.' }, { status: 400 })
+  }
   const query: Record<string, string> = {}
   for (const [key, value] of form.entries()) {
     if (typeof value === 'string') query[key] = value

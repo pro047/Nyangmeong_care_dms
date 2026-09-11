@@ -1,14 +1,19 @@
-import { createHash } from 'node:crypto'
+import { createHash, hkdfSync } from 'node:crypto'
 import { SignJWT, jwtVerify } from 'jose'
 import { env } from '@/lib/env'
 import type { SessionUser } from '@/lib/session'
 
 /**
- * 전부 AUTH_SECRET 으로 서명한 HS256 JWT 다. `aud` 로 용도를 가른다 — `upload-token.ts`
- * 가 세션과 갈라 둔 것과 같은 이유다(섞이면 한 토큰이 다른 자리에서 통과한다).
+ * 전부 HS256 JWT 이고, 이 파일 안에서는 `aud` 로 용도를 가른다.
  * verify 계열은 실패 이유를 구분하지 않고 전부 null 을 돌려준다.
+ *
+ * 키는 AUTH_SECRET 그대로가 아니라 거기서 파생한 별도 키다. 세션 검증기(`session.ts`·
+ * `proxy.ts`)는 `aud` 를 요구하지 않아서, 같은 키로 서명하면 **인증 없이 받는 client_id**
+ * 를 포함한 여기 토큰 전부가 `dms_session` 쿠키로 통과한다. `aud` 분리는 양쪽 검증기가
+ * 모두 `aud` 를 볼 때만 성립한다 — 세션 쪽을 고치면 전원 재로그인이라 키를 가른다.
+ * 이 키를 세션·프록시에서 import 하지 말 것.
  */
-const key = new TextEncoder().encode(env.AUTH_SECRET)
+const key = new Uint8Array(hkdfSync('sha256', env.AUTH_SECRET, '', 'dms:oauth', 32))
 
 const CLIENT_AUDIENCE = 'dms:oauth-client'
 const CODE_AUDIENCE = 'dms:oauth-code'
@@ -127,22 +132,36 @@ export async function verifyAccessToken(token: string): Promise<{
   }
 }
 
-export async function signRefreshToken(params: { userId: string; clientIdHash: string }) {
-  return new SignJWT({ cid: params.clientIdHash })
+/**
+ * 만료는 발급 시각이 아니라 `authTime`(동의 화면을 지난 시각) 기준이다. 리프레시마다
+ * 30일을 새로 주면 30일 안에 한 번씩만 갱신해도 길드 재검사 없이 무기한 이어진다 —
+ * 웹 세션은 30일마다 디스코드 로그인(= 길드 검사)을 다시 거친다.
+ */
+export async function signRefreshToken(params: {
+  userId: string
+  clientIdHash: string
+  authTime: number
+}) {
+  return new SignJWT({ cid: params.clientIdHash, auth_time: params.authTime })
     .setProtectedHeader({ alg: 'HS256' })
     .setAudience(REFRESH_AUDIENCE)
     .setSubject(params.userId)
     .setIssuedAt()
-    .setExpirationTime(`${REFRESH_TTL_SECONDS}s`)
+    .setExpirationTime(params.authTime + REFRESH_TTL_SECONDS)
     .sign(key)
 }
 
 export async function verifyRefreshToken(
   token: string,
-): Promise<{ userId: string; clientIdHash: string } | null> {
+): Promise<{ userId: string; clientIdHash: string; authTime: number } | null> {
   try {
     const { payload } = await jwtVerify(token, key, { audience: REFRESH_AUDIENCE })
-    return { userId: payload.sub as string, clientIdHash: payload.cid as string }
+    if (typeof payload.auth_time !== 'number') return null
+    return {
+      userId: payload.sub as string,
+      clientIdHash: payload.cid as string,
+      authTime: payload.auth_time,
+    }
   } catch {
     return null
   }

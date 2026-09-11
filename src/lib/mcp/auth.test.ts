@@ -34,7 +34,11 @@ describe('verifyMcpBearer', () => {
   })
 
   it('refresh token·authorization code 는 bearer 로 받지 않아야 한다', async () => {
-    const refresh = await signRefreshToken({ userId: USER.id, clientIdHash: CID })
+    const refresh = await signRefreshToken({
+      userId: USER.id,
+      clientIdHash: CID,
+      authTime: Math.floor(Date.now() / 1000),
+    })
     const code = await signAuthorizationCode({
       userId: USER.id,
       clientIdHash: CID,

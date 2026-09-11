@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import { SignJWT, decodeJwt } from 'jose'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { SignJWT, decodeJwt, jwtVerify } from 'jose'
 import {
   clientIdHash,
   signAccessToken,
@@ -13,7 +13,9 @@ import {
 } from '@/lib/oauth/tokens'
 import type { SessionUser } from '@/lib/session'
 
-const key = new TextEncoder().encode(process.env.AUTH_SECRET)
+// 세션 쿠키가 서명·검증되는 키. OAuth 토큰은 이 키로 통과하면 안 된다.
+const sessionKey = new TextEncoder().encode(process.env.AUTH_SECRET)
+const nowSec = () => Math.floor(Date.now() / 1000)
 
 const USER: SessionUser = {
   id: 'user_1',
@@ -22,6 +24,10 @@ const USER: SessionUser = {
   avatarUrl: null,
 }
 const CID = clientIdHash('client-jwt')
+
+afterEach(() => {
+  vi.useRealTimers()
+})
 
 describe('clientId', () => {
   it('발급 → 검증 왕복이 값을 보존해야 한다', async () => {
@@ -51,18 +57,15 @@ describe('authorizationCode', () => {
   })
 
   it('만료된 코드는 거부해야 한다', async () => {
-    const expired = await new SignJWT({
-      cid: CID,
-      redirect_uri: 'http://localhost:3000/cb',
-      code_challenge: 'challenge',
+    vi.useFakeTimers({ now: Date.now() - 61_000 })
+    const expired = await signAuthorizationCode({
+      userId: USER.id,
+      clientIdHash: CID,
+      redirectUri: 'http://localhost:3000/cb',
+      codeChallenge: 'challenge',
       scope: 'dms',
     })
-      .setProtectedHeader({ alg: 'HS256' })
-      .setAudience('dms:oauth-code')
-      .setSubject(USER.id)
-      .setIssuedAt(0)
-      .setExpirationTime(1)
-      .sign(key)
+    vi.useRealTimers()
 
     expect(await verifyAuthorizationCode(expired)).toBeNull()
   })
@@ -82,9 +85,17 @@ describe('accessToken / refreshToken', () => {
   })
 
   it('refresh 발급 → 검증 왕복이 값을 보존해야 한다', async () => {
-    const token = await signRefreshToken({ userId: USER.id, clientIdHash: CID })
+    const authTime = nowSec()
+    const token = await signRefreshToken({ userId: USER.id, clientIdHash: CID, authTime })
     const result = await verifyRefreshToken(token)
-    expect(result).toEqual({ userId: USER.id, clientIdHash: CID })
+    expect(result).toEqual({ userId: USER.id, clientIdHash: CID, authTime })
+  })
+
+  it('authTime 으로부터 30일이 지난 refresh 는 발급 직후라도 거부해야 한다', async () => {
+    const authTime = nowSec() - 60 * 60 * 24 * 30 - 1
+    const token = await signRefreshToken({ userId: USER.id, clientIdHash: CID, authTime })
+
+    expect(await verifyRefreshToken(token)).toBeNull()
   })
 })
 
@@ -94,7 +105,7 @@ describe('aud 분리', () => {
       .setProtectedHeader({ alg: 'HS256' })
       .setIssuedAt()
       .setExpirationTime('30d')
-      .sign(key)
+      .sign(sessionKey)
 
     expect(await verifyAccessToken(sessionLike)).toBeNull()
   })
@@ -126,7 +137,7 @@ describe('aud 분리 — 전 조합', () => {
       .setProtectedHeader({ alg: 'HS256' })
       .setIssuedAt()
       .setExpirationTime('30d')
-      .sign(key)
+      .sign(sessionKey)
     return {
       session: sessionLike,
       client: await signClientId({ redirectUris: ['http://localhost:3000/cb'], clientName: 'CLI' }),
@@ -138,7 +149,7 @@ describe('aud 분리 — 전 조합', () => {
         scope: 'dms',
       }),
       access: await signAccessToken({ user: USER, clientIdHash: CID }),
-      refresh: await signRefreshToken({ userId: USER.id, clientIdHash: CID }),
+      refresh: await signRefreshToken({ userId: USER.id, clientIdHash: CID, authTime: nowSec() }),
     }
   }
 
@@ -171,10 +182,20 @@ describe('aud 분리 — 전 조합', () => {
 
     expect(await verifyAccessToken(forged)).toBeNull()
   })
+
+  it('OAuth 토큰은 세션 검증기(AUTH_SECRET · aud 요구 없음)를 통과하면 안 된다', async () => {
+    // session.ts 의 getSession() · proxy.ts 와 같은 호출이다. 통과하면 인증 없이 받는
+    // client_id 를 dms_session 쿠키에 넣어 로그인이 된다.
+    const tokens = await issueAll()
+    for (const kind of ['client', 'code', 'access', 'refresh'] as const) {
+      const token = tokens[kind]
+      await expect(jwtVerify(token, sessionKey), kind).rejects.toThrow()
+    }
+  })
 })
 
 describe('TTL', () => {
-  it('code 60초 · access 3600초 · refresh 30일이어야 하고 client_id 에는 exp 가 없어야 한다', async () => {
+  it('code 60초 · access 3600초 · refresh 는 authTime 부터 30일이어야 하고 client_id 에는 exp 가 없어야 한다', async () => {
     const code = decodeJwt(
       await signAuthorizationCode({
         userId: USER.id,
@@ -185,14 +206,15 @@ describe('TTL', () => {
       }),
     )
     const access = decodeJwt(await signAccessToken({ user: USER, clientIdHash: CID }))
-    const refresh = decodeJwt(await signRefreshToken({ userId: USER.id, clientIdHash: CID }))
+    const authTime = nowSec()
+    const refresh = decodeJwt(await signRefreshToken({ userId: USER.id, clientIdHash: CID, authTime }))
     const client = decodeJwt(
       await signClientId({ redirectUris: ['http://localhost:3000/cb'], clientName: 'CLI' }),
     )
 
     expect(code.exp! - code.iat!).toBe(60)
     expect(access.exp! - access.iat!).toBe(3600)
-    expect(refresh.exp! - refresh.iat!).toBe(60 * 60 * 24 * 30)
+    expect(refresh.exp).toBe(authTime + 60 * 60 * 24 * 30)
     expect(client.exp).toBeUndefined()
   })
 

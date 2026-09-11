@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
+import { decodeJwt } from 'jose'
 import { POST } from './route'
 import {
   clientIdHash,
@@ -21,6 +22,7 @@ const REDIRECT = 'http://localhost:41234/cb'
 // RFC 7636 부록 B.
 const VERIFIER = 'dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk'
 const CHALLENGE = 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM'
+const nowSec = () => Math.floor(Date.now() / 1000)
 const DB_USER = {
   id: 'user_1',
   discordId: '1000000000000000001',
@@ -78,7 +80,7 @@ describe('POST /api/oauth/token — authorization_code', () => {
       username: DB_USER.username,
       clientIdHash: CID,
     })
-    expect(await verifyRefreshToken(body.refresh_token)).toEqual({
+    expect(await verifyRefreshToken(body.refresh_token)).toMatchObject({
       userId: DB_USER.id,
       clientIdHash: CID,
     })
@@ -146,7 +148,7 @@ describe('POST /api/oauth/token — authorization_code', () => {
 
 describe('POST /api/oauth/token — refresh_token', () => {
   it('새 access 와 새 refresh 를 주고, 닉네임은 DB 에서 다시 읽어야 한다', async () => {
-    const refresh = await signRefreshToken({ userId: DB_USER.id, clientIdHash: CID })
+    const refresh = await signRefreshToken({ userId: DB_USER.id, clientIdHash: CID, authTime: nowSec() })
 
     const res = await post({ grant_type: 'refresh_token', refresh_token: refresh, client_id: CLIENT_ID })
 
@@ -156,14 +158,14 @@ describe('POST /api/oauth/token — refresh_token', () => {
     expect(body).toMatchObject({ token_type: 'Bearer', expires_in: 3600, scope: 'dms' })
     expect(findUnique).toHaveBeenCalledWith({ where: { id: DB_USER.id } })
     expect((await verifyAccessToken(body.access_token))?.username).toBe('새닉네임')
-    expect(await verifyRefreshToken(body.refresh_token)).toEqual({
+    expect(await verifyRefreshToken(body.refresh_token)).toMatchObject({
       userId: DB_USER.id,
       clientIdHash: CID,
     })
   })
 
   it('다른 client_id 면 invalid_grant 여야 한다', async () => {
-    const refresh = await signRefreshToken({ userId: DB_USER.id, clientIdHash: CID })
+    const refresh = await signRefreshToken({ userId: DB_USER.id, clientIdHash: CID, authTime: nowSec() })
 
     const res = await post({ grant_type: 'refresh_token', refresh_token: refresh, client_id: 'other' })
 
@@ -181,11 +183,22 @@ describe('POST /api/oauth/token — refresh_token', () => {
 
   it('사용자가 DB 에 없으면 invalid_grant 여야 한다', async () => {
     findUnique.mockResolvedValue(null)
-    const refresh = await signRefreshToken({ userId: DB_USER.id, clientIdHash: CID })
+    const refresh = await signRefreshToken({ userId: DB_USER.id, clientIdHash: CID, authTime: nowSec() })
 
     const res = await post({ grant_type: 'refresh_token', refresh_token: refresh, client_id: CLIENT_ID })
 
     expect(await res.json()).toEqual({ error: 'invalid_grant' })
+  })
+
+  it('리프레시해도 만료는 최초 동의 시각 기준으로 늘어나지 않아야 한다', async () => {
+    const authTime = nowSec() - 60 * 60 * 24 * 29
+    const refresh = await signRefreshToken({ userId: DB_USER.id, clientIdHash: CID, authTime })
+
+    const res = await post({ grant_type: 'refresh_token', refresh_token: refresh, client_id: CLIENT_ID })
+
+    const body = await res.json()
+    expect(decodeJwt(body.refresh_token).exp).toBe(decodeJwt(refresh).exp)
+    expect(await verifyRefreshToken(body.refresh_token)).toMatchObject({ authTime })
   })
 
   it('refresh_token 이 빠지면 invalid_request 여야 한다', async () => {
@@ -202,5 +215,18 @@ describe('POST /api/oauth/token — grant_type', () => {
 
     expect(res.status).toBe(400)
     expect(await res.json()).toEqual({ error: 'unsupported_grant_type' })
+  })
+
+  it('본문이 form 이 아니면 500 이 아니라 invalid_request 여야 한다', async () => {
+    const res = await POST(
+      new NextRequest(BASE, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ grant_type: 'refresh_token' }),
+      }),
+    )
+
+    expect(res.status).toBe(400)
+    expect(await res.json()).toEqual({ error: 'invalid_request' })
   })
 })
