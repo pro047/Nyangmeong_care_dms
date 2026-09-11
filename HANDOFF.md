@@ -26,7 +26,8 @@
 
 ## 현재 위치 (2026-09-10 갱신)
 
-**계획된 코드 작업이 없다 — 배포 하나가 열려 있다.**
+**계획된 코드 작업이 없다 — 배포 하나가 열려 있다.** (2026-09-11 추가: **MCP 서버 1단계가
+코드 완료·미배포다** — 아래 "다음 작업" 0-3. 다음은 배포 후 사람 확인 ⓐ~ⓖ, 그다음 2단계.)
 붙이기 스트림이 2026-09-09 에 코드 완료 + dev 검증까지 갔고(아래 절), **배포는 안 했다.**
 M0~M6 은 2026-08-28 에 닫혔고, 그 뒤에 연 스트림 아홉(xlsx·html 미리보기 · S3 고아 정리 ·
 폴더 2뎁스 · 구버전 흐리기 · 목록 버전 열 · 권한 경계 · 최신 판정 컬럼 · 목록 API·버전
@@ -466,7 +467,7 @@ PowerShell·sandbox 해제), `npx tsc --noEmit`, `./node_modules/.bin/tsc`,
 |---|---|---|
 | ~~`discord.ts:88`~~ | 임베드 `url` 이 없는 `/documents/[id]` 를 가리킴 | **해소됨** — M3 가 그 라우트를 만들었다. 다만 알림은 `NODE_ENV=production` 에서만 나가므로 임베드 링크가 실제로 열리는지는 배포(M6) 후 확인 |
 | ~~`documents/route.ts:37`~~<br>~~`[id]/versions/route.ts:35`~~ | **해소됨 (2026-08-30)** — 두 라우트가 토큰 검증 직후 `documentVersion.findFirst({where:{s3Key}})` 로 끊고, DB 의 `@@unique([s3Key])` 가 동시 요청까지 막는다. 실측: 순차 재사용 400(X4·X5), 동시 두 발 `201/400` 에 버전 행 1개(X9). 아래는 원문이다. `keyToken` 이 5분간 재사용 가능 → 같은 S3 객체에 Document N개. **M3 에서 versions 라우트가 같은 구멍을 복제했다** (2026-08-24 리뷰). `verifyUploadToken`(`upload-token.ts:35`)은 검증만 하고 토큰을 소모하지 않아, TTL 300초 안에 같은 `(s3Key, keyToken)` 으로 **서로 다른 문서**의 `/versions` 에 반복 POST 가 된다 — 피해 범위가 한 문서 안에서 문서 **사이**로 넓어졌다 | **고아 객체 정리 때 같이** — 정리 배치가 붙는 순간 한 문서를 지우면 다른 문서 파일이 사라진다. **두 곳을 같이 막을 것.** 토큰 1회용화는 사용 기록 저장소가 필요해 스키마 변경을 부른다. **2026-08-25: 영구삭제(`[id]/purge`)가 이 구멍을 우회한다** — `deleteObject` 앞에서 같은 `s3Key` 를 가리키는 버전이 남아 있는지 세고 0 일 때만 지운다. 구멍 자체는 그대로이고, 공유된 객체는 고아로 남는다(파일 유실보다 낫다) |
-| `session.ts:6`<br>`session.ts:34` | **길드 멤버십은 로그인 순간에만 검사된다.** 세션은 30일 JWT 이고 `getSession()` 은 서명만 검증한다 — 길드 멤버십을 다시 안 본다. 그래서 **팀원이 길드에서 나가거나 추방돼도 최대 30일간 문서 열람·업로드·삭제가 된다.** `CLAUDE.md` 는 "접근 제어는 디스코드 길드 멤버십 하나뿐"이라고 적었지만 실제로는 **로그인 시점의 스냅샷**이다. JWT 라 개별 무효화 수단이 없고, 전역 무효화는 `AUTH_SECRET` 교체(= 전원 재로그인)뿐이다 (2026-08-25 코드 확인) | **팀원 이탈이 생기면 즉시** — 그전까지는 노출이 없다. 7인 팀에 이탈이 없으면 계기가 안 온다. 고치는 방향 둘: (a) `MAX_AGE_SECONDS` 를 30일 → 1~7일로 줄여 창을 좁힌다(싸다, 재로그인이 잦아진다) (b) `getSession()` 에서 길드를 재확인한다(정확하다, 매 요청 디스코드 API 를 쳐서 비싸다). **급하면 `AUTH_SECRET` 교체가 즉효다** |
+| `session.ts:6`<br>`session.ts:34` | **길드 멤버십은 로그인 순간에만 검사된다.** 세션은 30일 JWT 이고 `getSession()` 은 서명만 검증한다 — 길드 멤버십을 다시 안 본다. 그래서 **팀원이 길드에서 나가거나 추방돼도 최대 30일간 문서 열람·업로드·삭제가 된다.** `CLAUDE.md` 는 "접근 제어는 디스코드 길드 멤버십 하나뿐"이라고 적었지만 실제로는 **로그인 시점의 스냅샷**이다. JWT 라 개별 무효화 수단이 없고, 전역 무효화는 `AUTH_SECRET` 교체(= 전원 재로그인)뿐이다 (2026-08-25 코드 확인). **MCP(`oauth/tokens.ts`)도 같은 모양이다** — access(1시간)는 세션이 있어야 새로 나가지만, refresh 는 발급 이후 `prisma.user` 재조회만 하고 길드 멤버십은 다시 안 본다. refresh 의 만료는 **최초 동의 시각(`auth_time`) + 30일 고정**이라 세션 쿠키와 같은 30일 창이다(2026-09-11). *원래는 리프레시마다 새 30일을 줘서 창이 무기한이었고, 여기에 "두 배로 만들지 않는다"고 적었던 것은 그걸 못 본 것이다 — 코드 리뷰로 정정* | **팀원 이탈이 생기면 즉시** — 그전까지는 노출이 없다. 7인 팀에 이탈이 없으면 계기가 안 온다. 고치는 방향 둘: (a) `MAX_AGE_SECONDS` 를 30일 → 1~7일로 줄여 창을 좁힌다(싸다, 재로그인이 잦아진다) (b) `getSession()`·MCP 리프레시 양쪽에서 길드를 재확인한다(정확하다, 매 요청 디스코드 API 를 쳐서 비싸다). **급하면 `AUTH_SECRET` 교체가 즉효다** — MCP 토큰의 키도 이 시크릿에서 파생되므로 세션과 함께 전부 무효화된다 |
 | `login/page.tsx:31` | `?error=` 값을 **화이트리스트 없이 그대로 렌더**한다. `page.tsx` 배너(`/`)는 `pageErrorMessage` 로 거르는데 `/login` 은 안 거른다 — 임의 문장이 빨간 배너로 뜬다. React 가 이스케이프하므로 XSS 는 아니고, 로그인 폼에 입력 필드가 없어 훔칠 것도 없다 (2026-08-25 코드 확인) | **계기 없음** — 심각도가 낮다. `/` 와 정책이 갈린다는 것만 기록해 둔다. 고친다면 `pageErrorMessage` 를 `/login` 에도 적용 |
 | `s3.ts:71` | `catch { return null }` 이 403·503 을 "파일 없음"으로 뭉갬 | 로그 추가로 충분 |
 | `upload-dialog.tsx:39,74,139`<br>`version-upload-dialog.tsx:39,50,98` | `inFlight` 에서 완료된 XHR 을 제거하지 않음. 줄번호는 `putToS3` 를 `lib/upload-xhr.ts` 로 뺀 뒤 기준(2026-08-24). 같은 결함이 재업로드 다이얼로그에 복제됐다 | 누수는 다이얼로그 수명 한정 |
@@ -773,6 +774,15 @@ abort가 무효라 문서 생성으로 넘어가고, 아직 시작 안 한 대�
 ```
 src/
   app/
+    .well-known/
+      oauth-authorization-server/route.ts   GET RFC 8414 인가 서버 메타데이터
+      oauth-protected-resource/route.ts     GET RFC 9728 보호 자원 메타데이터 (mcp-handler)
+    oauth/authorize/page.tsx  MCP 동의 화면. (app) 밖 — login/page.tsx 와 같은 층
+    api/oauth/
+      register/route.ts       POST 동적 클라이언트 등록(DCR)
+      authorize/route.ts      POST 동의 제출 → 인가 코드
+      token/route.ts          POST 토큰 교환·리프레시
+    api/mcp/route.ts          MCP 서버 본체 (withMcpAuth + createMcpHandler)
     (app)/                    로그인 필수 구간. layout.tsx가 세션 검사 + 헤더/사이드바
       page.tsx                문서 목록 (최근 수정순). 제목은 상세로 간다
       documents/[id]/page.tsx 문서 상세 — 메타 수정 · 재업로드 · 버전 타임라인
@@ -829,6 +839,18 @@ src/
     classify.ts               파일명 → 폴더 판정. 정규화(NFC·소문자·문자/숫자만) ·
                               노이즈 제거(버전·날짜·중복접미사·숫자prefix) · 점수(키 길이)
     classify-plan.ts          목적지 계획 · 폴더 선생성 · 빈 폴더 정리 (의존성 주입)
+    oauth/                    MCP 인가 서버 (전부 순수 함수 + jose)
+      tokens.ts                client_id·code·access·refresh JWT 발급·검증 (aud 로 용도 분리,
+                               키는 AUTH_SECRET 파생 — 세션 쿠키로 통과하지 않게)
+      redirect-uri.ts          redirect_uri 허용 목록·루프백 매칭
+      pkce.ts                  S256 검증
+      return-to.ts             로그인 후 돌아갈 곳 검증
+      authorize-request.ts     /oauth/authorize 쿼리 스키마·오류 리다이렉트
+      metadata.ts              RFC 8414 메타데이터 조립
+    mcp/                      MCP 리소스 서버
+      tools.ts                 도구 입력 스키마 + Prisma 행 → 출력 변환 (순수)
+      server.ts                registerDmsTools — 도구 4개를 McpServer 에 등록 (접착)
+      auth.ts                  withMcpAuth 의 verifyToken (Bearer → AuthInfo)
   generated/prisma            Prisma 산출물 (gitignore, postinstall로 자동 생성)
   proxy.ts                    구 middleware.ts
 
@@ -887,6 +909,23 @@ UI 작업은 터널 없이도 진행할 수 있다.
    급하지 않음). 얹으면 판번호 파서가 한 벌이 되어 우리와 정합성 저장소가 갈릴 수 없다.
    공개 API 계약 변경이라 결정 사항이다 — 근거는 위 "파일명 판번호 표기" 절.
    **저쪽은 자기 정규식을 넓히면 되므로 막혀 있지 않다.**
+
+0-3. **MCP 서버 — 1단계 코드 완료 · 미배포 (2026-09-11).** Claude Code·Codex·claude.ai·
+   ChatGPT 가 문서를 찾아 읽고(1단계) 새 판으로 올리게(2단계) 한다. 설계·주행 기록·검증 표는
+   `MILESTONES.md` §'MCP 서버 · 1단계 코드 완료', 확정 근거는 같은 파일 '확정된 설계 결정'
+   표의 MCP 행 3개(① 패키지 추가 ② 무상태 JWT ③ 파일은 URL 만·샌드박스 A 먼저 실측).
+   1단계 = OAuth 인가 서버(DCR+PKCE, 동의 화면) + 읽기 도구 4개. 테스트 668건·lint·빌드
+   통과. 브랜치 `feature/mcp`(파이프라인 worktree `pipeline/mcp-read` 를 합침).
+   ⓪ **코드 리뷰는 돌렸고 3건을 전부 고쳤다** (2026-09-11) — 치명 1건은 **인증 없이 받는
+   `client_id` 를 세션 쿠키로 쓰면 로그인이 되는 것**이었다(OAuth 토큰 키를 파생 키로 갈라
+   닫음). 전문은 `MILESTONES.md` §'MCP 서버' 의 *코드 리뷰*. 미배포 상태에서 닫혔다.
+   **남은 것 (순서대로)**: 배포 →
+   `MILESTONES.md` 의 사람 확인 ⓐ~ⓖ + ①(동의 POST 가 302 인지) →
+   2단계(`upload-commit.ts` 추출 + 올리기 도구 5개) → 3단계(claude.ai 샌드박스 S3 실측).
+   **`CLAUDE.md` 인증 절에 MCP 한 줄은 아직 안 넣었다**(보호 파일 — 사람이 세션에서).
+   worktree `../Nyangmeong_care_dms-pipeline-mcp-read` 와 브랜치 `pipeline/mcp-read` 는
+   `feature/mcp` 에 합쳐졌으므로 지워도 된다(`.pipeline/mcp-read/` 산출물은 git 밖 —
+   VERIFY.md 의 사람 체크리스트 전문이 거기 있다).
 
 **다음 스트림은 관찰 결과로 고른다.** 1·2 번은 2026-09-10 에 둘 다 닫혔다
 (팀이 쓴다 · 유일 제약 적용됨). **3 만 남았고 그건 계기 대기다** — 즉 이 목록에

@@ -3,6 +3,7 @@ import { exchangeCode, fetchDiscordUser, isGuildMember } from '@/lib/discord'
 import { createSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
 import { env } from '@/lib/env'
+import { RETURN_TO_COOKIE, safeReturnTo } from '@/lib/oauth/return-to'
 
 export const dynamic = 'force-dynamic'
 
@@ -40,8 +41,11 @@ export async function GET(req: NextRequest) {
       avatarUrl: user.avatarUrl,
     })
 
-    const res = NextResponse.redirect(`${env.APP_URL}/`)
+    // /oauth/authorize 에서 로그인을 거쳐 왔으면 그리로, 아니면 홈으로.
+    const dest = safeReturnTo(req.cookies.get(RETURN_TO_COOKIE)?.value)
+    const res = NextResponse.redirect(`${env.APP_URL}${dest}`)
     res.cookies.delete('dms_oauth_state')
+    res.cookies.delete(RETURN_TO_COOKIE)
     return res
   } catch (err) {
     console.error('디스코드 로그인 실패:', err)

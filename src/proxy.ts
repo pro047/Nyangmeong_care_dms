@@ -7,7 +7,19 @@ import { isNavigationRequest } from '@/lib/request-kind'
 // 죽으면 앱 전체가 죽는다.
 const key = new TextEncoder().encode(process.env.AUTH_SECRET)
 
-const PUBLIC_PATHS = ['/login', '/api/auth/login', '/api/auth/callback']
+// /.well-known · /oauth · /api/oauth · /api/mcp: MCP 인가 서버·리소스 서버 경로.
+// /api/mcp 는 Bearer 로 인증하므로 쿠키 검사에서 빼고, 실제 방어는 withMcpAuth 가 한다.
+// /oauth/authorize 는 세션이 필요하지만 여기서 /login 으로 보내면 쿼리(returnTo)가
+// 사라지므로 통과시키고 페이지가 직접 검사한다.
+const PUBLIC_PATHS = [
+  '/login',
+  '/api/auth/login',
+  '/api/auth/callback',
+  '/.well-known',
+  '/oauth',
+  '/api/oauth',
+  '/api/mcp',
+]
 
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl
