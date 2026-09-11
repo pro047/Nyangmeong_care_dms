@@ -315,3 +315,41 @@ Prisma 7 은 드라이버 어댑터가 필수라(`@prisma/adapter-pg`) **같은 
 배포(Vercel)에서도 같은 Neon 을 쓰므로 운영용으로 따로 손볼 것은 없다. 다만
 **`DATABASE_URL` 은 pooled 엔드포인트로 넣는다** — 서버리스는 함수 인스턴스가 여러 개 뜨고
 `src/lib/prisma.ts` 의 `max: 5` 는 인스턴스당이라 곱해진다.
+
+---
+
+## MCP 클라이언트 연결
+
+`<APP_URL>/api/mcp` 에 OAuth(동적 클라이언트 등록 + PKCE)로 붙으면 문서 검색·폴더
+목록·문서 상세·다운로드 URL 발급 도구 4개를 쓸 수 있다. 파일 바이트는 서버를 거치지
+않는다 — 도구는 presigned URL 만 돌려준다.
+
+**Claude Code**
+
+```bash
+claude mcp add --transport http dms <APP_URL>/api/mcp
+```
+
+브라우저가 열리고 디스코드 로그인(길드 멤버만) → 동의 화면 → 허용을 거치면 연결된다.
+
+**Codex CLI** — `~/.codex/config.toml` 에:
+
+```toml
+[mcp_servers.dms]
+url = "<APP_URL>/api/mcp"
+```
+
+**claude.ai / ChatGPT** — 설정의 커스텀 커넥터(MCP)에서 위 URL 을 그대로 등록하면
+동적 클라이언트 등록(DCR)으로 알아서 붙는다.
+
+연결이 안 되면:
+
+| 증상 | 원인 |
+|---|---|
+| 401 뒤에 아무 반응이 없음 | 클라이언트가 `WWW-Authenticate` 의 `resource_metadata` 를 안 따라간다 — 클라이언트 자체 문제일 가능성이 크다 |
+| 동의 화면에서 "등록되지 않은 redirect_uri" | 클라이언트가 `src/lib/oauth/redirect-uri.ts` 의 허용 목록·루프백 규칙 밖의 주소를 쓴다 |
+| 로그인 후 동의 화면으로 안 돌아옴 | `dms_return_to` 쿠키가 600초 안에 소비되지 않음 — 로그인을 너무 오래 미룬 경우 |
+| "팀 디스코드 서버 멤버만 이용할 수 있습니다" | 위 디스코드 OAuth 절과 같은 원인 — MCP 도 같은 로그인을 탄다 |
+
+토큰은 access 1시간 · refresh 30일이고 무상태(JWT)라 개별 취소가 안 된다 — 사람이
+받기로 한 대가다 (`HANDOFF.md` 미룬 항목).

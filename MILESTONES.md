@@ -1610,7 +1610,7 @@ select created_by, count(*), min(created_at), max(created_at) from documents gro
 
 ---
 
-## MCP 서버 · 설계 완료 (2026-09-11) — 착수 전 · 사람 결정 3건 **확정**
+## MCP 서버 · 1단계 코드 완료 (2026-09-11) — 읽기 도구 4개 · **미배포 · 사람 확인 ⓐ~ⓖ 대기**
 
 Claude Code·Codex CLI 와 claude.ai·ChatGPT 웹에서 DMS 문서를 **찾아 읽고, 분석 결과를
 새 문서나 새 판으로 올리게** 한다. 존재 이유 셋 중 "어디 있는지 못 찾는다"의 연장이다 —
@@ -1813,6 +1813,67 @@ PUT 200 → `add_version` 201 → 화면에 v2 · 디스코드 알림 1건 ⓔ �
 1. OAuth + 읽기 도구 4개(search · list · get · download_url) — ⓐⓑⓒ와 ⓓ(다운로드) 실측
 2. `upload-commit` 추출 + 올리기 도구 5개 — ⓓ(업로드)
 3. ③ A 실측 → 결과로 B 를 열지 정한다
+
+### 1단계 구현 (2026-09-11) — 파이프라인 `mcp-read` · 코드 완료 · **미배포**
+
+브랜치 `pipeline/mcp-read` (`feature/mcp` 에서 분기). 설계 파일 29개 전부 만들어졌고
+범위 밖 소스 변경 0건. 신규 소스 16개 · 수정 3개(`proxy.ts` · `login/route.ts` ·
+`callback/route.ts`) · 문서 3개(`SETUP.md` MCP 연결 절 · `HANDOFF.md` 미룬 항목·디렉터리 ·
+이 절).
+
+**파이프라인 주행 기록** — 설계는 세션(Fable 5.1)이 미리 넣었고 design 단계는 안 돌았다.
+
+| 단계 | 모델 | 결과 | 비용 |
+|---|---|---|---|
+| judge 1차 | Fable 5.1 | BLOCKED — PowerShell 권한 거부 3건으로 실측 2건 미확인 + **반박 1건**(`withMcpAuth` 의 `resourceUrl` 은 origin, `protectedResourceHandler` 의 것은 자원 식별자 — 같은 이름, 다른 뜻) | $4.02 |
+| judge 2차 | Fable 5.1 | DONE — 확인 36 · 미확인 4 · 반박 0 (설계에 #9 반영 후) | $4.05 |
+| impl 1차 | Sonnet 5 | 사망 — 턴 상한 80. 코드는 다 나왔고 `git status` 를 Bash·PowerShell 로 번갈아 시도하다 턴 소진 | $4.17 |
+| impl 2차 | Sonnet 5 (`TURNS_IMPL=120`) | DONE — 기존 산출물 대조 검증, 코드 수정 0 | — |
+| verify | Opus 5 | BLOCKED — **결함 1건**: `POST /api/oauth/authorize` 의 `NextResponse.redirect` 가 기본값 **307** 이라 동의 폼 본문을 콜백에 POST 로 재전송한다(설계는 302). 실패 테스트로 잡음. 테스트 18파일 159건 작성 | — |
+
+**verify 이후는 세션이 직접 마무리했다** (사람 결정, 2026-09-11). 이유 둘 — ① 307 수정은
+3줄이고 ② verify 가 만든 테스트 11파일이 설계의 `TEST_FILES` 밖이라 파이프라인을 다시
+돌리면 범위 게이트가 죽인다. 살리려면 설계 수정 → judge 재실행($4) → 사람 게이트 2번인데,
+테스트 내용(401 헤더 주소 고정 · 길드 불변식 · `s3Key` 미노출)은 버릴 것이 아니었다.
+수정: `authorize/route.ts` 에 `redirectToClient = (url) => NextResponse.redirect(url, 302)`
+헬퍼를 두고 3곳을 바꿨다. 이유는 코드 주석에 있다.
+
+**파이프라인에서 배운 것 (하네스 결함, `HANDOFF.md` 파이프라인 결함 절과 같은 계열)**
+- 이 Windows PC 에서 에이전트가 PowerShell 도구를 고른다. `AGENT_TOOLS` 기본값은 `Bash(...)` 뿐이라 `npm test` 조차 거부됐다. `PowerShell(npm test:*)` 류를 같이 넣으면 judge 는 풀리지만, `cd "…"; git status` 같은 **복합 명령**은 여전히 거부돼 impl 이 턴을 태웠다.
+- `MODEL_LOG.md` 가 0바이트다 — 기록 함수가 실제 모델을 못 받아 적는다. 판정은 단계별 `result.json` 을 보므로 게이트에는 영향 없음. 원격 `main` 에서도 같은지 미확인.
+- 설계와 judge 가 **같은 모델**(Fable)이었다. 세션이 설계를 미리 넣을 때는 `MODEL_JUDGE=claude-opus-5` 로 갈라야 티어링 원칙에 맞는다. 그래도 #9 반박은 잡았다.
+- `approve.sh --relayed y` 는 Claude Code 권한 분류기가 "자동 모드 우회"로 막는다. 사람이 `!` 셸로 직접 쳐야 한다 — CLAUDE.md 의 "승인은 사람만" 과 같은 뜻이라 우회하지 않았다.
+
+### 검증 (2026-09-11, worktree)
+
+**[테스트 가능]** — 전부 통과. `npx vitest run` **50파일 663건**(기존 504 + 신규 159) ·
+`npm run lint` 통과 · `npm run build` 라우트 27개(신규 7: `/.well-known/*` 2 ·
+`/api/oauth/*` 3 · `/oauth/authorize` · `/api/mcp`) + `ƒ Proxy (Middleware)`.
+
+| 대상 | 케이스 수 | 고정한 것 |
+|---|---|---|
+| `oauth/redirect-uri` | 14 | 허용 5개 상수 일치 · https 완전일치 · 루프백 포트 무시 · `localhost.evil.com` 거부 |
+| `oauth/pkce` | 4 | RFC 7636 부록 B 벡터(judge #34 가 못 돌린 것 — 통과로 확인됨) |
+| `oauth/return-to` | 13 | `/oauth/authorize?` 외 전부 `/` · CR/LF · 외부 호스트 |
+| `oauth/tokens` | 15 | **aud 5×4 행렬** — 제자리만 통과 · TTL · 다른 키 거부 |
+| `oauth/authorize-request` · `metadata` | 5 · 3 | |
+| `mcp/tools` · `mcp/server` · `mcp/auth` | 19 · 16 · 6 | `versionNo desc` 로 최신 · `s3Key` 응답 미포함 · where 에 사용자·역할 조건 없음 · 세션형 토큰은 bearer 로 거부 |
+| `api/oauth/{register,authorize,token}` | 6 · 10 · 14 | 오류 코드 · `no-store` · 리프레시 회전·닉네임 재조회 · **302** |
+| `api/mcp` · `.well-known/*` | 2 · 3 | 401 헤더가 `…/.well-known/oauth-protected-resource` 를 가리킴(#9 재발 방지) · `resource` 가 호스트 헤더를 안 믿음 |
+| `proxy` · `api/auth/{login,callback}` | 16 · 5 · 8 | 공개 경로 4종 · 이름만 비슷한 경로는 보호 유지 · returnTo 쿠키 심기·소비·삭제 · 비길드는 returnTo 있어도 `/login` |
+
+**[사람 확인 필요]** — 배포 후. 체크리스트 전문은 `.pipeline/mcp-read/VERIFY.md`(git 밖)에
+있고 요지는 ⓐ Claude Code `claude mcp add --transport http dms <APP_URL>/api/mcp` → 동의 →
+`search_documents` ⓑ Codex ⓒ claude.ai 커넥터(DCR) — `invalid_redirect_uri` 면 허용 목록
+값(judge #31 추정)이 틀린 것 ⓓ 다운로드 URL curl 200, 5분 뒤 403 ⓔ 1시간 뒤 리프레시
+ⓖ 비길드 계정 차단. **추가로 ①**: 동의 "허용" 뒤 Network 탭에서 `POST /api/oauth/authorize`
+가 302 이고 콜백 요청이 GET 인지 — 이번에 고친 그 자리다.
+
+**verify 의 부수 관찰 (범위 밖, 기록)** — `proxy.ts:33`·`session.ts:38` 은 세션 쿠키를
+`aud` 없이 검증한다. MCP access 토큰을 `dms_session` 쿠키에 넣으면 프록시와 `getSession()`
+을 통과한다(`sub` 라 `id` 는 `undefined`, 보유자는 이미 길드 멤버 — 권한 상승 경로로는
+미확인). 반대 방향은 테스트가 막았다. 세션에 `aud` 를 넣으면 기존 세션이 전부 무효화되므로
+**사람 결정** 사항 — `HANDOFF.md` 미룬 항목 후보.
 
 ### 근거
 
