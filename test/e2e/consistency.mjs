@@ -83,6 +83,15 @@ const payload = {
   docs: DOCS,
 }
 
+// 대상 확인이 먼저다. 이 파일은 APP·DB 를 둘 다 env 로 받는데 **둘이 어긋날 수 있다** —
+// 실제로 겪었다(2026-09-12): APP 은 로컬, DB 는 운영을 보게 돌려서 앱은 201 을 냈는데
+// 조회가 아무것도 못 찾았고 정리도 0건이었다. 한쪽만 바꾸면 조용히 엇나간다.
+// `HANDOFF.md` 의 "운영 스크립트는 실행 전 대상 확인을 붙일 것" 이 이 자리다.
+const dbHost = (process.env.DATABASE_URL ?? '').match(/@([^/?]+)/)?.[1] ?? '(모름)'
+console.log(`■ 대상 APP : ${APP}`)
+console.log(`■ 대상 DB  : ${dbHost}`)
+console.log('■ 운영이면 vercel.app + ep-winter-meadow, 로컬이면 localhost + ep-aged-king 이어야 한다\n')
+
 const token = (await mintSession()).token
 const H = { 'Content-Type': 'application/json', Cookie: `dms_session=${token}` }
 const send = (body, headers = H) =>
