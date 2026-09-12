@@ -105,3 +105,88 @@ model DocumentTag {
   @@index([tagId])
   @@map("document_tags")
 }
+
+/// 정합성 저장소(`~/orca/Nyangmeong_care`)가 보낸 측정 1회. 덮어쓰지 않고 쌓는다.
+///
+/// **DMS 는 계산하지 않는다.** 문서 본문을 파싱하는 것은 저쪽 일이고 이쪽은 받아서
+/// 보관한다 — 서버가 html 을 읽기 시작하면 `preview.ts` 의 iframe 격리를 우회하는
+/// 경로가 생기고, 파서가 두 벌이 되면 갈린다(판번호 정규식에서 실제로 겪었다).
+model ConsistencySnapshot {
+  id              String   @id @default(cuid())
+  measuredAt      DateTime @map("measured_at")
+  reqVer          String   @map("req_ver")
+  errorCount      Int      @map("error_count")
+  warningCount    Int      @map("warning_count")
+  pendingCount    Int      @map("pending_count")
+  unresolvedCount Int      @map("unresolved_count")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  metrics  ConsistencyMetric[]
+  findings ConsistencyFinding[]
+  docs     ConsistencySnapshotDoc[]
+
+  /// 재전송 사고를 막는다. 측정 시각이 같으면 같은 측정이다 — 스크립트가 두 번 돌아도
+  /// 두 행이 되지 않는다. 위반은 P2002 로 오고 라우트가 409 로 바꾼다.
+  @@unique([measuredAt])
+  @@index([measuredAt(sort: Desc)])
+  @@map("consistency_snapshots")
+}
+
+/// 축별 분자/분모. **비율은 저장하지 않는다** — 어느 축이 "정합성"이냐는 판정이고
+/// 그 판정은 사람이 한다. 화면에서 나눈다.
+model ConsistencyMetric {
+  id         String  @id @default(cuid())
+  snapshotId String  @map("snapshot_id")
+  axis       String
+  /// axis = "reference" 일 때만 채워진다.
+  fromKind   String? @map("from_kind")
+  toKind     String? @map("to_kind")
+  ok         Int
+  total      Int
+
+  snapshot ConsistencySnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+
+  /// 같은 축이 두 번 들어오는 것을 막는 **보조** 수단이다. 포스트그레스는 유일 인덱스에서
+  /// NULL 을 서로 다른 값으로 보므로 from/to 가 null 인 축 4개(referenceTotal·reqCoverage·
+  /// reqCoverageWithDocs·scrCoverage)에는 **이 제약이 안 걸린다.** 진짜 방어는
+  /// `lib/consistency.ts` 의 중복 축 검사다.
+  @@unique([snapshotId, axis, fromKind, toKind])
+  @@map("consistency_metrics")
+}
+
+/// 검사가 발견한 것 1건. level 은 error·warning·pending·unresolved.
+model ConsistencyFinding {
+  id         String  @id @default(cuid())
+  snapshotId String  @map("snapshot_id")
+  level      String
+  check      String
+  doc        String
+  refId      String? @map("ref_id")
+  where      String?
+  message    String
+
+  snapshot ConsistencySnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+
+  @@index([snapshotId, level])
+  @@index([snapshotId, doc])
+  @@map("consistency_findings")
+}
+
+/// 이 측정에 쓴 문서와 그 판.
+///
+/// **`dmsId` 에 FK 를 걸지 않는다.** 문서는 하드 삭제되고(2026-09-09 통합에서 9건이
+/// 사라졌다) 스냅샷은 **그 시점의 기록**이라 남아야 한다. FK 를 걸면 문서 삭제가 과거
+/// 스냅샷을 깨거나 삭제 자체를 막는다. 링크는 "문서가 없으면 빼는" 쪽으로 그린다.
+model ConsistencySnapshotDoc {
+  id         String @id @default(cuid())
+  snapshotId String @map("snapshot_id")
+  key        String
+  ver        String
+  dmsId      String @map("dms_id")
+  dmsVersion Int    @map("dms_version")
+
+  snapshot ConsistencySnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+
+  @@unique([snapshotId, key])
+  @@map("consistency_snapshot_docs")
+}
