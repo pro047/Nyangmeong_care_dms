@@ -37,6 +37,20 @@ describe('formatRelative', () => {
   it('7일이 넘으면 날짜로 떨어진다', () => {
     expect(at('2026-08-20T12:00:00Z', 30 * 24 * 60)).toMatch(/2026년/)
   })
+
+  it('실행 머신이 UTC 여도 한국 날짜로 떨어져야 한다', () => {
+    // 운영(Vercel)은 UTC 인데 팀은 KST 다. 2026-08-26T20:00Z 는 한국에서 8월 27일 새벽
+    // 5시이므로 "8월 27일" 이어야 한다 — timeZone 을 안 박으면 UTC 로 8월 26일이 된다.
+    const tz = process.env.TZ
+    process.env.TZ = 'UTC'
+    try {
+      vi.useFakeTimers()
+      vi.setSystemTime(new Date('2026-09-30T00:00:00Z'))
+      expect(formatRelative(new Date('2026-08-26T20:00:00Z'))).toBe('2026년 8월 27일')
+    } finally {
+      process.env.TZ = tz
+    }
+  })
 })
 
 describe('formatDateTime', () => {
