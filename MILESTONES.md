@@ -1612,7 +1612,7 @@ select created_by, count(*), min(created_at), max(created_at) from documents gro
 
 ---
 
-## MCP 서버 · 1단계 코드 완료 (2026-09-11) — 읽기 도구 4개 · **미배포 · 사람 확인 ⓐ~ⓖ 대기**
+## MCP 서버 · 1단계 (2026-09-11 코드 · 2026-09-12 배포) — 읽기 도구 4개 · **운영 동작 확인됨 · ⓑⓔⓕⓖ 남음**
 
 Claude Code·Codex CLI 와 claude.ai·ChatGPT 웹에서 DMS 문서를 **찾아 읽고, 분석 결과를
 새 문서나 새 판으로 올리게** 한다. 존재 이유 셋 중 "어디 있는지 못 찾는다"의 연장이다 —
@@ -1875,6 +1875,7 @@ PUT 200 → `add_version` 201 → 화면에 v2 · 디스코드 알림 1건 ⓔ �
 값(judge #31 추정)이 틀린 것 ⓓ 다운로드 URL curl 200, 5분 뒤 403 ⓔ 1시간 뒤 리프레시
 ⓖ 비길드 계정 차단. **추가로 ①**: 동의 "허용" 뒤 Network 탭에서 `POST /api/oauth/authorize`
 가 302 이고 콜백 요청이 GET 인지 — 이번에 고친 그 자리다.
+**결과는 아래 §'배포와 사람 확인'에 있다.**
 
 **verify 의 부수 관찰 (범위 밖, 기록)** — `proxy.ts:33`·`session.ts:38` 은 세션 쿠키를
 `aud` 없이 검증한다. MCP access 토큰을 `dms_session` 쿠키에 넣으면 프록시와 `getSession()`
@@ -1910,6 +1911,33 @@ eslint(변경 영역) · `npm run build` 라우트 27개 + `ƒ Proxy (Middleware
 `frame-ancestors` 없음(2 — Lax 쿠키라 교차 iframe 에서 세션이 안 실린다). 범위 밖 참고:
 `upload-token.ts` 도 원문 `AUTH_SECRET` 이라 세션 서명 검증을 통과하지만, 멤버에게만
 5분짜리로 나가고 `id` 가 없어 상승 경로는 미확인.
+
+### 배포와 사람 확인 (2026-09-12) — 운영에서 통과 6 · 남음 4
+
+PR #1 → `main` 머지(`c2e658d`) → Vercel Production 배포 `success`. 운영 URL
+`https://nyangmeong-care-dms.vercel.app`.
+
+| # | 확인 | 결과 |
+|---|---|---|
+| ⓪ | 기존 웹 로그인 유지 (재로그인 없이 목록) | **통과** — 키 분리가 세션에 영향 없음이 운영에서 확인됨 |
+| ⓐ | Claude Code `claude mcp add` → 동의 → `search_documents` | **통과** — 문서 5건·폴더 24개. 응답에 `s3Key` 없음 · `versionNo` 최신 · 휴지통 제외가 운영 응답에서 확인됨 |
+| ① | 동의 POST 302 · 콜백 GET | **간접 통과** — 인증이 끝까지 성공했다. 307 이었다면 콜백이 POST 를 받아 거기서 끊긴다. Network 탭으로는 못 봤다(동의가 새 탭에서 열려 devtools 가 안 붙었다) |
+| ⓒ | claude.ai 커스텀 커넥터(DCR) | **통과** — 추가 화면에서 인증 `지금 로그인`·클라이언트 `자동으로 등록`이 **"감지됨"** 으로 떴다(= 우리 401 챌린지와 `registration_endpoint` 를 저쪽이 읽었다는 뜻). 연결 후 도구 4개 노출, 채팅에서 검색·URL 발급 동작 |
+| ⓓ | 다운로드 URL 200 → 5분 뒤 403 | **통과** — 발급 직후 206(앞 100바이트만 요청), 320초 뒤 **403** |
+| ✚ | `client_id` 를 `dms_session` 쿠키에 넣기 | **통과(차단됨)** — `/` 와 다운로드 API 모두 401, 쿠키 없음·`garbage` 쿠키와 같은 응답 |
+| ⓑ | Codex CLI | **미확인** |
+| ⓔ | 1시간 뒤 리프레시 | **미확인** — 액세스 만료를 기다려야 한다 |
+| ⓕ | ③ A 실측 (claude.ai 샌드박스가 S3 에 직접 붙는가) | **판정 불가** — 아래 |
+| ⓖ | 비길드 계정 차단 | **미확인** — 부계정이 없다. 코드·테스트로만 확인됨(`callback/route.ts:25`, `route.test.ts:67`) |
+
+**ⓕ 1차 시도는 판정이 안 된다.** claude.ai 가 "웹 가져오기 도구가 이 링크를 못 열고,
+컨테이너 네트워크 허용 목록에 S3 도메인이 없으며, 5분짜리라 만료됐을 수 있다"고 답했다 —
+**막힌 이유 둘이 섞여 있다.** 가르려면 허용 목록에 버킷 도메인
+(`nm-care-…-an.s3.ap-northeast-2.amazonaws.com`)을 넣고 **새 URL 을 받아 즉시** 시도해야
+한다. 그 전에는 A 가 안 된다고 적지 말 것 — B(서버 중계)를 여는 근거로 쓸 수 없다.
+
+**운영 스모크에서 발급한 흔적** — 검증용으로 `client_name=regression-check` 인 `client_id`
+하나를 운영에서 발급했다. 무상태라 DB 에 남지 않고, 동의를 안 지났으므로 권한이 없다.
 
 **문제없음으로 확인한 것** (리뷰 에이전트 실측) — `mcp-handler@2.1.1` 은 `basePath` 를
 비교하지 않고 stateless 핸들러로 넘겨서 `/api/mcp` 경로에서 404 가 나지 않는다 ·
