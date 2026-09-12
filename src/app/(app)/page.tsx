@@ -3,6 +3,9 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { UploadDialog } from '@/components/upload-dialog'
 import { DocumentTable } from '@/components/document-table'
+import { ConsistencyPanel } from '@/components/consistency-panel'
+import { measuredAgo } from '@/lib/consistency-view'
+import { formatDateTime } from '@/lib/format'
 import { prisma } from '@/lib/prisma'
 import { activeDocumentWhere } from '@/lib/trash'
 import { folderFilterWhere, tagFilterWhere } from '@/lib/search'
@@ -40,6 +43,31 @@ async function getDocuments(where: Prisma.DocumentWhereInput) {
         take: 1,
         include: { uploadedBy: { select: { username: true } } },
       },
+    },
+  })
+}
+
+/**
+ * 최신 측정 1건. **`measuredAt` 으로 고른다 — `createdAt` 이 아니다.** 전송 시각과 측정
+ * 시각은 다르고, 저쪽이 오래된 측정을 뒤늦게 보내면 순서가 뒤집힌다.
+ *
+ * `findings` 149행이 그대로 HTML 에 실린다. 필터를 클라이언트에서 하기 때문인데, 여기가
+ * 메인이라 searchParams 로 거르면 필터 한 번에 문서 목록까지 전부 다시 조회된다.
+ */
+async function latestConsistencySnapshot() {
+  return prisma.consistencySnapshot.findFirst({
+    orderBy: { measuredAt: 'desc' },
+    include: {
+      // **셋 다 orderBy 를 건다.** `ORDER BY` 가 없으면 순서는 실행계획에 달린다 —
+      // 지금은 행이 적어 Seq Scan 이라 삽입 순서로 나오지만, 스냅샷이 쌓이면 플래너가
+      // `@@index([snapshotId, level])` 을 타서 **등급별로 묶여** 나온다. 그러면 저쪽
+      // 보고서와 대조가 안 되고 새로고침마다 순서가 흔들릴 수 있다.
+      //
+      // `id` 로 거는 이유: cuid 는 시각 접두사라 한 번의 중첩 create 안에서 삽입 순으로
+      // 정렬된다(실측). 축 순서는 의미가 있어 axis 로 따로 건다 — 저쪽이 보낸 순서와 같다.
+      metrics: { orderBy: [{ axis: 'asc' }, { fromKind: 'asc' }, { toKind: 'asc' }] },
+      findings: { orderBy: { id: 'asc' } },
+      docs: { orderBy: { key: 'asc' } },
     },
   })
 }
@@ -96,7 +124,9 @@ export default async function DocumentsPage({
   // 아니다. 후보를 화면에 그린 집합에서 뽑으면 필터가 좁힌 만큼 판정이 빠진다.
   // 구버전 판정(latestCandidateQuery)과 조회를 합치지 않는 이유는 latest.ts 주석에 있다:
   // 두 판정이 한 조회를 공유하면 한쪽 요구로 컬럼을 고칠 때 다른 쪽이 조용히 따라 바뀐다.
-  const [documents, latestRows, similarRows] = await Promise.all([
+  // 정합성 스냅샷도 같이 읽는다. 측정이 한 번도 안 왔으면 null 이고 그때는 아무것도 안 그린다 —
+  // 빈 상자를 띄우면 "지표가 0" 으로 읽힌다.
+  const [documents, latestRows, similarRows, snapshot, activeRows] = await Promise.all([
     getDocuments({
       AND: [
         activeDocumentWhere(),
@@ -106,8 +136,16 @@ export default async function DocumentsPage({
     }),
     prisma.document.findMany(latestCandidateQuery()),
     prisma.document.findMany(similarCandidateQuery()),
+    latestConsistencySnapshot(),
+    // 링크를 걸 수 있는지 판정할 집합. dmsId 에 FK 가 없어 사라진 문서가 섞여 있다.
+    // **`latestCandidateQuery()` 를 재사용하지 않는다** — 그쪽은 폴더 기반 구버전 판정용이고
+    // `latest.ts` 가 "두 판정이 한 조회를 공유하면 한쪽 요구로 컬럼을 고칠 때 다른 쪽이
+    // 조용히 따라 바뀐다"고 못박아 뒀다. 실제로 그 조회에 `folderId: { not: null }` 을
+    // 더하는 것이 당연한 다음 수인데, 공유했다면 미분류 문서의 링크가 말없이 사라진다.
+    prisma.document.findMany({ where: activeDocumentWhere(), select: { id: true } }),
   ])
   const supersededIds = supersededDocumentIds(latestRows)
+  const activeDocumentIds = new Set(activeRows.map((row) => row.id))
 
   const activeTag = typeof tag === 'string' && tag !== '' ? tag : null
   const filtered = activeFolder !== null || activeTag !== null
@@ -167,6 +205,21 @@ export default async function DocumentsPage({
         <p className="mb-5 rounded-lg border border-danger/20 bg-danger-soft px-3.5 py-2.5 text-sm text-danger">
           {errorMessage}
         </p>
+      )}
+
+      {/* 필터를 걸어도 그대로 둔다 — 측정은 폴더·태그와 무관하게 전체 문서를 본 결과라
+          목록이 좁아졌다고 지표를 감추면 숫자가 그 폴더 것으로 읽힌다. */}
+      {snapshot && (
+        <ConsistencyPanel
+          snapshot={{
+            ...snapshot,
+            // 시각 포매팅은 서버에서 끝낸다 — 패널이 클라이언트라 여기서 안 하면
+            // 하이드레이션에서 TZ 와 Date.now() 가 갈린다.
+            measuredLabel: formatDateTime(snapshot.measuredAt),
+            agoLabel: measuredAgo(snapshot.measuredAt, new Date()),
+          }}
+          activeDocumentIds={activeDocumentIds}
+        />
       )}
 
       {/* 문서가 없어도 자식 폴더가 있으면 표를 그린다 — 자식이 있는데 점선 박스를 띄우면

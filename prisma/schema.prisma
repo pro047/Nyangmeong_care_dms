@@ -112,8 +112,21 @@ model DocumentTag {
 /// 보관한다 — 서버가 html 을 읽기 시작하면 `preview.ts` 의 iframe 격리를 우회하는
 /// 경로가 생기고, 파서가 두 벌이 되면 갈린다(판번호 정규식에서 실제로 겪었다).
 model ConsistencySnapshot {
-  id              String   @id @default(cuid())
-  measuredAt      DateTime @map("measured_at")
+  id String @id @default(cuid())
+
+  /// 이 앱에서 유일하게 **외부에서 타임존을 달고 들어오는** 시각이라 `timestamptz` 다.
+  /// 나머지 시각 컬럼(`created_at` 등)은 `timestamp` 이고 UTC 벽시계로 들어 있다.
+  ///
+  /// **화면 버그를 고치려고 바꾼 것이 아니다** (2026-09-13 실측). `timestamp` 로 되돌려도
+  /// 화면은 맞게 나온다 — 쓰는 쪽(Prisma)과 읽는 쪽(node-postgres)이 같은 TZ 면 두 오차가
+  /// 상쇄되기 때문이다. 사는 것은 **다른 경로로 읽을 때의 모호함**이다: `::text`·psql 로 읽은
+  /// 값이 UTC 인지 로컬인지 갈리지 않고(2026-08-26 에 그 모호함으로 사건 순서를 오판했다),
+  /// 이 컬럼을 **키로 쓰는 쿼리가 안 어긋난다**(E2E 정리가 0행을 지우고도 0행 남았다고
+  /// 보고한 적이 있다).
+  ///
+  /// 타입을 바꿀 때 `USING measured_at AT TIME ZONE 'UTC'` 를 빼지 말 것 — Prisma 가
+  /// 생성하는 SQL 에는 없어서 세션 타임존에 기댄다.
+  measuredAt      DateTime @map("measured_at") @db.Timestamptz(3)
   reqVer          String   @map("req_ver")
   errorCount      Int      @map("error_count")
   warningCount    Int      @map("warning_count")
