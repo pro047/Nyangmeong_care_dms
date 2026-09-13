@@ -104,9 +104,9 @@ export function kindLabel(kind: string | null): string {
  */
 const AXIS_LABEL: Record<string, string> = {
   [AXIS.referenceTotal]: '가리킨 ID 가 실제로 있나',
-  [AXIS.reqCoverage]: '요구사항이 화면·기능에 나오나',
+  [AXIS.reqCoverage]: '요구사항이 화면설계서·기능명세서에 나오나',
   [AXIS.reqCoverageWithDocs]: '화면설계서가 있을 수 있는 것만',
-  [AXIS.scrCoverage]: '화면이 기능명세서에 나오나',
+  [AXIS.scrCoverage]: '화면설계서의 화면이 기능명세서에 나오나',
   [AXIS.triangle]: '연결이 서로 어긋나는 곳',
 }
 
