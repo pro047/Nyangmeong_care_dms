@@ -862,8 +862,13 @@ UI 작업은 터널 없이도 진행할 수 있다.
    표는 `MILESTONES.md` §'배포와 사람 확인'.
    **남은 것**: ⓑ Codex · ⓔ 1시간 뒤 리프레시 · ⓖ 비길드 차단(부계정이 없어 미확인) ·
    ⓕ ③ A 실측(**판정 불가** — claude.ai 컨테이너 허용 목록과 5분 만료가 섞였다. 허용 목록에
-   버킷 도메인을 넣고 새 URL 로 즉시 재시도해야 가른다) →
-   2단계(`upload-commit.ts` 추출 + 올리기 도구 5개) → 3단계(ⓕ 결과로 B 를 열지 정한다).
+   버킷 도메인을 넣고 새 URL 로 즉시 재시도해야 가른다) → 3단계(ⓕ 결과로 B 를 열지 정한다).
+   **2단계는 코드가 끝났다 (2026-09-13, 브랜치 `feature/mcp-upload` · 미배포).**
+   `upload-commit.ts` 추출 + 올리기 도구 5개. 파이프라인 `mcp-upload` 로 돌렸고
+   `/code-review high` 6건(전부 도구 경로 — 없는 folderId 500·null folderId 거부·고아
+   객체 안내 없음 등)을 반영했다. vitest 815·lint·build 통과. 전문은 `MILESTONES.md`
+   §'2단계 구현'. **남은 것은 배포와 [사람 확인 필요] 9가지**(실제 PUT·알림·403 문구·
+   discard 실제 삭제·suggestedFolder 대조·화면 회귀) 이고 셸이 못 돌린다.
    **`CLAUDE.md` 인증 절에 MCP 한 줄은 아직 안 넣었다**(보호 파일 — 사람이 세션에서).
    worktree `../Nyangmeong_care_dms-pipeline-mcp-read` 와 브랜치 `pipeline/mcp-read` 는
    `feature/mcp` 에 합쳐졌으므로 지워도 된다(`.pipeline/mcp-read/` 산출물은 git 밖 —
