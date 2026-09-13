@@ -17,6 +17,8 @@ export const AXIS = {
   reqCoverage: 'reqCoverage',
   reqCoverageWithDocs: 'reqCoverageWithDocs',
   scrCoverage: 'scrCoverage',
+  triangle: 'triangle',
+  scrFuncCoverage: 'scrFuncCoverage',
 } as const
 
 export type MetricRow = {
@@ -105,6 +107,7 @@ const AXIS_LABEL: Record<string, string> = {
   [AXIS.reqCoverage]: '요구사항이 화면·기능에 나오나',
   [AXIS.reqCoverageWithDocs]: '화면설계서가 있을 수 있는 것만',
   [AXIS.scrCoverage]: '화면이 기능명세서에 나오나',
+  [AXIS.triangle]: '연결이 서로 어긋나는 곳',
 }
 
 /**
@@ -127,6 +130,7 @@ function axisKey(metric: MetricRow): string {
  * 온 9행이 같은 이름으로 아홉 번 나와 어느 문서 것인지 알 수 없다.
  */
 function fallbackLabel(metric: MetricRow): string {
+  if (metric.axis === AXIS.scrFuncCoverage && metric.toKind !== null) return metric.toKind
   const known = AXIS_LABEL[metric.axis]
   if (known !== undefined) return known
   const scope = [metric.fromKind, metric.toKind].filter((part) => part !== null).join('→')
@@ -150,6 +154,8 @@ export type AxisGroups = {
   total: AxisView | null
   /** `reference` 5줄. 저쪽이 보낸 순서를 그대로 쓴다. */
   reference: AxisView[]
+  triangle: AxisView | null
+  scrFuncCoverage: AxisView[]
   /**
    * 커버리지 3축. `reqNarrow`(분모 62)와 `reqWide`(분모 50)는 **반드시 나란히** 그린다 —
    * 짝이 아니라 두 필드로 둔 이유가 그것이다. 리스트로 두면 순서가 흔들려 떨어질 수 있다.
@@ -183,14 +189,23 @@ export function axisGroups(metrics: MetricRow[]): AxisGroups {
     scr: pick(AXIS.scrCoverage),
   }
   const total = pick(AXIS.referenceTotal)
+  const triangle = pick(AXIS.triangle)
+  const scrFuncCoverage = views
+    .filter((_, i) => metrics[i].axis === AXIS.scrFuncCoverage)
+    .sort((a, b) => {
+      // 분모가 없는 행은 0%로 취급하지 않고 비율이 있는 행 뒤에 둔다.
+      if (a.percent === null && b.percent !== null) return 1
+      if (a.percent !== null && b.percent === null) return -1
+      return (a.percent ?? 0) - (b.percent ?? 0) || a.label.localeCompare(b.label)
+    })
 
   const claimed = new Set(
-    [total, ...Object.values(coverage), ...reference]
+    [total, triangle, ...Object.values(coverage), ...reference, ...scrFuncCoverage]
       .filter((view) => view !== null)
       .map((view) => view.key),
   )
 
-  return { total, reference, coverage, others: views.filter((view) => !claimed.has(view.key)) }
+  return { total, reference, coverage, triangle, scrFuncCoverage, others: views.filter((view) => !claimed.has(view.key)) }
 }
 
 export type FindingRow = {

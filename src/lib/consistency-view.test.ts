@@ -125,11 +125,60 @@ describe('axisGroups', () => {
     ]
     const groups = axisGroups(perDoc)
 
-    expect(groups.others).toHaveLength(4)
-    expect(new Set(groups.others.map((view) => view.key)).size).toBe(4)
+    expect(groups.others).toHaveLength(0)
+    expect(groups.scrFuncCoverage).toHaveLength(4)
+    expect(new Set(groups.scrFuncCoverage.map((view) => view.key)).size).toBe(4)
     // 라벨도 갈려야 한다 — 넷이 같은 이름이면 어느 문서 것인지 알 수 없다.
-    expect(new Set(groups.others.map((view) => view.label)).size).toBe(4)
-    expect(groups.others[2]).toMatchObject({ ok: 0, total: 4, gap: 4 })
+    expect(groups.scrFuncCoverage.map((view) => view.label)).toEqual([
+      'SCR-MAN', 'SCR-CMU', 'SCR-ACC', 'SCR-MYP',
+    ])
+    expect(groups.scrFuncCoverage[0]).toMatchObject({ ok: 0, total: 4, gap: 4 })
+  })
+
+  it('삼각 축과 문서별 9행을 제자리에 두어 19축을 전부 보존해야 한다', () => {
+    const perDoc: MetricRow[] = [
+      ['SCR-ACC', 51, 69], ['SCR-AIM', 22, 44], ['SCR-CMU', 15, 71],
+      ['SCR-COM', 16, 24], ['SCR-CSC', 2, 11], ['SCR-HLT', 31, 34],
+      ['SCR-MAN', 0, 4], ['SCR-MYP', 98, 98], ['SCR-PLC', 31, 31],
+    ].map(([toKind, ok, total]) => ({
+      axis: AXIS.scrFuncCoverage, fromKind: null, toKind: toKind as string,
+      ok: ok as number, total: total as number,
+    }))
+    const groups = axisGroups([
+      ...METRICS,
+      { axis: AXIS.triangle, fromKind: null, toKind: null, ok: 653, total: 660 },
+      ...perDoc.reverse(),
+    ])
+
+    expect(groups.triangle).toMatchObject({
+      key: 'triangle', label: '연결이 서로 어긋나는 곳', ok: 653, total: 660, gap: 7,
+    })
+    expect(groups.scrFuncCoverage.map((view) => view.label)).toEqual([
+      'SCR-MAN', 'SCR-CSC', 'SCR-CMU', 'SCR-AIM', 'SCR-COM',
+      'SCR-ACC', 'SCR-HLT', 'SCR-MYP', 'SCR-PLC',
+    ])
+    const seen = [groups.total, groups.triangle, ...groups.reference,
+      ...Object.values(groups.coverage), ...groups.scrFuncCoverage, ...groups.others]
+      .filter((view) => view !== null)
+    expect(seen).toHaveLength(19)
+    expect(new Set(seen.map((view) => view.key)).size).toBe(19)
+    expect(groups.others).toEqual([])
+  })
+
+  it('문서별 비율이 없으면 0%와 구별하여 뒤에 두고 동률은 문서 키로 정렬한다', () => {
+    const metrics: MetricRow[] = [
+      { axis: AXIS.scrFuncCoverage, fromKind: null, toKind: 'SCR-Z', ok: 0, total: 0 },
+      { axis: AXIS.scrFuncCoverage, fromKind: null, toKind: 'SCR-B', ok: 2, total: 4 },
+      { axis: AXIS.scrFuncCoverage, fromKind: null, toKind: 'SCR-A', ok: 1, total: 2 },
+      { axis: AXIS.scrFuncCoverage, fromKind: null, toKind: 'SCR-C', ok: 0, total: 3 },
+      { axis: AXIS.scrFuncCoverage, fromKind: null, toKind: 'SCR-Y', ok: 0, total: 0 },
+    ]
+    const before = structuredClone(metrics)
+    const views = axisGroups(metrics).scrFuncCoverage
+
+    expect(views.map((view) => view.label)).toEqual(['SCR-C', 'SCR-A', 'SCR-B', 'SCR-Y', 'SCR-Z'])
+    expect(views[3].percent).toBeNull()
+    expect(metrics).toEqual(before)
   })
 
   it('from·to 가 둘 다 null 인 축은 키가 축 이름 그대로여야 한다', () => {
@@ -144,6 +193,8 @@ describe('axisGroups', () => {
     const groups = axisGroups([METRICS[0]])
 
     expect(groups.total).toBeNull()
+    expect(groups.triangle).toBeNull()
+    expect(groups.scrFuncCoverage).toEqual([])
     expect(groups.coverage).toEqual({ reqNarrow: null, reqWide: null, scr: null })
     expect(groups.reference).toHaveLength(1)
   })

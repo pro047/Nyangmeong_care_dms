@@ -96,8 +96,8 @@ function MeterRow({
 }) {
   return (
     <div className={indent ? 'pl-3' : undefined}>
-      <div className="flex items-baseline justify-between gap-3">
-        <p className={`min-w-0 truncate text-xs ${strong ? 'text-ink' : 'text-ink-muted'}`}>
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <p className={`min-w-0 text-xs ${strong ? 'text-ink' : 'text-ink-muted'}`}>
           {indent && <span className="mr-1 text-ink-subtle">└</span>}
           {label ?? view.label}
         </p>
@@ -106,7 +106,7 @@ function MeterRow({
             {view.ok}/{view.total}
           </span>{' '}
           <span className="tabular-nums text-ink-subtle">
-            {view.gap === 0 ? '전부 확인됨' : `${view.gap}개 ${gapNoun}`}
+            {view.gap === 0 ? '전부 확인됨' : gapNoun === '곳' ? `${view.gap}곳 어긋남` : `${view.gap}개 ${gapNoun}`}
           </span>
           {/* 저쪽 보고서는 비율로 적혀 있다. 붙여서 대조가 되게 하되 주인공은 개수다 —
               비율만 따로 모아 두면 어느 숫자가 어느 축인지 알 수 없다. */}
@@ -192,6 +192,7 @@ export function ConsistencyPanel({
   activeDocumentIds: ReadonlySet<string>
 }) {
   const [open, setOpen] = useState(false)
+  const [docsOpen, setDocsOpen] = useState(false)
   const [raw, setRaw] = useState<FindingFilter>(EMPTY_FILTER)
 
   const groups = axisGroups(snapshot.metrics)
@@ -220,10 +221,10 @@ export function ConsistencyPanel({
         </p>
       </div>
 
-      <div className="grid gap-3 p-4 lg:grid-cols-[minmax(0,12rem)_minmax(0,1.15fr)_minmax(0,1fr)]">
+      <div className="grid gap-3 p-4 lg:grid-cols-[minmax(0,12rem)_minmax(0,1.5fr)_minmax(0,1fr)]">
         {/* 히어로 + 등급 내역. findings 목록을 여는 자리이기도 하다. */}
         <section className="flex min-w-0 flex-col rounded-lg border border-border bg-canvas p-3">
-          <h3 className="text-xs font-semibold text-ink">사람이 볼 항목</h3>
+          <h3 className="text-xs font-semibold text-ink">검사가 찾은 것</h3>
           {/* 히어로에는 tabular-nums 를 쓰지 않는다 — 큰 글자에서 자간이 벌어진다. */}
           <p className="mt-0.5 text-5xl font-semibold leading-none text-ink">
             {snapshot.findings.length}
@@ -247,7 +248,8 @@ export function ConsistencyPanel({
           </button>
         </section>
 
-        <Card title="가리킨 ID 가 실제로 있나">
+        <Card title="문서 사이 연결">
+          <p className="text-xs text-ink-muted">적어 놓은 ID 가 실제로 있나</p>
           {groups.total && <MeterRow view={groups.total} label="전체" gapNoun="없음" strong />}
           {groups.reference.length > 0 && (
             <div className="grid gap-2 border-t border-border pt-2.5">
@@ -256,9 +258,14 @@ export function ConsistencyPanel({
               ))}
             </div>
           )}
+          {groups.triangle && (
+            <div className="border-t border-border pt-2.5" title="양 끝이 다 적혀 있는 쌍만 셉니다">
+              <MeterRow view={groups.triangle} gapNoun="곳" />
+            </div>
+          )}
         </Card>
 
-        <Card title="정의만 해 놓고 안 쓴 것이 있나">
+        <Card title="참고: 아직 안 쓴 것">
           {/* 두 REQ 축은 반드시 나란히. 25개만 보이면 오해다 — 그중 12건은 관리자·비기능이라
               화면설계서가 있을 수 없고 5건은 신규다. 좁은 분모를 바로 아래 들여쓰기로 붙여
               "같은 것을 다르게 센 값"임이 보이게 한다. */}
@@ -283,6 +290,36 @@ export function ConsistencyPanel({
           )}
         </Card>
       </div>
+
+      {groups.scrFuncCoverage.length > 0 && (
+        <div className="border-t border-border px-4 py-2.5">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <h3 className="text-xs font-semibold text-ink">화면의 기능이 기능명세서에 옮겨졌나</h3>
+            <p className="text-xs text-ink-muted">
+              문서 {groups.scrFuncCoverage.length}개 · 검사한 항목 {groups.scrFuncCoverage.reduce((sum, view) => sum + view.total, 0)}개
+            </p>
+            <button
+              type="button"
+              onClick={() => setDocsOpen(!docsOpen)}
+              aria-expanded={docsOpen}
+              className="ml-auto flex items-center gap-1 rounded-md border border-border bg-surface px-2 py-1.5 text-xs text-ink-muted hover:bg-accent-soft hover:text-ink"
+            >
+              {docsOpen ? '문서별 접기' : '문서별 보기'}
+              <ChevronDown className={`h-3.5 w-3.5 ${docsOpen ? 'rotate-180' : ''}`} aria-hidden />
+            </button>
+          </div>
+          {docsOpen && (
+            <div className="mt-3 grid gap-2.5">
+              {groups.scrFuncCoverage.map((view) => (
+                <MeterRow key={view.key} view={view} gapNoun="아직 안 나옴" />
+              ))}
+              <p className="text-xs text-ink-subtle">
+                낮다고 틀린 것이 아닙니다 — 문서마다 기능을 적는 방식이 다릅니다
+              </p>
+            </div>
+          )}
+        </div>
+      )}
 
       {open && (
         <div className="border-t border-border">
