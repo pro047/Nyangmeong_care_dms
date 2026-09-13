@@ -162,13 +162,28 @@ try {
   check('V4', 'REQ 커버리지 두 분모가 같이 보인다',
     text.includes('59.68%') && text.includes('74.00%'))
 
-  // 신호등 금지. errors 14 는 "14개가 잘못됐다" 가 아니라 "14개를 사람이 봐야 한다" 다.
+  // 신호등 금지. 확인 필요 14 는 "14개가 잘못됐다" 가 아니라 "14개를 사람이 봐야 한다" 다.
   const dangerish = await band.locator('[class*="danger"], [class*="success"]').count()
   check('V8', '밴드에 신호등(빨강·초록)이 없다', dangerish === 0, `색 요소 ${dangerish}개`)
 
+  // 화면이 영문 약어·화살표로 말하지 않아야 한다 — 팀원 7명이 보는 화면이다.
+  const jargon = ['FN→', 'SCR→', '→REQ', 'error', 'warning', 'unresolved 2', 'REQ 커버리지']
+  const found = jargon.filter((word) => text.includes(word))
+  check('V12', '지표 이름이 영문 약어·화살표가 아니다', found.length === 0,
+    `남은 것: ${found.join(', ') || '없음'}`)
+
+  // 못 채운 개수를 직접 보여줘야 한다. 94.83% 는 사람이 뺄셈을 해야 3개가 나온다.
+  check('V13', '못 맞은 개수를 숫자로 보여준다',
+    text.includes('16개 없음') && text.includes('3개 없음') && text.includes('13개 없음'),
+    text.split('\n').filter((line) => line.includes('개 없음')).join(' / ') || '(없음)')
+
+  // 한국어 등급. "오류" 가 아니라 "확인 필요" 다 — 판정하지 않는 한국어를 고른다.
+  check('V14', '등급이 한국어다',
+    ['확인 필요', '참고', '보류', '미해결'].every((word) => text.includes(word)))
+
   await page.screenshot({ path: 'test/e2e/shots/CV-collapsed.png' })
 
-  await page.getByRole('button', { name: /149건/ }).click()
+  await page.getByRole('button', { name: '목록 보기' }).click()
   await page.waitForTimeout(200)
   const allRows = await band.locator('tbody tr').count()
   check('V5', 'findings 149건이 펼치면 전부 나온다', allRows === 149, `${allRows}행`)

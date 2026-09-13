@@ -35,6 +35,11 @@ export type AxisView = {
   total: number
   /** 0~100. total 이 0 이면 null — "0%" 로 그리면 분모가 없는 것과 전부 틀린 것이 같아 보인다. */
   percent: number | null
+  /**
+   * 아직 안 맞는 개수. **화면이 실제로 읽는 숫자는 이쪽이다.**
+   * `94.83%` 는 사람이 뺄셈을 해야 "3개" 가 나오는데, 할 일은 그 3개다.
+   */
+  gap: number
 }
 
 /**
@@ -51,27 +56,55 @@ export function formatPercent(percent: number | null): string {
   return percent === null ? '—' : `${percent.toFixed(2)}%`
 }
 
-const KIND_LABEL: Record<string, string> = {
+/** ID 를 **쓴 쪽**. 문서 이름으로 읽어야 "어느 파일을 열어야 하나"가 바로 나온다. */
+const SOURCE_LABEL: Record<string, string> = {
+  REQ: '요구사항정의서',
+  FN: '기능명세서',
+  SCR: '화면설계서',
+}
+
+/** ID 가 **정의된 쪽**. 여기는 문서가 아니라 대상의 종류라 짧게 쓴다. */
+const TARGET_LABEL: Record<string, string> = {
   REQ: '요구사항',
   FN: '기능',
   SCR: '화면',
 }
 
-/** `FN→SCR` 처럼 원문 기호를 유지한다. 한글로 풀면 저쪽 보고서와 대조가 안 된다. */
+/**
+ * `FN→SCR` 을 *"기능명세서가 쓴 화면 ID"* 로 읽는다.
+ *
+ * **화살표와 영문 약어를 쓰지 않는다** (2026-09-13). 이 화면은 개발자가 아니라 팀원 7명이
+ * 보고, `CLAUDE.md` 가 "UI 문구는 한국어"로 못박아 뒀다. 원문 기호를 남겨 저쪽 보고서와
+ * 대조하려던 것은 **개발자 한 명의 사정**이었다 — 대조는 숫자(`55/58`)로 되고, 축 이름까지
+ * 영문일 이유가 없다.
+ *
+ * `SCR→SCR` 만 "다른 화면"이다. 같은 종류끼리면 자기 자신을 가리키는 것처럼 읽힌다.
+ */
 export function referenceLabel(fromKind: string | null, toKind: string | null): string {
-  return `${fromKind ?? '?'}→${toKind ?? '?'}`
+  const source = fromKind === null ? '?' : (SOURCE_LABEL[fromKind] ?? fromKind)
+  const target = toKind === null ? '?' : (TARGET_LABEL[toKind] ?? toKind)
+  const same = fromKind !== null && fromKind === toKind
+  return `${source}가 쓴 ${same ? '다른 ' : ''}${target} ID`
 }
 
 /** 한글 이름이 필요한 자리(툴팁 등)를 위해 따로 둔다. */
 export function kindLabel(kind: string | null): string {
-  return kind === null ? '?' : (KIND_LABEL[kind] ?? kind)
+  return kind === null ? '?' : (TARGET_LABEL[kind] ?? kind)
 }
 
+/**
+ * 나머지 축도 **질문 문장**으로 읽는다 — `REQ 커버리지` 는 용어를 아는 사람만 읽지만
+ * *"요구사항이 화면·기능에 나오나"* 는 아무나 읽는다.
+ *
+ * `reqCoverageWithDocs` 의 라벨이 분모를 설명하는 이유: 62 와 50 의 차이가 이 화면에서
+ * 가장 오해받기 쉬운 자리다. 빠진 25건 중 12건은 관리자·비기능이라 화면설계서가 있을 수
+ * 없고 5건은 신규다 — **실제 판정 대상은 8건**이라는 것이 두 줄을 나란히 둔 이유다.
+ */
 const AXIS_LABEL: Record<string, string> = {
-  [AXIS.referenceTotal]: '참조 합계',
-  [AXIS.reqCoverage]: 'REQ 커버리지',
-  [AXIS.reqCoverageWithDocs]: 'REQ 커버리지 (문서 있는 것만)',
-  [AXIS.scrCoverage]: 'SCR 커버리지',
+  [AXIS.referenceTotal]: '가리킨 ID 가 실제로 있나',
+  [AXIS.reqCoverage]: '요구사항이 화면·기능에 나오나',
+  [AXIS.reqCoverageWithDocs]: '화면설계서가 있을 수 있는 것만',
+  [AXIS.scrCoverage]: '화면이 기능명세서에 나오나',
 }
 
 function toView(metric: MetricRow): AxisView {
@@ -86,6 +119,7 @@ function toView(metric: MetricRow): AxisView {
     ok: metric.ok,
     total: metric.total,
     percent: percentOf(metric.ok, metric.total),
+    gap: metric.total - metric.ok,
   }
 }
 
@@ -236,16 +270,21 @@ export function filterFindings(findings: FindingRow[], filter: FindingFilter): F
 }
 
 const LEVEL_LABEL: Record<string, string> = {
-  error: 'error',
-  warning: 'warning',
-  pending: 'pending',
-  unresolved: 'unresolved',
+  error: '확인 필요',
+  warning: '참고',
+  pending: '보류',
+  unresolved: '미해결',
 }
 
 /**
- * 등급 이름을 한글로 풀지 않는다. `error` 를 "오류"로 쓰면 *"14개가 잘못됐다"* 로 읽히는데
- * 뜻은 *"14개를 사람이 봐야 한다"* 다 — 신호등을 금지한 것과 같은 이유다. 저쪽 보고서와
- * 같은 낱말을 써야 대조도 된다.
+ * 등급을 한국어로 쓰되 **"오류"라고 쓰지 않는다** (2026-09-13, 사람이 정함).
+ *
+ * 원래는 영문 그대로 뒀다 — *"오류"로 쓰면 "14개가 잘못됐다"로 읽히는데 뜻은 "14개를
+ * 사람이 봐야 한다"* 라는 이유였다. 그 이유는 맞지만 **결론이 틀렸다**: 영문으로 두면
+ * 팀원이 아예 못 읽는다. 판정을 피하려면 영어로 도망갈 게 아니라 **판정하지 않는 한국어**
+ * 를 고르면 된다 — `error` → `확인 필요` 가 그것이다. 뜻을 그대로 옮긴다.
+ *
+ * 모르는 등급은 원문 그대로 내보낸다. 저쪽이 등급을 더했을 때 조용히 빠지는 것이 최악이다.
  */
 export function levelLabel(level: string): string {
   return LEVEL_LABEL[level] ?? level

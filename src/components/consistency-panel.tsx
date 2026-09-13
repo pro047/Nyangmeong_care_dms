@@ -40,18 +40,96 @@ export type ConsistencySnapshotView = {
   docs: SnapshotDocRow[]
 }
 
-/** 분자/분모와 비율을 한 덩이로. 비율만 크게 쓰지 않는다 — 37/62 를 봐야 25건이 보인다. */
-function AxisCell({ view, emphasis = false }: { view: AxisView; emphasis?: boolean }) {
+/**
+ * 비율 하나를 한계에 대고 보는 자리라 **미터**를 쓴다 (막대그래프도 파이도 아니다).
+ *
+ * **채움 색으로 심각도를 나타내지 않는다.** 미터의 일반 관례는 accent→warning→danger 지만
+ * 이 화면은 신호등이 금지다 — 2026-09-11 측정의 `확인 필요` 14건 중 **6건은 문서 결함이
+ * 아니라 저쪽 파서 한계**였고, 색이 있었으면 빨강이었으며 그건 틀린 신호다. 전부 한 색이다.
+ *
+ * **트랙이 배경보다 진하다.** 95.76% 처럼 거의 찬 미터에서 사람이 봐야 할 것은 *남은 4%*
+ * 인데, 트랙이 배경과 같으면 그 자리가 "빈 곳"이 아니라 "카드 여백"으로 읽힌다.
+ */
+function Meter({ view, strong = false }: { view: AxisView; strong?: boolean }) {
+  const filled = view.total === 0 ? 0 : (view.ok / view.total) * 100
   return (
-    <div className="min-w-0">
-      <p className="truncate text-xs text-ink-muted">{view.label}</p>
-      <p className={emphasis ? 'text-base font-semibold text-ink' : 'text-sm text-ink'}>
-        <span className="tabular-nums">
-          {view.ok}/{view.total}
-        </span>
-        <span className="ml-1.5 tabular-nums text-ink-muted">{formatPercent(view.percent)}</span>
-      </p>
+    <div
+      className="h-1.5 w-full overflow-hidden rounded-full bg-border"
+      role="img"
+      aria-label={`${view.total} 중 ${view.ok}`}
+    >
+      <div
+        className={`h-full rounded-full ${strong ? 'bg-ink' : 'bg-ink-muted'}`}
+        style={{ width: `${filled}%` }}
+      />
     </div>
+  )
+}
+
+/**
+ * 미터 한 줄 = 라벨 · 분수 · 못 채운 개수 · 막대.
+ *
+ * **못 채운 개수를 직접 라벨로 단다.** 축 9개가 전부 90% 이상이라 막대만으로는 서로
+ * 구분이 안 된다 — 그게 사실이기도 하다(거의 다 맞다). 그래서 막대는 맥락이고 **메시지는
+ * 숫자**다. `94.83%` 는 사람이 뺄셈을 해야 "3개"가 나오는데 할 일은 그 3개다.
+ */
+function MeterRow({
+  view,
+  gapNoun,
+  label,
+  showPercent,
+  strong = false,
+  indent = false,
+}: {
+  view: AxisView
+  /** "없음" · "아직 안 나옴" 처럼 구획마다 다른 말. 빠진 것의 뜻이 구획마다 다르다. */
+  gapNoun: string
+  /** 카드 제목과 같은 말이 되는 줄에서만 덮어쓴다 — 같은 문장이 두 번 나오면 읽다 멈춘다. */
+  label?: string
+  /**
+   * 기본은 강조 줄만. **짝을 이루는 줄은 반드시 같이 켠다** — 한쪽만 비율이 보이면
+   * 나란히 둔 뜻이 사라진다. 2026-09-13 에 `74.00%` 만 빠져 E2E V4 가 잡았다.
+   */
+  showPercent?: boolean
+  strong?: boolean
+  indent?: boolean
+}) {
+  return (
+    <div className={indent ? 'pl-3' : undefined}>
+      <div className="flex items-baseline justify-between gap-3">
+        <p className={`min-w-0 truncate text-xs ${strong ? 'text-ink' : 'text-ink-muted'}`}>
+          {indent && <span className="mr-1 text-ink-subtle">└</span>}
+          {label ?? view.label}
+        </p>
+        <p className="shrink-0 text-xs">
+          <span className={`tabular-nums text-ink ${strong ? 'font-medium' : ''}`}>
+            {view.ok}/{view.total}
+          </span>{' '}
+          <span className="tabular-nums text-ink-subtle">
+            {view.gap === 0 ? '전부 확인됨' : `${view.gap}개 ${gapNoun}`}
+          </span>
+          {/* 저쪽 보고서는 비율로 적혀 있다. 붙여서 대조가 되게 하되 주인공은 개수다 —
+              비율만 따로 모아 두면 어느 숫자가 어느 축인지 알 수 없다. */}
+          {(showPercent ?? strong) && (
+            <span className="ml-1.5 tabular-nums text-ink-subtle">
+              {formatPercent(view.percent)}
+            </span>
+          )}
+        </p>
+      </div>
+      <div className="mt-1">
+        <Meter view={view} strong={strong} />
+      </div>
+    </div>
+  )
+}
+
+function Card({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="min-w-0 rounded-lg border border-border bg-canvas p-3">
+      <h3 className="mb-2.5 text-xs font-semibold text-ink">{title}</h3>
+      <div className="grid gap-2.5">{children}</div>
+    </section>
   )
 }
 
@@ -87,17 +165,19 @@ function FilterSelect({
 }
 
 /**
- * 정합성 측정 1회를 메인 목록 위에 띄운다.
+ * 정합성 측정 1회를 메인 목록 위에 대시보드로 띄운다.
  *
- * **축 9개는 항상 펼쳐 두고 findings 만 접는다.** 접힘 상태에서 한 축만 보이면 그게
+ * **구획 셋이 팀원이 묻는 질문 셋이다** — 저쪽 데이터 모델("축 9개")을 그대로 늘어놓으면
+ * `FN→REQ 42/42` 가 되는데 그건 개발자만 읽는다. ① 가리킨 ID 가 실제로 있나 ② 정의만 해
+ * 놓고 안 쓴 것이 있나 ③ 내가 볼 목록이 뭔가.
+ *
+ * **축 9개는 항상 펼쳐 두고 findings 149건만 접는다.** 접힘 상태에서 한 축만 보이면 그게
  * *"정합성 = N%"* 라는 판정이 되는데 그 판정은 팀장이 한다 — 같은 데이터로 100% ·
- * 95.76% · 59.68% · 74.00% 가 다 나온다. findings 149건은 "지금 볼 사람"만 여는 목록이라
- * 사정이 다르다.
+ * 95.76% · 59.68% · 74.00% 가 다 나온다.
  *
- * **신호등을 붙이지 않는다.** 빨강/초록이나 "합격" 표시가 없는 것이 사양이다. `errors 14`
- * 는 *"14개가 잘못됐다"* 가 아니라 *"14개를 사람이 봐야 한다"* 는 뜻이고, 2026-09-11 측정의
- * 14건 중 6건은 문서 결함이 아니라 저쪽 파서 한계였다. 신호등이 있었으면 빨강이었고
- * 그건 틀린 신호다.
+ * **히어로 숫자를 findings 건수로 잡았다.** 비율을 크게 띄우면 그것이 곧 판정이지만
+ * 149 는 *"사람이 볼 항목이 149개"* 라는 **할 일의 크기**라 판정이 아니다. 한 화면에
+ * 히어로는 하나다.
  *
  * 필터를 searchParams 가 아니라 클라이언트 상태로 두는 이유: 여기는 메인이라 URL 이 바뀌면
  * 문서 목록·폴더·구버전 판정까지 전부 다시 조회된다. findings 149행은 이미 HTML 에 실려
@@ -124,79 +204,84 @@ export function ConsistencyPanel({
 
   return (
     <section className="mb-5 rounded-xl border border-border bg-surface" aria-label="정합성 지표">
-      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-border px-4 py-3">
-        <h2 className="text-sm font-semibold text-ink">정합성</h2>
-        {/* 이 숫자는 자동으로 갱신되지 않는다 — 문서를 올려도 안 바뀌고 정합성 저장소가
-            손으로 돌려야 새 값이 온다. 시각이 안 보이면 낡은 숫자가 현재값으로 읽힌다. */}
-        <p className="text-sm text-ink">{snapshot.measuredLabel} 측정</p>
-        <p className="text-xs text-ink-muted">
-          {snapshot.agoLabel && `${snapshot.agoLabel} · `}요구사항 {snapshot.reqVer} · 문서{' '}
-          {docs.length}건
-        </p>
-      </div>
-
-      <div className="grid gap-4 px-4 py-3 md:grid-cols-[minmax(0,11rem)_minmax(0,1fr)]">
-        {groups.total && (
-          <div className="md:border-r md:border-border md:pr-4">
-            <AxisCell view={groups.total} emphasis />
-          </div>
-        )}
-
-        <div className="grid gap-3">
-          {groups.reference.length > 0 && (
-            <div>
-              <p className="mb-1 text-xs font-medium text-ink-muted">참조</p>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3 lg:grid-cols-5">
-                {groups.reference.map((view) => (
-                  <AxisCell key={view.key} view={view} />
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div>
-            <p className="mb-1 text-xs font-medium text-ink-muted">커버리지</p>
-            <div className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3">
-              {/* 두 REQ 축은 반드시 나란히. 59.68% 만 보이면 오해다 — 빠진 25건 중 12건은
-                  관리자·비기능이라 화면설계서가 있을 수 없고 5건은 신규다. */}
-              {groups.coverage.reqNarrow && <AxisCell view={groups.coverage.reqNarrow} />}
-              {groups.coverage.reqWide && <AxisCell view={groups.coverage.reqWide} />}
-              {groups.coverage.scr && <AxisCell view={groups.coverage.scr} />}
-            </div>
-          </div>
-
-          {groups.others.length > 0 && (
-            <div>
-              {/* 축 계약에 없는 것. 모르는 채로라도 띄운다 — 조용히 빠지는 것이 가장 나쁘다. */}
-              <p className="mb-1 text-xs font-medium text-ink-muted">그 밖의 축</p>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3">
-                {groups.others.map((view) => (
-                  <AxisCell key={view.key} view={view} />
-                ))}
-              </div>
-            </div>
-          )}
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-border px-4 py-3">
+        <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
+          <h2 className="text-sm font-semibold text-ink">정합성</h2>
+          {/* 무엇을 보는 화면인지 한 줄로. 용어를 아는 사람만 읽는 화면이 되면 안 된다. */}
+          <p className="text-xs text-ink-muted">문서끼리 가리키는 ID 가 맞는지 검사한 결과</p>
         </div>
+        {/* 이 숫자는 자동으로 갱신되지 않는다 — 문서를 올려도 안 바뀌고 정합성 저장소가
+            손으로 돌려야 새 값이 온다. 시각이 안 보이면 낡은 숫자가 현재값으로 읽히므로
+            "자동 갱신 안 됨" 을 말로도 적는다. */}
+        <p className="text-xs text-ink-muted">
+          <span className="text-ink">{snapshot.measuredLabel} 측정</span>
+          {snapshot.agoLabel && ` · ${snapshot.agoLabel}`} · 요구사항 {snapshot.reqVer} · 자동 갱신
+          안 됨
+        </p>
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-2.5">
-        <p className="text-xs text-ink-muted">
-          {counts.map((entry, i) => (
-            <span key={entry.level}>
-              {i > 0 && <span className="mx-1.5 text-ink-subtle">·</span>}
-              {levelLabel(entry.level)} <span className="tabular-nums text-ink">{entry.count}</span>
-            </span>
-          ))}
-        </p>
-        <button
-          type="button"
-          onClick={() => setOpen(!open)}
-          aria-expanded={open}
-          className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-ink-muted hover:bg-accent-soft hover:text-ink"
-        >
-          {snapshot.findings.length}건 {open ? '접기' : '보기'}
-          <ChevronDown className={`h-3.5 w-3.5 ${open ? 'rotate-180' : ''}`} aria-hidden />
-        </button>
+      <div className="grid gap-3 p-4 lg:grid-cols-[minmax(0,12rem)_minmax(0,1.15fr)_minmax(0,1fr)]">
+        {/* 히어로 + 등급 내역. findings 목록을 여는 자리이기도 하다. */}
+        <section className="flex min-w-0 flex-col rounded-lg border border-border bg-canvas p-3">
+          <h3 className="text-xs font-semibold text-ink">사람이 볼 항목</h3>
+          {/* 히어로에는 tabular-nums 를 쓰지 않는다 — 큰 글자에서 자간이 벌어진다. */}
+          <p className="mt-0.5 text-5xl font-semibold leading-none text-ink">
+            {snapshot.findings.length}
+          </p>
+          <dl className="mb-3 mt-3 grid gap-1 text-xs">
+            {counts.map((entry) => (
+              <div key={entry.level} className="flex items-baseline justify-between gap-2">
+                <dt className="text-ink-muted">{levelLabel(entry.level)}</dt>
+                <dd className="tabular-nums text-ink">{entry.count}</dd>
+              </div>
+            ))}
+          </dl>
+          <button
+            type="button"
+            onClick={() => setOpen(!open)}
+            aria-expanded={open}
+            className="mt-auto flex items-center justify-center gap-1 rounded-md border border-border bg-surface px-2 py-1.5 text-xs text-ink-muted hover:bg-accent-soft hover:text-ink"
+          >
+            {open ? '목록 닫기' : '목록 보기'}
+            <ChevronDown className={`h-3.5 w-3.5 ${open ? 'rotate-180' : ''}`} aria-hidden />
+          </button>
+        </section>
+
+        <Card title="가리킨 ID 가 실제로 있나">
+          {groups.total && <MeterRow view={groups.total} label="전체" gapNoun="없음" strong />}
+          {groups.reference.length > 0 && (
+            <div className="grid gap-2 border-t border-border pt-2.5">
+              {groups.reference.map((view) => (
+                <MeterRow key={view.key} view={view} gapNoun="없음" />
+              ))}
+            </div>
+          )}
+        </Card>
+
+        <Card title="정의만 해 놓고 안 쓴 것이 있나">
+          {/* 두 REQ 축은 반드시 나란히. 25개만 보이면 오해다 — 그중 12건은 관리자·비기능이라
+              화면설계서가 있을 수 없고 5건은 신규다. 좁은 분모를 바로 아래 들여쓰기로 붙여
+              "같은 것을 다르게 센 값"임이 보이게 한다. */}
+          {groups.coverage.reqNarrow && (
+            <MeterRow view={groups.coverage.reqNarrow} gapNoun="아직 안 나옴" strong />
+          )}
+          {groups.coverage.reqWide && (
+            <MeterRow view={groups.coverage.reqWide} gapNoun="아직 안 나옴" showPercent indent />
+          )}
+          {groups.coverage.scr && (
+            <div className="border-t border-border pt-2.5">
+              <MeterRow view={groups.coverage.scr} gapNoun="아직 안 나옴" strong />
+            </div>
+          )}
+          {groups.others.length > 0 && (
+            <div className="grid gap-2 border-t border-border pt-2.5">
+              {/* 축 계약에 없는 것. 모르는 채로라도 띄운다 — 조용히 빠지는 것이 가장 나쁘다. */}
+              {groups.others.map((view) => (
+                <MeterRow key={view.key} view={view} gapNoun="남음" />
+              ))}
+            </div>
+          )}
+        </Card>
       </div>
 
       {open && (
@@ -264,12 +349,16 @@ export function ConsistencyPanel({
           </div>
 
           <div className="flex flex-wrap gap-x-3 gap-y-1 border-t border-border px-4 py-2.5 text-xs text-ink-muted">
-            <span>측정에 쓴 문서</span>
+            <span>측정에 쓴 문서 {docs.length}건</span>
             {docs.map((doc) =>
               // 문서는 하드 삭제되므로 없으면 링크를 뺀다. 행까지 감추면 측정이 이
               // 문서를 봤다는 사실이 사라진다.
               doc.linkable ? (
-                <Link key={doc.key} href={`/documents/${doc.dmsId}`} className="text-ink hover:underline">
+                <Link
+                  key={doc.key}
+                  href={`/documents/${doc.dmsId}`}
+                  className="text-ink hover:underline"
+                >
                   {doc.key} {doc.ver}
                 </Link>
               ) : (

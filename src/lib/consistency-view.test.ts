@@ -70,17 +70,27 @@ describe('axisGroups', () => {
     expect(new Set(seen.map((view) => view.key)).size).toBe(9)
   })
 
-  it('reference 5줄이 from→to 라벨과 함께 순서대로 와야 한다', () => {
+  it('reference 5줄이 한국어 문장 라벨과 함께 순서대로 와야 한다', () => {
+    // 화살표와 영문 약어를 쓰지 않는다 — 이 화면은 팀원 7명이 본다.
     const groups = axisGroups(METRICS)
 
     expect(groups.reference.map((view) => view.label)).toEqual([
-      'FN→REQ',
-      'FN→SCR',
-      'SCR→FN',
-      'SCR→REQ',
-      'SCR→SCR',
+      '기능명세서가 쓴 요구사항 ID',
+      '기능명세서가 쓴 화면 ID',
+      '화면설계서가 쓴 기능 ID',
+      '화면설계서가 쓴 요구사항 ID',
+      '화면설계서가 쓴 다른 화면 ID',
     ])
-    expect(groups.reference[1]).toMatchObject({ ok: 55, total: 58 })
+    expect(groups.reference[1]).toMatchObject({ ok: 55, total: 58, gap: 3 })
+  })
+
+  it('못 채운 개수를 따로 세어 줘야 한다', () => {
+    // 94.83% 는 사람이 뺄셈을 해야 "3개" 가 나온다. 할 일은 그 3개다.
+    const groups = axisGroups(METRICS)
+
+    expect(groups.reference.map((view) => view.gap)).toEqual([0, 3, 0, 0, 13])
+    expect(groups.total?.gap).toBe(16)
+    expect(groups.coverage.reqNarrow?.gap).toBe(25)
   })
 
   it('REQ 커버리지는 넓은 분모와 좁은 분모가 짝으로 나와야 한다', () => {
@@ -118,13 +128,24 @@ describe('axisGroups', () => {
     ])
 
     expect(new Set(groups.reference.map((view) => view.key)).size).toBe(2)
-    expect(groups.reference[0].label).toBe('?→?')
+    expect(groups.reference[0].label).toBe('?가 쓴 ? ID')
   })
 })
 
 describe('referenceLabel', () => {
-  it('저쪽 보고서와 대조되도록 원문 기호를 유지해야 한다', () => {
-    expect(referenceLabel('SCR', 'FN')).toBe('SCR→FN')
+  it('쓴 쪽은 문서 이름으로, 가리킨 쪽은 종류로 읽혀야 한다', () => {
+    // 쓴 쪽은 "어느 파일을 열어야 하나" 라서 문서 이름이어야 한다.
+    expect(referenceLabel('SCR', 'FN')).toBe('화면설계서가 쓴 기능 ID')
+    expect(referenceLabel('FN', 'REQ')).toBe('기능명세서가 쓴 요구사항 ID')
+  })
+
+  it('같은 종류끼리면 "다른" 을 붙여야 한다', () => {
+    // 안 붙이면 자기 자신을 가리키는 것처럼 읽힌다.
+    expect(referenceLabel('SCR', 'SCR')).toBe('화면설계서가 쓴 다른 화면 ID')
+  })
+
+  it('모르는 종류는 원문 그대로 내보내야 한다', () => {
+    expect(referenceLabel('NFR', 'REQ')).toBe('NFR가 쓴 요구사항 ID')
   })
 })
 
@@ -200,10 +221,18 @@ describe('filterFindings', () => {
 })
 
 describe('levelLabel', () => {
-  it('등급을 한글로 풀지 않아야 한다', () => {
-    // "오류" 로 쓰면 "14개가 잘못됐다" 로 읽힌다. 뜻은 "14개를 사람이 봐야 한다" 다.
-    expect(levelLabel('error')).toBe('error')
-    expect(levelLabel('unresolved')).toBe('unresolved')
+  it('등급을 한국어로 쓰되 "오류" 라고 하지 않아야 한다', () => {
+    // "오류" 는 "14개가 잘못됐다" 로 읽힌다. 뜻은 "14개를 사람이 봐야 한다" 다 —
+    // 판정을 피하려고 영어로 도망가면 팀원이 아예 못 읽는다.
+    expect(levelLabel('error')).toBe('확인 필요')
+    expect(levelLabel('warning')).toBe('참고')
+    expect(levelLabel('pending')).toBe('보류')
+    expect(levelLabel('unresolved')).toBe('미해결')
+  })
+
+  it('모르는 등급은 원문 그대로 내보내야 한다', () => {
+    // 저쪽이 등급을 더했을 때 조용히 빠지는 것이 최악이다.
+    expect(levelLabel('fatal')).toBe('fatal')
   })
 })
 
