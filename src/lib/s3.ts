@@ -57,6 +57,22 @@ export function deleteObject(key: string) {
 }
 
 /**
+ * 객체 앞부분 최대 maxBytes+1 바이트. 실패(없는 키 포함)면 null.
+ * +1 은 호출자가 "상한 초과" 를 알아보게 하려는 것이다.
+ */
+export async function getObjectBytes(key: string, maxBytes: number): Promise<Uint8Array | null> {
+  try {
+    const res = await s3.send(
+      new GetObjectCommand({ Bucket: env.S3_BUCKET, Key: key, Range: `bytes=0-${maxBytes}` }),
+    )
+    if (!res.Body) return null
+    return await res.Body.transformToByteArray()
+  } catch {
+    return null
+  }
+}
+
+/**
  * 객체의 실제 크기. 없으면 null.
  *
  * 두 가지를 한 번에 해결한다 — 브라우저가 PUT 을 실제로 끝냈는지 확인하고(안 그러면

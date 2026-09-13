@@ -6,6 +6,7 @@ import { SIMILAR_CANDIDATES_EXIST } from '@/lib/mcp/upload-tools'
 import { ACTIVE_DOCUMENT_NOT_FOUND } from '@/lib/trash'
 import { VERSION_FORBIDDEN } from '@/lib/ownership'
 import { titleFromFileName } from '@/lib/title'
+import { READ_UNSUPPORTED_FORMAT, readVersionQuery } from '@/lib/mcp/read-tools'
 
 // 실제 DB·S3 없이 "도구가 무엇을 어떤 인자로 조회하고 무엇을 돌려주는가"만 본다.
 // server.ts 가 prisma·presign·commit 을 주입받게 된 이유가 이 테스트다.
@@ -27,6 +28,7 @@ const signUploadToken = vi.fn()
 const commitCreateDocument = vi.fn()
 const commitAddVersion = vi.fn()
 const commitDiscardUpload = vi.fn()
+const getObjectBytes = vi.fn()
 
 const tools = new Map<string, { config: { inputSchema?: unknown }; cb: ToolCallback }>()
 
@@ -62,6 +64,7 @@ function setup() {
     buildS3Key,
     signUploadToken,
     adminDiscordId: ADMIN_DISCORD_ID,
+    getObjectBytes,
     commit: {
       createDocument: commitCreateDocument,
       addVersion: commitAddVersion,
@@ -96,17 +99,19 @@ beforeEach(() => {
     .mockReset()
     .mockResolvedValue({ ok: true, status: 201, value: { id: 'doc_1', title: '문서', versionNo: 3 } })
   commitDiscardUpload.mockReset().mockResolvedValue({ ok: true, status: 200, value: { deleted: true } })
+  getObjectBytes.mockReset()
   setup()
 })
 
 describe('registerDmsTools — 등록', () => {
-  it('읽기 4개와 올리기 5개, 도구 9개를 등록해야 한다 (MILESTONES 도구 표)', () => {
+  it('읽기 4개·올리기 5개·본문 읽기 1개, 도구 10개를 등록해야 한다 (MILESTONES 도구 표)', () => {
     expect([...tools.keys()].sort()).toEqual(
       [
         'search_documents',
         'list_folders',
         'get_document',
         'get_download_url',
+        'read_document',
         'find_similar_documents',
         'request_upload',
         'create_document',
@@ -299,6 +304,123 @@ describe('get_download_url — 파일은 앱 서버를 거치지 않는다', () 
 
     expect(result.isError).toBe(true)
     expect(presignDownload).not.toHaveBeenCalled()
+  })
+})
+
+describe('read_document — 접착 (3단계)', () => {
+  const S3_KEY = 'documents/0f3a-secret-key.csv'
+  const BODY = 'a,b\n1,2\n'
+  const CSV_VERSION = {
+    versionNo: 1,
+    fileName: 'data.csv',
+    mimeType: 'text/csv',
+    sizeBytes: new TextEncoder().encode(BODY).length,
+    s3Key: S3_KEY,
+  }
+
+  // SDK 가 inputSchema 로 파싱(기본값 적용)한 뒤 부르는 것을 흉내 내고, ctx 는 비워 둔다 —
+  // 1단계 읽기 도구처럼 토큰 사용자를 쓰지 않아야 한다.
+  const read = (args: Record<string, unknown>) => callWithAuth('read_document', args, {})
+
+  it('versionNo 를 안 주면 readVersionQuery(id, undefined) 와 같은 인자로 조회해야 한다 (V3)', async () => {
+    documentFindFirst.mockResolvedValue(null)
+
+    await read({ id: 'doc_1' })
+
+    expect(documentFindFirst).toHaveBeenCalledTimes(1)
+    expect(documentFindFirst.mock.calls[0][0]).toEqual(readVersionQuery('doc_1', undefined))
+    expect(documentFindFirst.mock.calls[0][0].select.versions.orderBy).toEqual({ versionNo: 'desc' })
+  })
+
+  it('versionNo 를 주면 readVersionQuery(id, versionNo) 와 같은 인자로 조회해야 한다 (V3)', async () => {
+    documentFindFirst.mockResolvedValue(null)
+
+    await read({ id: 'doc_1', versionNo: 2 })
+
+    expect(documentFindFirst.mock.calls[0][0]).toEqual(readVersionQuery('doc_1', 2))
+  })
+
+  it('문서가 없거나 휴지통이면 S3 를 부르지 않고 isError 와 공용 문구여야 한다 (V4)', async () => {
+    documentFindFirst.mockResolvedValue(null)
+
+    const result = await read({ id: 'doc_1' })
+
+    expect(result.isError).toBe(true)
+    expect(result.content[0].text).toBe(ACTIVE_DOCUMENT_NOT_FOUND)
+    expect(getObjectBytes).not.toHaveBeenCalled()
+  })
+
+  it('지정한 판이 없으면(versions: []) S3 를 부르지 않고 isError 와 공용 문구여야 한다 (V4)', async () => {
+    documentFindFirst.mockResolvedValue({ title: '데이터', versions: [] })
+
+    const result = await read({ id: 'doc_1', versionNo: 9 })
+
+    expect(result.isError).toBe(true)
+    expect(result.content[0].text).toBe(ACTIVE_DOCUMENT_NOT_FOUND)
+    expect(getObjectBytes).not.toHaveBeenCalled()
+  })
+
+  it('csv 를 읽으면 content 는 [메타 JSON, 본문] 두 블록이고 structuredContent 에 본문이 없어야 한다 (V5·V8)', async () => {
+    documentFindFirst.mockResolvedValue({ title: '데이터', versions: [CSV_VERSION] })
+    getObjectBytes.mockResolvedValue(new TextEncoder().encode(BODY))
+
+    const result = await read({ id: 'doc_1' })
+
+    expect(result.isError).toBeUndefined()
+    expect(result.content).toHaveLength(2)
+    expect(JSON.parse(result.content[0].text)).toEqual(result.structuredContent)
+    expect(result.content[1].text).toBe(BODY)
+    expect(result.structuredContent).toMatchObject({ documentId: 'doc_1', kind: 'csv', nextOffset: null })
+    expect(JSON.stringify(result.structuredContent)).not.toContain('a,b')
+  })
+
+  it('성공·실패 응답 어디에도 s3Key 값이 없어야 한다 (V6)', async () => {
+    documentFindFirst.mockResolvedValue({ title: '데이터', versions: [CSV_VERSION] })
+    getObjectBytes.mockResolvedValueOnce(new TextEncoder().encode(BODY)).mockResolvedValueOnce(null)
+
+    const ok = await read({ id: 'doc_1' })
+    const failed = await read({ id: 'doc_1' })
+
+    expect(failed.isError).toBe(true)
+    expect(JSON.stringify(ok)).not.toContain(S3_KEY)
+    expect(JSON.stringify(failed)).not.toContain(S3_KEY)
+  })
+
+  it('pdf 문서면 S3 를 부르지 않고 isError 와 READ_UNSUPPORTED_FORMAT JSON 이어야 한다 (V7)', async () => {
+    documentFindFirst.mockResolvedValue({
+      title: '보고서',
+      versions: [{ ...CSV_VERSION, fileName: '보고서.pdf', mimeType: 'application/pdf' }],
+    })
+
+    const result = await read({ id: 'doc_1' })
+
+    expect(result.isError).toBe(true)
+    expect(JSON.parse(result.content[0].text).error).toBe(READ_UNSUPPORTED_FORMAT)
+    expect(getObjectBytes).not.toHaveBeenCalled()
+  })
+
+  // 읽기 예외(서버가 S3 에서 받는다)는 읽기에만 열렸다 — 올리기 경로의 presign·커밋을 건드리면 안 된다.
+  it('본문을 읽어도 presign·업로드 토큰·커밋을 부르지 않고 getObjectBytes 만 불러야 한다', async () => {
+    documentFindFirst.mockResolvedValue({ title: '데이터', versions: [CSV_VERSION] })
+    getObjectBytes.mockResolvedValue(new TextEncoder().encode(BODY))
+
+    await read({ id: 'doc_1' })
+
+    expect(getObjectBytes).toHaveBeenCalledTimes(1)
+    expect(documentFindFirst).toHaveBeenCalledTimes(1)
+    for (const fn of [
+      presignDownload,
+      presignUpload,
+      buildS3Key,
+      signUploadToken,
+      commitCreateDocument,
+      commitAddVersion,
+      commitDiscardUpload,
+      documentFindMany,
+      folderFindMany,
+    ]) {
+      expect(fn).not.toHaveBeenCalled()
+    }
   })
 })
 

@@ -9,7 +9,12 @@ import {
   tagFilterWhere,
 } from '@/lib/search'
 import { ACTIVE_DOCUMENT_NOT_FOUND } from '@/lib/trash'
-import type { presignDownload as presignDownloadFn, presignUpload as presignUploadFn, buildS3Key as buildS3KeyFn } from '@/lib/s3'
+import type {
+  presignDownload as presignDownloadFn,
+  presignUpload as presignUploadFn,
+  buildS3Key as buildS3KeyFn,
+  getObjectBytes as getObjectBytesFn,
+} from '@/lib/s3'
 import type { signUploadToken as signUploadTokenFn } from '@/lib/upload-token'
 import { classifyFileName } from '@/lib/classify'
 import { deletePermission, type Viewer } from '@/lib/ownership'
@@ -45,6 +50,12 @@ import {
   toolTitle,
   uploadFailure,
 } from './upload-tools'
+import {
+  readDocumentInputSchema,
+  readVersionQuery,
+  readDocumentContent,
+} from './read-tools'
+import { parseXlsx } from './xlsx-text'
 
 type Deps = {
   prisma: PrismaClient
@@ -54,6 +65,8 @@ type Deps = {
   buildS3Key: typeof buildS3KeyFn
   signUploadToken: typeof signUploadTokenFn
   adminDiscordId: string | undefined
+  // ↓ 3단계에서 추가
+  getObjectBytes: typeof getObjectBytesFn
   /** upload-commit 의 세 함수를 CommitDeps 로 미리 묶어 넘긴다 — 도구 테스트가
       커밋 계층(prisma·S3 목)까지 끌고 오지 않게 하려는 것이다. */
   commit: {
@@ -77,13 +90,24 @@ function authRequiredError() {
 }
 
 /**
- * 1단계 도구 4개는 전원 동등(CLAUDE.md) — 사용자별 권한 분기가 없다. 2단계 도구 5개는
- * 액세스 토큰의 sub 를 올린 사람으로 쓴다(§올리기 도구, 삭제·재업로드 예외).
+ * 1단계 도구 4개와 3단계 `read_document` 는 전원 동등(CLAUDE.md) — 사용자별 권한
+ * 분기가 없다. 2단계 도구 5개는 액세스 토큰의 sub 를 올린 사람으로 쓴다(§올리기 도구,
+ * 삭제·재업로드 예외).
  * `deps.prisma`·`deps.presignDownload` 등을 주입받는 이유는 테스트에서 실제 DB·S3 없이
- * 순수 함수(tools.ts·upload-tools.ts)만 검증하기 위해서다(이 파일 자체는 접착만 한다).
+ * 순수 함수(tools.ts·upload-tools.ts·read-tools.ts)만 검증하기 위해서다(이 파일 자체는
+ * 접착만 한다).
  */
 export function registerDmsTools(server: McpServer, deps: Deps) {
-  const { prisma, presignDownload, presignUpload, buildS3Key, signUploadToken, adminDiscordId, commit } = deps
+  const {
+    prisma,
+    presignDownload,
+    presignUpload,
+    buildS3Key,
+    signUploadToken,
+    adminDiscordId,
+    commit,
+    getObjectBytes,
+  } = deps
 
   server.registerTool(
     'search_documents',
@@ -393,6 +417,42 @@ export function registerDmsTools(server: McpServer, deps: Deps) {
       return {
         content: [{ type: 'text' as const, text: JSON.stringify(outcome.value) }],
         structuredContent: outcome.value,
+      }
+    },
+  )
+
+  server.registerTool(
+    'read_document',
+    {
+      title: '문서 본문 읽기',
+      description:
+        '문서(버전)의 본문을 텍스트로 돌려준다. 읽을 수 있는 형식: html·md·csv·txt·xlsx, ' +
+        '원본 1MB 이하. 본문이 길면 nextOffset 으로 이어 읽는다. 그 밖의 형식이거나 원본 ' +
+        '파일 자체가 필요하면 get_download_url 을 쓴다.',
+      inputSchema: readDocumentInputSchema,
+    },
+    async ({ id, versionNo, offset, limit, format }) => {
+      const document = await prisma.document.findFirst(readVersionQuery(id, versionNo))
+      const version = document?.versions[0]
+      if (!version) {
+        return { content: [{ type: 'text' as const, text: ACTIVE_DOCUMENT_NOT_FOUND }], isError: true }
+      }
+
+      const outcome = await readDocumentContent(
+        { documentId: id, title: document.title, ...version },
+        { offset, limit, format },
+        { getObjectBytes, parseXlsx },
+      )
+
+      if (!outcome.ok) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify(outcome.failure) }], isError: true }
+      }
+      return {
+        content: [
+          { type: 'text' as const, text: JSON.stringify(outcome.meta) },
+          { type: 'text' as const, text: outcome.chunk },
+        ],
+        structuredContent: outcome.meta,
       }
     },
   )
