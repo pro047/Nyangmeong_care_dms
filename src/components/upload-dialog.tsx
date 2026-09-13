@@ -516,7 +516,7 @@ export function UploadDialog({
   }
 
   /**
-   * "새 문서 / 기존 문서의 새 판" 선택칸. 후보가 없으면 아무것도 그리지 않는다.
+   * "새 문서 / 기존 문서의 새 버전" 선택칸. 후보가 없으면 아무것도 그리지 않는다.
    *
    * **기본값은 항상 새 문서다.** 새 문서로 잘못 간 것은 나중에 붙이면 되지만, 잘못 붙인
    * 판을 떼는 화면은 앱에 없다(버전 롤백은 범위 밖). 그 비대칭이 이 기본값의 전부다.
@@ -543,7 +543,7 @@ export function UploadDialog({
               다음 판인가"이고, 제목은 사람이 고칠 수 있어 파일과 어긋나 있을 수 있다. */}
           {found.map((c) => (
             <option key={c.id} value={c.id}>
-              ‘{c.latestFileName}’ 의 새 판으로 붙이기
+              ‘{c.latestFileName}’ 의 새 버전으로 올리기
             </option>
           ))}
         </select>
@@ -555,7 +555,7 @@ export function UploadDialog({
           </p>
         )}
         {target !== undefined && (
-          <p className="mt-1 text-xs text-ink-muted">붙인 판은 나중에 뗄 수 없습니다.</p>
+          <p className="mt-1 text-xs text-ink-muted">새 버전으로 올리면 되돌릴 수 없습니다.</p>
         )}
       </div>
     )
@@ -839,7 +839,7 @@ export function UploadDialog({
                   : items.length === 0
                     ? ' '
                     : waitingCount > 0
-                      ? `${waitingCount}건이 기존 문서의 새 판일 수 있습니다`
+                      ? `${waitingCount}건은 새 문서인지 기존 문서의 새 버전인지 골라 주세요`
                       : uploading
                         ? `업로드 중… ${doneCount}/${items.length}`
                         : `완료 ${doneCount}건${errorCount > 0 ? ` · 실패 ${errorCount}건` : ''}`}

@@ -10,7 +10,14 @@ export function formatBytes(bytes: number) {
   return `${value < 10 ? value.toFixed(1) : Math.round(value)} ${units[i]}`
 }
 
-/** 목록에서는 "3시간 전"이, 오래된 건 날짜가 읽기 편하다. */
+/**
+ * 목록에서는 "3시간 전"이, 오래된 건 날짜가 읽기 편하다.
+ *
+ * 7일이 넘어 날짜로 떨어질 때 **`Asia/Seoul` 을 박는다** — `formatDateTime` 과 같은 이유다.
+ * 안 박으면 실행 머신의 TZ 를 쓰는데 **운영(Vercel)은 UTC 이고 팀은 KST** 라, 한국 시각으로
+ * 새벽 0~9시에 올린 문서가 목록에서 **하루 이르게** 표시된다. 상대 시각 구간은 차이를
+ * 분 단위로 계산해 TZ 를 안 타므로 이 분기만 문제였다 (2026-09-13, 코드 리뷰가 잡음).
+ */
 export function formatRelative(date: Date) {
   const diffMs = Date.now() - date.getTime()
   const min = Math.floor(diffMs / 60000)
@@ -20,7 +27,12 @@ export function formatRelative(date: Date) {
   if (hour < 24) return `${hour}시간 전`
   const day = Math.floor(hour / 24)
   if (day < 7) return `${day}일 전`
-  return date.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })
+  return date.toLocaleDateString('ko-KR', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  })
 }
 
 /**

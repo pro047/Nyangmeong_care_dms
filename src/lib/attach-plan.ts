@@ -2,7 +2,12 @@ import { compareFileVersions, fileVersionLabel } from '@/lib/file-version'
 import type { SimilarCandidate } from '@/lib/similar-document'
 
 /**
- * 업로드 다이얼로그의 "새 문서 / 기존 문서의 새 판" 선택을 값으로 옮긴다.
+ * 업로드 다이얼로그의 "새 문서 / 기존 문서의 새 버전" 선택을 값으로 옮긴다.
+ *
+ * **화면 문구에서 "판"을 쓰지 않는다** (2026-09-13, 사람 지시). 같은 동작을 상세 페이지는
+ * `새 버전 올리기` 로 부르는데 여기만 `새 판으로 붙이기` 였다 — 결과가 같은 일에 이름이
+ * 둘이었다. 코드 식별자(`attach*`)는 그대로 둔다: 인계 문서가 이 기능을 "붙이기"로 적고
+ * 있어 내부 이름과 화면 문구를 갈라 두는 편이 추적이 산다.
  *
  * 판정(같은 문서인가)은 `similar-document.ts` 가, 판번호 비교는 `file-version.ts` 가
  * 이미 한다. 여기 있는 것은 **그 결과를 사람의 선택과 합쳐 업로드 대상으로 바꾸는 일**과
@@ -53,21 +58,21 @@ export function attachVersionWarning(
   targetFileName: string,
 ): AttachWarning | null {
   const compared = compareFileVersions(uploadFileName, targetFileName)
-  const becomesLatest = '붙이면 이 파일이 최신본이 됩니다.'
+  const becomesLatest = '올리면 이 파일이 최신본이 됩니다.'
 
   if (compared === null) {
-    return { level: 'notice', message: `판번호를 읽을 수 없어 순서를 확인하지 못했습니다. ${becomesLatest}` }
+    return { level: 'notice', message: `버전을 읽을 수 없어 순서를 확인하지 못했습니다. ${becomesLatest}` }
   }
   if (compared < 0) {
     return {
       level: 'danger',
-      message: `현재 판 ${fileVersionLabel(targetFileName)} 보다 낮은 ${fileVersionLabel(uploadFileName)} 입니다. ${becomesLatest}`,
+      message: `현재 버전 ${fileVersionLabel(targetFileName)} 보다 낮은 ${fileVersionLabel(uploadFileName)} 입니다. ${becomesLatest}`,
     }
   }
   if (compared === 0) {
     return {
       level: 'notice',
-      message: `현재 판과 같은 ${fileVersionLabel(targetFileName)} 입니다. ${becomesLatest}`,
+      message: `현재 버전과 같은 ${fileVersionLabel(targetFileName)} 입니다. ${becomesLatest}`,
     }
   }
   return null

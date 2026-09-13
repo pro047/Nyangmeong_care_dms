@@ -1,30 +1,13 @@
 import Link from 'next/link'
-import { ChevronRight, Download, Folder } from 'lucide-react'
-import { DocumentRowActions } from '@/components/document-row-actions'
-import { fileVersionLabel } from '@/lib/file-version'
-import { canDeleteRow, type DeletePermission } from '@/lib/ownership'
-import { formatBytes, formatRelative, fileLabel } from '@/lib/format'
+import { ChevronRight, Folder } from 'lucide-react'
+import { DocumentRow } from '@/components/document-rows'
+import type { DeletePermission } from '@/lib/ownership'
+import type { DocumentListItem } from '@/lib/document-list'
 import type { FolderChildCard } from '@/lib/folder'
 
-/** 목록·검색이 같은 표를 쓰므로 두 쿼리의 include 가 이 모양을 만족해야 한다. */
-export type DocumentListItem = {
-  id: string
-  title: string
-  /** 삭제 버튼을 그릴지 정한다 (ownership.ts). 두 쿼리 모두 include 라 이미 실려 온다. */
-  createdById: string
-  /** 정렬 기준과 같은 값이어야 한다 — updatedAt 을 그리면 보이는 날짜와 행 순서가 어긋난다. */
-  createdAt: Date
-  folder: { name: string } | null
-  tags: { tag: { name: string } }[]
-  versions: {
-    versionNo: number
-    fileName: string
-    sizeBytes: number
-    uploadedBy: { username: string }
-  }[]
-}
+export type { DocumentListItem }
 
-/** 열 수. 폴더 행이 전체 폭을 쓰려면 이 값이 thead 와 맞아야 한다. */
+/** 열 수. 폴더 행과 펼친 이력 행이 전체 폭을 쓰려면 이 값이 thead 와 맞아야 한다. */
 const COLUMN_COUNT = 8
 
 /**
@@ -92,84 +75,18 @@ export function DocumentTable({
               </td>
             </tr>
           ))}
-          {documents.map((doc) => {
-            const latest = doc.versions[0]
-            // 구버전은 강조를 빼는 방식으로 구분한다 — 표시를 최신 쪽에 붙이면 거의 전
-            // 행에 달린다. 행 배경은 건드리지 않는다. 배경까지 바꾸면 휴지통 행처럼 읽힌다.
-            //
-            // 색을 개별로 낮추지 않고 opacity 로 셀을 통째로 내리는 이유: 이 표의 본문 색
-            // (#666666)이 이미 폴더·올린사람·크기·날짜 열의 기본색이라, 제목만 그 색으로
-            // 바꾸면 "흐려졌다"가 아니라 "제목이 다른 열과 같아졌다"로 읽힌다. 대조는 행
-            // 단위로 생겨야 한다. 다운로드·삭제 칸에는 안 건다 — 구버전도 받아 갈 문서다.
-            const superseded = supersededIds?.has(doc.id) ?? false
-            const dim = superseded ? 'opacity-45' : ''
-            return (
-              <tr key={doc.id} className="border-b border-border last:border-0 hover:bg-canvas">
-                <td className={`max-w-0 px-4 py-3 ${dim}`}>
-                  {/* 제목은 상세로 간다. 바로 받고 싶으면 오른쪽 다운로드 아이콘. */}
-                  <Link href={`/documents/${doc.id}`} className="flex items-center gap-2.5">
-                    <span className="flex h-7 w-9 shrink-0 items-center justify-center rounded bg-canvas text-xs font-semibold text-ink-muted">
-                      {latest ? fileLabel(latest.fileName) : '—'}
-                    </span>
-                    <span className="min-w-0">
-                      <span className="truncate-cell block font-medium text-ink">{doc.title}</span>
-                    </span>
-                  </Link>
-                  {/* 칩은 제목 링크 바깥에 둔다 — a 안에 a 는 유효하지 않다. */}
-                  {doc.tags.length > 0 && (
-                    <span className="mt-1 flex flex-wrap gap-1 pl-[46px]">
-                      {doc.tags.map(({ tag }) => (
-                        <Link
-                          key={tag.name}
-                          href={`/?tag=${encodeURIComponent(tag.name)}`}
-                          className="rounded bg-canvas px-1.5 py-0.5 text-xs text-ink-muted transition-colors hover:bg-accent-soft hover:text-accent"
-                        >
-                          {tag.name}
-                        </Link>
-                      ))}
-                    </span>
-                  )}
-                </td>
-                {/* 파일명이 말하는 버전이다. 앱이 센 versionNo 가 아니다 — 팀은 v0.2 →
-                    v0.3 을 재업로드가 아니라 별개 문서로 올려서 versionNo 는 거의 전부 1
-                    이고, 목록에서 실제로 구분에 쓰이는 값은 이쪽이다. 두 숫자를 한 화면에
-                    두면 같은 이름으로 다른 말을 하므로 제목 아래 v{versionNo} 는 걷었다
-                    (재업로드 이력은 상세 페이지의 버전 타임라인이 정본). */}
-                <td className={`w-20 px-3 py-3 whitespace-nowrap text-ink-muted ${dim}`}>
-                  {(latest && fileVersionLabel(latest.fileName)) ?? '—'}
-                </td>
-                <td className={`truncate-cell hidden w-28 px-3 py-3 text-ink-muted md:table-cell ${dim}`}>
-                  {doc.folder?.name ?? '—'}
-                </td>
-                <td className={`truncate-cell hidden w-28 px-3 py-3 text-ink-muted lg:table-cell ${dim}`}>
-                  {latest?.uploadedBy.username ?? '—'}
-                </td>
-                <td className={`hidden w-20 px-3 py-3 whitespace-nowrap text-ink-muted sm:table-cell ${dim}`}>
-                  {latest ? formatBytes(latest.sizeBytes) : '—'}
-                </td>
-                <td className={`w-24 px-3 py-3 whitespace-nowrap text-ink-muted ${dim}`}>
-                  {formatRelative(doc.createdAt)}
-                </td>
-                <td className="px-4 py-3">
-                  <a
-                    href={`/api/documents/${doc.id}/download`}
-                    aria-label={`${doc.title} 다운로드`}
-                    className="flex h-7 w-7 items-center justify-center rounded-lg text-ink-subtle transition-colors hover:bg-accent-soft hover:text-accent"
-                  >
-                    <Download className="h-4 w-4" />
-                  </a>
-                </td>
-                <td className="px-4 py-3">
-                  {/* 상세 페이지에도 같은 버튼이 있다. 목록에서도 바로 지울 수 있게 둔다.
-                      남의 문서면 칸을 비운다 — 비활성 버튼을 두면 누를 수 있어 보이고,
-                      매번 403 토스트를 띄우는 것보다 안 보이는 편이 조용하다. */}
-                  {canDeleteRow(permission, doc) && (
-                    <DocumentRowActions id={doc.id} title={doc.title} />
-                  )}
-                </td>
-              </tr>
-            )
-          })}
+          {/* 문서 행은 클라이언트 컴포넌트다 — 이력 펼치기에 상태가 필요하고, 펼친 내용이
+              형제 `<tr>` 이라 셀 안에 못 넣는다. 경계를 행에서 자르면 여기 서버 컴포넌트가
+              `supersededIds`(Set)를 그대로 들고 있을 수 있다. */}
+          {documents.map((doc) => (
+            <DocumentRow
+              key={doc.id}
+              doc={doc}
+              superseded={supersededIds?.has(doc.id) ?? false}
+              permission={permission}
+              columnCount={COLUMN_COUNT}
+            />
+          ))}
         </tbody>
       </table>
     </div>
