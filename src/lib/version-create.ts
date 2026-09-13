@@ -52,6 +52,18 @@ export function versionCreateFailure(err: unknown): VersionCreateFailure | null 
 }
 
 /**
+ * P2003 = 외래 키 위반. 존재하지 않는 `folderId` 로 문서를 만들 때 난다.
+ * 화면은 폴더 선택기에서 고르므로 닿지 않던 경로인데, MCP `create_document` 는
+ * 에이전트가 아무 문자열이나 넣을 수 있어 열렸다. 뭉개서 rethrow 하면 500 이 되고
+ * S3 객체는 고아로 남는다 — 400 으로 돌려 호출자가 discard 할 수 있게 한다.
+ */
+export function isMissingRelation(err: unknown): boolean {
+  const code =
+    typeof err === 'object' && err !== null ? (err as { code?: unknown }).code : undefined
+  return code === 'P2003'
+}
+
+/**
  * P2002 가 s3_key 제약에서 났는가. `meta.target` 은 Prisma 버전·드라이버에 따라
  * 문자열 배열이거나 문자열 하나라 둘 다 받는다. 판정이 안 되면 false 를 돌려
  * 기존 해석(버전 번호 충돌)으로 떨어진다 — 모르는 것을 새 분기로 끌어오지 않는다.

@@ -5,7 +5,8 @@ import { POST } from './route'
 // DB·S3 는 테스트 환경에 없다. 인증 경계(401 과 그 헤더)만 본다 — 도구 동작은
 // src/lib/mcp/server.test.ts 가 본다.
 vi.mock('@/lib/prisma', () => ({ prisma: {} }))
-vi.mock('@/lib/s3', () => ({ presignDownload: vi.fn() }))
+// MAX_UPLOAD_BYTES 는 upload-tools.ts 의 스키마가 import 시점에 읽는다 — 없으면 모듈 로딩이 깨진다.
+vi.mock('@/lib/s3', () => ({ presignDownload: vi.fn(), MAX_UPLOAD_BYTES: 100 * 1024 * 1024 }))
 
 const APP_URL = 'http://localhost:3002'
 const RESOURCE_METADATA = `resource_metadata="${APP_URL}/.well-known/oauth-protected-resource"`
