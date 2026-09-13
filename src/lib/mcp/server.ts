@@ -427,7 +427,8 @@ export function registerDmsTools(server: McpServer, deps: Deps) {
       title: '문서 본문 읽기',
       description:
         '문서(버전)의 본문을 텍스트로 돌려준다. 읽을 수 있는 형식: html·md·csv·txt·xlsx, ' +
-        '원본 1MB 이하. 본문이 길면 nextOffset 으로 이어 읽는다. 그 밖의 형식이거나 원본 ' +
+        '원본 1MB 이하. 응답 첫 줄은 메타 JSON(nextOffset 등), 빈 줄 다음이 본문이다. ' +
+        '본문이 길면 nextOffset 으로 이어 읽는다. 그 밖의 형식이거나 원본 ' +
         '파일 자체가 필요하면 get_download_url 을 쓴다.',
       inputSchema: readDocumentInputSchema,
     },
@@ -447,12 +448,11 @@ export function registerDmsTools(server: McpServer, deps: Deps) {
       if (!outcome.ok) {
         return { content: [{ type: 'text' as const, text: JSON.stringify(outcome.failure) }], isError: true }
       }
+      // 메타와 본문을 텍스트 블록 하나에 싣고 structuredContent 는 두지 않는다. 2026-09-14
+      // 운영에서 Claude Code 가 [메타, 본문] 두 블록 중 메타만 보여줘 본문을 못 읽었다
+      // (웹챗은 둘 다 보였다). 첫 블록만 보이든 structuredContent 가 우선이든 이 모양이면 보인다.
       return {
-        content: [
-          { type: 'text' as const, text: JSON.stringify(outcome.meta) },
-          { type: 'text' as const, text: outcome.chunk },
-        ],
-        structuredContent: outcome.meta,
+        content: [{ type: 'text' as const, text: `${JSON.stringify(outcome.meta)}\n\n${outcome.chunk}` }],
       }
     },
   )

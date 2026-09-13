@@ -360,18 +360,18 @@ describe('read_document — 접착 (3단계)', () => {
     expect(getObjectBytes).not.toHaveBeenCalled()
   })
 
-  it('csv 를 읽으면 content 는 [메타 JSON, 본문] 두 블록이고 structuredContent 에 본문이 없어야 한다 (V5·V8)', async () => {
+  it('csv 를 읽으면 텍스트 블록 하나에 메타 JSON 줄과 본문을 싣고 structuredContent 는 없어야 한다 (V5·V8)', async () => {
     documentFindFirst.mockResolvedValue({ title: '데이터', versions: [CSV_VERSION] })
     getObjectBytes.mockResolvedValue(new TextEncoder().encode(BODY))
 
     const result = await read({ id: 'doc_1' })
 
     expect(result.isError).toBeUndefined()
-    expect(result.content).toHaveLength(2)
-    expect(JSON.parse(result.content[0].text)).toEqual(result.structuredContent)
-    expect(result.content[1].text).toBe(BODY)
-    expect(result.structuredContent).toMatchObject({ documentId: 'doc_1', kind: 'csv', nextOffset: null })
-    expect(JSON.stringify(result.structuredContent)).not.toContain('a,b')
+    expect(result.content).toHaveLength(1)
+    expect(result.structuredContent).toBeUndefined()
+    const [metaLine, ...body] = result.content[0].text.split('\n\n')
+    expect(JSON.parse(metaLine)).toMatchObject({ documentId: 'doc_1', kind: 'csv', nextOffset: null })
+    expect(body.join('\n\n')).toBe(BODY)
   })
 
   it('성공·실패 응답 어디에도 s3Key 값이 없어야 한다 (V6)', async () => {

@@ -5,6 +5,7 @@
  * ExcelJS 로딩은 `parseXlsx` 안의 동적 import 하나로 가둔다.
  */
 import { formatCellValue, buildMergeLayout } from '@/lib/xlsx-view'
+import { loadXlsx } from '@/lib/xlsx-load'
 
 export type SheetRows = {
   name: string
@@ -79,13 +80,10 @@ export function sheetsToText(sheets: SheetRows[]): string {
     .join('\n\n')
 }
 
-/** 부작용 경계. await import('exceljs') → new Workbook() → xlsx.load(Buffer.from(bytes)) → workbookToSheetRows. 실패는 throw 그대로. */
+/** 부작용 경계. await import('exceljs') → loadXlsx(접두사 폴백 포함) → workbookToSheetRows. 실패는 throw 그대로. */
 export async function parseXlsx(bytes: Uint8Array): Promise<SheetRows[]> {
   const mod = await import('exceljs')
   const ExcelJS = mod.default ?? mod
-  const workbook = new ExcelJS.Workbook()
-  // exceljs 의 `Buffer` 타입은 자기 모듈 안에서 새로 선언한 것이라(ArrayBuffer 구조),
-  // @types/node 의 제네릭 Buffer 와 이름만 같고 안 맞는다 — 런타임은 실제 Buffer 를 받는다.
-  await workbook.xlsx.load(Buffer.from(bytes) as unknown as Parameters<typeof workbook.xlsx.load>[0])
+  const workbook = await loadXlsx(() => new ExcelJS.Workbook(), bytes.slice().buffer as ArrayBuffer)
   return workbookToSheetRows(workbook)
 }

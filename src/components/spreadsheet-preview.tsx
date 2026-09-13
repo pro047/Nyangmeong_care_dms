@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { Download, Loader2 } from 'lucide-react'
+import { loadXlsx } from '@/lib/xlsx-load'
 import {
   buildMergeLayout,
   columnWidthToPx,
@@ -248,8 +249,7 @@ export function SpreadsheetPreview({
       .then(async ([mod, res]) => {
         if (!res.ok) throw new Error(`파일을 받지 못했습니다 (${res.status})`)
         const ExcelJS = mod.default ?? mod
-        const workbook = new ExcelJS.Workbook()
-        await workbook.xlsx.load(await res.arrayBuffer())
+        const workbook = await loadXlsx(() => new ExcelJS.Workbook(), await res.arrayBuffer())
         if (cancelled) return
         const view = toSheetViews(workbook)
         setState({ status: 'ready', ...view })
