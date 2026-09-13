@@ -117,7 +117,7 @@ function MeterRow({
           )}
         </p>
       </div>
-      <div className="mt-1">
+      <div className="mt-0.5">
         <Meter view={view} strong={strong} />
       </div>
     </div>
@@ -128,7 +128,7 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
   return (
     <section className="min-w-0 rounded-lg border border-border bg-canvas p-3">
       <h3 className="mb-2.5 text-xs font-semibold text-ink">{title}</h3>
-      <div className="grid gap-2.5">{children}</div>
+      <div className="grid gap-2">{children}</div>
     </section>
   )
 }
@@ -288,38 +288,37 @@ export function ConsistencyPanel({
               ))}
             </div>
           )}
-        </Card>
-      </div>
-
-      {groups.scrFuncCoverage.length > 0 && (
-        <div className="border-t border-border px-4 py-2.5">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-            <h3 className="text-xs font-semibold text-ink">화면의 기능이 기능명세서에 옮겨졌나</h3>
-            <p className="text-xs text-ink-muted">
-              문서 {groups.scrFuncCoverage.length}개 · 검사한 항목 {groups.scrFuncCoverage.reduce((sum, view) => sum + view.total, 0)}개
-            </p>
-            <button
-              type="button"
-              onClick={() => setDocsOpen(!docsOpen)}
-              aria-expanded={docsOpen}
-              className="ml-auto flex items-center gap-1 rounded-md border border-border bg-surface px-2 py-1.5 text-xs text-ink-muted hover:bg-accent-soft hover:text-ink"
-            >
-              {docsOpen ? '문서별 접기' : '문서별 보기'}
-              <ChevronDown className={`h-3.5 w-3.5 ${docsOpen ? 'rotate-180' : ''}`} aria-hidden />
-            </button>
-          </div>
-          {docsOpen && (
-            <div className="mt-3 grid gap-2.5">
-              {groups.scrFuncCoverage.map((view) => (
-                <MeterRow key={view.key} view={view} gapNoun="아직 안 나옴" />
-              ))}
-              <p className="text-xs text-ink-subtle">
-                낮다고 틀린 것이 아닙니다 — 문서마다 기능을 적는 방식이 다릅니다
-              </p>
+          {groups.scrFuncCoverage.length > 0 && (
+            <div className="border-t border-border pt-2.5">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                <h3 className="text-xs font-semibold text-ink">화면의 기능이 기능명세서에 옮겨졌나</h3>
+                <p className="text-xs text-ink-muted">
+                  문서 {groups.scrFuncCoverage.length}개 · 검사한 항목 {groups.scrFuncCoverage.reduce((sum, view) => sum + view.total, 0)}개
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setDocsOpen(!docsOpen)}
+                  aria-expanded={docsOpen}
+                  className="ml-auto flex items-center gap-1 rounded-md border border-border bg-surface px-2 py-1.5 text-xs text-ink-muted hover:bg-accent-soft hover:text-ink"
+                >
+                  {docsOpen ? '문서별 접기' : '문서별 보기'}
+                  <ChevronDown className={`h-3.5 w-3.5 ${docsOpen ? 'rotate-180' : ''}`} aria-hidden />
+                </button>
+              </div>
+              {docsOpen && (
+                <div className="mt-3 grid gap-2.5">
+                  {groups.scrFuncCoverage.map((view) => (
+                    <MeterRow key={view.key} view={view} gapNoun="아직 안 나옴" />
+                  ))}
+                  <p className="text-xs text-ink-subtle">
+                    낮다고 틀린 것이 아닙니다 — 문서마다 기능을 적는 방식이 다릅니다
+                  </p>
             </div>
           )}
-        </div>
-      )}
+            </div>
+          )}
+        </Card>
+      </div>
 
       {open && (
         <div className="border-t border-border">
