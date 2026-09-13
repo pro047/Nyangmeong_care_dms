@@ -28,7 +28,14 @@ const EXPECTED_CLOCK = '20:14'
 /** UTC 로 해석하면 이 값이 나온다. 둘을 같이 봐야 "안 밀렸다" 가 확정된다. */
 const SHIFTED_CLOCK = '11:14'
 
-/** 저쪽 인계문 §2 의 축 9개. 값이 실측이라 그대로 쓴다. */
+/**
+ * 축 19개. 값이 실측이라 그대로 쓴다.
+ *
+ * **픽스처가 계약을 따라가야 한다.** 2026-09-13 에 축이 9 → 19 로 늘었는데 여기는 9개인
+ * 채로 뒀더니, `triangle` 과 문서별 9줄을 **화면에서 통째로 지워도 13/13 이 통과**했다
+ * (실제로 지워 보고 확인함). 검사가 만드는 화면에 그 축이 애초에 없어서다.
+ * 저쪽이 축을 더하면 여기도 더해야 한다 — 안 그러면 새 코드가 검사 밖에 남는다.
+ */
 const METRICS = [
   { axis: 'reference', from: 'FN', to: 'REQ', ok: 42, total: 42 },
   { axis: 'reference', from: 'FN', to: 'SCR', ok: 55, total: 58 },
@@ -39,6 +46,18 @@ const METRICS = [
   { axis: 'reqCoverage', from: null, to: null, ok: 37, total: 62 },
   { axis: 'reqCoverageWithDocs', from: null, to: null, ok: 37, total: 50 },
   { axis: 'scrCoverage', from: null, to: null, ok: 54, total: 54 },
+  // 아래 10개가 2026-09-13 에 늘어난 것이다.
+  { axis: 'triangle', from: null, to: null, ok: 653, total: 660 },
+  // `to` 에 문서 *종류*(SCR)가 아니라 문서 *키*(SCR-CMU)가 온다 — 다른 축과 뜻이 다르다.
+  { axis: 'scrFuncCoverage', from: null, to: 'SCR-ACC', ok: 51, total: 69 },
+  { axis: 'scrFuncCoverage', from: null, to: 'SCR-AIM', ok: 22, total: 44 },
+  { axis: 'scrFuncCoverage', from: null, to: 'SCR-CMU', ok: 15, total: 71 },
+  { axis: 'scrFuncCoverage', from: null, to: 'SCR-COM', ok: 16, total: 24 },
+  { axis: 'scrFuncCoverage', from: null, to: 'SCR-CSC', ok: 2, total: 11 },
+  { axis: 'scrFuncCoverage', from: null, to: 'SCR-HLT', ok: 31, total: 34 },
+  { axis: 'scrFuncCoverage', from: null, to: 'SCR-MAN', ok: 0, total: 4 },
+  { axis: 'scrFuncCoverage', from: null, to: 'SCR-MYP', ok: 98, total: 98 },
+  { axis: 'scrFuncCoverage', from: null, to: 'SCR-PLC', ok: 31, total: 31 },
 ]
 
 /** 실측 분포와 같은 건수 — error 14 · warning 107 · unresolved 28 = 149. */
@@ -181,7 +200,40 @@ try {
   check('V14', '등급이 한국어다',
     ['확인 필요', '참고', '보류', '미해결'].every((word) => text.includes(word)))
 
+  // ── 2026-09-13 에 늘어난 축 ──────────────────────────────────
+  // 새 축은 `others` 로 떨어지지 않고 제자리에 놓여야 한다.
+  check('V15', '연결이 서로 어긋나는 곳(triangle)이 보인다',
+    text.includes('연결이 서로 어긋나는 곳') && text.includes('653/660') && text.includes('7곳'),
+    text.split('\n').find((line) => line.includes('653/660')) ?? '(못 찾음)')
+
+  // 합치면 SCR-MAN 0/4 와 SCR-MYP 98/98 이 둘 다 사라진다 — 저쪽이 명시로 금지했다.
+  check('V16', '문서별 합계 비율을 안 만든다',
+    !text.includes('266/386') && text.includes('검사한 항목 386개'))
+
+  check('V17', '축 이름이 원문 그대로 새지 않는다', !text.includes('scrFuncCoverage'),
+    text.split('\n').filter((line) => line.includes('scrFuncCoverage')).join(' / ') || '없음')
+
   await page.screenshot({ path: 'test/e2e/shots/CV-collapsed.png' })
+
+  // 문서별 9줄이 **각각** 그려져야 한다 — 축 이름 하나에 to 만 다른 9행이 키 하나로
+  // 뭉치던 결함이 있었다(2026-09-13). 그 회귀를 여기서 막는다.
+  // 버튼이 없으면 던지지 말고 FAIL 로 적는다 — 스위트가 죽으면 뒤 항목을 못 읽는다.
+  const perDocButton = band.getByRole('button', { name: /문서별/ })
+  let perDoc = []
+  if ((await perDocButton.count()) > 0) {
+    await perDocButton.click()
+    await page.waitForTimeout(200)
+    perDoc = (await band.innerText())
+      .split('\n')
+      .filter((line) => /^SCR-[A-Z]{3}\b/.test(line.trim()))
+    await page.screenshot({ path: 'test/e2e/shots/CV-perdoc.png' })
+  }
+  check('V18', '문서별 9줄이 각각 그려진다', perDoc.length === 9, `${perDoc.length}줄`)
+  // 일이 어디 있는지 보이게 비율 낮은 순이다. 등수가 아니라는 문구도 같이 있어야 한다.
+  check('V19', '낮은 순으로 정렬되고 판정이 아니라고 밝힌다',
+    perDoc[0]?.startsWith('SCR-MAN') === true &&
+      (await band.innerText()).includes('낮다고 틀린 것이 아닙니다'),
+    perDoc[0] ?? '(없음)')
 
   await page.getByRole('button', { name: '목록 보기' }).click()
   await page.waitForTimeout(200)
