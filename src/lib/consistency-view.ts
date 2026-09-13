@@ -107,15 +107,37 @@ const AXIS_LABEL: Record<string, string> = {
   [AXIS.scrCoverage]: '화면이 기능명세서에 나오나',
 }
 
+/**
+ * 한 행을 유일하게 가리키는 키. **`from`·`to` 가 있으면 언제나 넣는다.**
+ *
+ * 원래는 `reference` 축일 때만 넣었다 — 첫 계약에서 나머지 축은 from/to 가 전부 null 이라
+ * 축 이름만으로 유일했기 때문이다. **그 전제가 2026-09-13 에 깨졌다**: 저쪽이 `to` 에 문서
+ * *종류*(`SCR`)가 아니라 문서 *키*(`SCR-CMU`)를 넣기 시작해서, `scrFuncCoverage` 9행이
+ * 축 이름 하나로 뭉쳤다(운영 데이터로 실측). **조용히 합쳐지는 것도 조용히 사라지는 것만큼
+ * 나쁘다** — 축 이름만으로 유일하다는 가정을 버린다.
+ *
+ * 기존 4축은 from/to 가 null 이라 키가 그대로다.
+ */
+function axisKey(metric: MetricRow): string {
+  return [metric.axis, metric.fromKind, metric.toKind].filter((part) => part !== null).join(':')
+}
+
+/**
+ * 모르는 축의 라벨. 축 이름을 그대로 쓰되 **`to` 가 있으면 붙인다** — 안 붙이면 문서별로
+ * 온 9행이 같은 이름으로 아홉 번 나와 어느 문서 것인지 알 수 없다.
+ */
+function fallbackLabel(metric: MetricRow): string {
+  const known = AXIS_LABEL[metric.axis]
+  if (known !== undefined) return known
+  const scope = [metric.fromKind, metric.toKind].filter((part) => part !== null).join('→')
+  return scope === '' ? metric.axis : `${metric.axis} · ${scope}`
+}
+
 function toView(metric: MetricRow): AxisView {
   const isReference = metric.axis === AXIS.reference
   return {
-    key: isReference
-      ? `${metric.axis}:${metric.fromKind}:${metric.toKind}`
-      : metric.axis,
-    label: isReference
-      ? referenceLabel(metric.fromKind, metric.toKind)
-      : (AXIS_LABEL[metric.axis] ?? metric.axis),
+    key: axisKey(metric),
+    label: isReference ? referenceLabel(metric.fromKind, metric.toKind) : fallbackLabel(metric),
     ok: metric.ok,
     total: metric.total,
     percent: percentOf(metric.ok, metric.total),
@@ -151,6 +173,7 @@ export type AxisGroups = {
  */
 export function axisGroups(metrics: MetricRow[]): AxisGroups {
   const views = metrics.map(toView)
+  // from/to 가 null 인 축은 키가 축 이름 그대로라 이 조회가 그대로 통한다(`axisKey` 참고).
   const pick = (axis: string) => views.find((view) => view.key === axis) ?? null
 
   const reference = views.filter((_, i) => metrics[i].axis === AXIS.reference)

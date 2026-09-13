@@ -112,6 +112,34 @@ describe('axisGroups', () => {
     expect(groups.others[0]).toMatchObject({ key: 'nfrCoverage', label: 'nfrCoverage' })
   })
 
+  it('축 이름은 같고 to 만 다른 행들을 서로 다르게 봐야 한다', () => {
+    // 2026-09-13 운영 실물. 저쪽이 `to` 에 문서 *종류*(SCR)가 아니라 문서 *키*(SCR-CMU)를
+    // 넣기 시작했다 — 축 이름만으로 유일하다는 전제가 깨졌다. 9행이 key 하나로 뭉치면
+    // 리액트 목록이 겹치고 화면에 한 줄만 남는다. 조용히 합쳐지는 것도 조용히 사라지는
+    // 것만큼 나쁘다.
+    const perDoc: MetricRow[] = [
+      { axis: 'scrFuncCoverage', fromKind: null, toKind: 'SCR-ACC', ok: 51, total: 69 },
+      { axis: 'scrFuncCoverage', fromKind: null, toKind: 'SCR-CMU', ok: 15, total: 71 },
+      { axis: 'scrFuncCoverage', fromKind: null, toKind: 'SCR-MAN', ok: 0, total: 4 },
+      { axis: 'scrFuncCoverage', fromKind: null, toKind: 'SCR-MYP', ok: 98, total: 98 },
+    ]
+    const groups = axisGroups(perDoc)
+
+    expect(groups.others).toHaveLength(4)
+    expect(new Set(groups.others.map((view) => view.key)).size).toBe(4)
+    // 라벨도 갈려야 한다 — 넷이 같은 이름이면 어느 문서 것인지 알 수 없다.
+    expect(new Set(groups.others.map((view) => view.label)).size).toBe(4)
+    expect(groups.others[2]).toMatchObject({ ok: 0, total: 4, gap: 4 })
+  })
+
+  it('from·to 가 둘 다 null 인 축은 키가 축 이름 그대로여야 한다', () => {
+    // 기존 4축(referenceTotal 등)의 키가 바뀌면 안 된다.
+    const groups = axisGroups(METRICS)
+
+    expect(groups.total?.key).toBe('referenceTotal')
+    expect(groups.coverage.reqNarrow?.key).toBe('reqCoverage')
+  })
+
   it('축이 빠져도 화면이 깨지지 않아야 한다', () => {
     const groups = axisGroups([METRICS[0]])
 
