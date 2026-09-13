@@ -807,6 +807,13 @@ UI 작업은 터널 없이도 진행할 수 있다.
       pdf·이미지는 제외 — 파서를 새로 들여야 해서다 ⓑ **크기 상한: 원본 1MB 이하.** 천장인 Vercel 응답
       4.5MB 보다 훨씬 아래이고, 오늘 본 가장 큰 문서(175KB)도 여유 있게 들어간다(실측).
       제외 형식이나 1MB 초과를 받았을 때 무엇을 돌려줄지는 설계 몫이다
+      ⓒ **형식 판정은 파일명 확장자 우선** (사람 결정 2026-09-13) — mimeType 은 보조다. 빈 값이
+      `application/octet-stream` 으로 저장되는 경로가 있다(`upload-dialog.tsx:131`). 운영 활성 문서
+      35건은 xlsx 18 · html 17 이고 전부 mimeType 이 확장자와 일치했다 — md·csv·txt 는 0건이라
+      그쪽 신고값은 모른다(실측, `search_documents` take 50)
+      ⓓ **CSV/TXT 는 UTF-8 만 읽는다** (사람 결정 2026-09-13) — 깨진 바이트는 U+FFFD 로 두고
+      응답에 경고를 싣는다. EUC-KR 재시도는 넣지 않는다: 운영에 csv·txt 가 0건이고, 로컬 Node
+      v24.10.0 은 `TextDecoder('euc-kr')` 를 지원하지만(실측) Vercel 런타임은 확인하지 못했다
    2. **xlsx 파서는 새로 들이지 않는다** — `exceljs 4.4.0` 이 이미 의존성이다(`package.json:35`).
       지금은 미리보기가 브라우저에서 `import('exceljs')` 로 쓴다(`spreadsheet-preview.tsx:247`).
       셀 값 서식 함수(`formatCellValue` 등)를 서버에서 재사용할 수 있는지는 확인하지 않았다(추정).
@@ -814,8 +821,11 @@ UI 작업은 터널 없이도 진행할 수 있다.
    3. 도구 모양은 설계에서 정한다 — 1·2단계와 같은 층(`src/lib/mcp/`)에 `read_document(id, versionNo?)`
       같은 도구 하나. HTML 은 태그를 걷고 텍스트만 줄지(토큰 절약) 원문을 줄지도 설계 몫이다.
       **올리기는 그대로 URL 직결**이다 — 예외는 읽기에만 연다
-   4. `CLAUDE.md` 의 "파일은 앱 서버를 거치지 않는다" 에 **읽기 예외 한 줄** — 보호 파일이라
-      **사람이 넣는다.**
+   4. ~~`CLAUDE.md` 의 "파일은 앱 서버를 거치지 않는다" 에 **읽기 예외 한 줄**~~ — **넣었다**
+      (2026-09-13, 사람 승인). 파이프라인 설계 프롬프트 `prompts/design.md` 의 "이 저장소의 제약"
+      절에도 같은 원칙이 박혀 있어 **거기에도 같은 예외를 넣었다** — 한쪽만 고치면 설계
+      에이전트가 "방향을 바꿔라" 지시를 따른다. 두 파일의 범위 밖 목록에서 이미 뒤집힌
+      `xlsx 미리보기` 도 뺐다
    **`CLAUDE.md` 인증 절에 MCP 한 줄은 아직 안 넣었다**(보호 파일 — 사람이 세션에서).
    worktree `../Nyangmeong_care_dms-pipeline-mcp-read` 와 브랜치 `pipeline/mcp-read` 는
    `feature/mcp` 에 합쳐졌으므로 지워도 된다(`.pipeline/mcp-read/` 산출물은 git 밖 —
