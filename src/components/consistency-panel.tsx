@@ -206,11 +206,11 @@ export function ConsistencyPanel({
   return (
     <section className="mb-5 rounded-xl border border-border bg-surface" aria-label="정합성 지표">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-border px-4 py-3">
-        <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
-          <h2 className="text-sm font-semibold text-ink">정합성</h2>
-          {/* 무엇을 보는 화면인지 한 줄로. 용어를 아는 사람만 읽는 화면이 되면 안 된다. */}
-          <p className="text-xs text-ink-muted">문서끼리 가리키는 ID 가 맞는지 검사한 결과</p>
-        </div>
+        {/* 부제를 안 단다 (2026-09-14, 사람 지시). *"문서끼리 가리키는 ID 가 맞는지 검사한
+            결과"* 라고 적었었는데, 카드가 셋이 되면서 **틀린 말이 됐다** — 오른쪽 카드는
+            "정의만 해 놓고 안 쓴 것"이라 ID 가 맞는지와 다른 질문이다. 그리고 카드마다
+            질문이 제목으로 붙어 있어 한 줄 요약이 할 일이 없다. */}
+        <h2 className="text-sm font-semibold text-ink">정합성</h2>
         {/* 이 숫자는 자동으로 갱신되지 않는다 — 문서를 올려도 안 바뀌고 정합성 저장소가
             손으로 돌려야 새 값이 온다. 시각이 안 보이면 낡은 숫자가 현재값으로 읽히므로
             "자동 갱신 안 됨" 을 말로도 적는다. */}
@@ -265,7 +265,9 @@ export function ConsistencyPanel({
           )}
         </Card>
 
-        <Card title="참고: 아직 안 쓴 것">
+        {/* 가운데 카드(`문서 사이 연결`)와 같은 화살표를 **반대로** 센다 — 저쪽은 가리킨
+            것이 실제로 있나(틀린 것), 여기는 앞 문서에 있는 것이 뒤 문서에 왔나(빠진 것). */}
+        <Card title="미반영 항목">
           {/* 두 REQ 축은 반드시 나란히. 25개만 보이면 오해다 — 그중 12건은 관리자·비기능이라
               화면설계서가 있을 수 없고 5건은 신규다. 좁은 분모를 바로 아래 들여쓰기로 붙여
               "같은 것을 다르게 센 값"임이 보이게 한다. */}
@@ -291,7 +293,7 @@ export function ConsistencyPanel({
           {groups.scrFuncCoverage.length > 0 && (
             <div className="border-t border-border pt-2.5">
               <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                <h3 className="text-xs font-semibold text-ink">화면의 기능이 기능명세서에 옮겨졌나</h3>
+                <h3 className="text-xs font-semibold text-ink">화면설계서의 기능이 기능명세서에 옮겨졌나</h3>
                 <p className="text-xs text-ink-muted">
                   문서 {groups.scrFuncCoverage.length}개 · 검사한 항목 {groups.scrFuncCoverage.reduce((sum, view) => sum + view.total, 0)}개
                 </p>
