@@ -61,6 +61,7 @@
 | MCP 접근 — 토큰 상태 (2026-09-11) | **무상태 JWT.** client_id · 인가 코드 · 액세스 · 리프레시 전부 **`AUTH_SECRET` 에서 파생한 별도 키**(아래 *토큰 서명 키* 행)로 서명한 JWT 이고 `aud` 로 가른다. 스키마 변경 없음 | 세션이 이미 무효화 불가 30일 JWT 라(HANDOFF 미룬 항목 `session.ts:6`) 같은 노출을 같은 방식으로 받고 같은 계기("팀원 이탈")로 함께 고친다. 테이블 3개는 1회용 코드·개별 취소를 주지만 운영 SQL 1회 + 코드 3배다. **받는 대가**: 코드가 60초 안에 재사용될 수 있고(PKCE 가 가로채기를 막는다), 리프레시 토큰 개별 취소 불가(전역 무효화는 `AUTH_SECRET` 교체) |
 | MCP 접근 — 파일 경로 (2026-09-11) | **도구는 URL 만 준다.** 파일 바이트가 앱 서버를 지나는 도구는 없다. 웹 클라이언트는 샌드박스가 S3 에 직접 붙는 것(A)을 **먼저 실측**하고, 서버 중계(B)는 열지 않는다 | "파일은 앱 서버를 거치지 않는다"를 MCP 에도 그대로 적용한다. B 는 그 원칙을 깨고 Vercel 응답 상한(4.5MB)에 걸리며 업로드는 원리상 안 된다(모델이 base64 로 넘겨야 한다). A 가 안 되면 **그때** B 를 읽기 전용·작은 파일 예외로 다시 올린다 |
 | MCP 접근 — 토큰 서명 키 (2026-09-11) | **OAuth 토큰은 `AUTH_SECRET` 이 아니라 HKDF 로 파생한 키(`info = 'dms:oauth'`)로 서명한다.** 세션 쪽(`session.ts`·`proxy.ts`)은 건드리지 않는다 | 세션 검증기는 `aud` 를 요구하지 않는다. 같은 키면 **인증 없이 받는 `client_id`**(만료 없음)를 `dms_session` 쿠키에 넣어 로그인이 됐다 — 코드 리뷰가 잡은 치명 결함(§'MCP 서버' 의 *코드 리뷰*). `aud` 분리는 **양쪽 검증기가 모두 `aud` 를 볼 때만** 성립한다. 대안 B(세션에 `aud` 를 달고 요구)는 전원 재로그인이고 보호 이중 검사 두 곳을 고친다. 파생이라 `AUTH_SECRET` 교체 = 전역 무효화는 그대로 성립한다. **이 키를 세션·프록시에서 import 하지 말 것** |
+| MCP 접근 — 도구의 폴더 선택 (2026-09-13) | **`request_upload` 가 `classifyFileName` 결과를 `suggestedFolder` 로 얹어 준다.** 강제는 아니고 최종 선택은 에이전트가 한다 | 도구 경로에는 사람 확인이 없다. 규칙(정규화→노이즈 제거→키 길이 점수)과 에이전트 판단이 따로 놀면 **같은 파일이 화면과 도구에서 다른 폴더로 간다** — 이 리포는 폴더 이름이 두 계층에 겹쳐 있어(`화면설계서/마이페이지` 와 `기능명세서/마이페이지`) 특히 그렇다. 대안 둘: (a) 안 준다 — 단순하지만 갈라짐이 남는다 (b) `folderId` 가 없으면 규칙으로 **채운다** — 가장 잘 맞지만 에이전트가 의도적으로 고른 값과 싸운다. **`create_document` 의 후보 거절은 이걸 못 막는다** — 폴더를 처음부터 틀리게 고르면 후보 자체가 안 잡힌다 |
 | MCP 접근 — 리프레시 만료 (2026-09-11) | **리프레시 토큰의 만료는 최초 동의 시각(`auth_time`) + 30일로 고정.** 리프레시해도 늘어나지 않는다 | 리프레시마다 새 30일을 주면 30일 안에 한 번씩만 갱신해도 길드 재검사 없이 무기한 이어진다 — 웹 세션은 30일마다 디스코드 로그인(= 길드 검사)을 다시 거친다. 대안(리프레시 때 길드 재확인)은 사용자의 디스코드 토큰이 필요한데 저장하지 않는다. 최대 노출 = 30일 + 액세스 1시간 |
 
 명시적으로 안 물어보고 정한 것 (이견 있으면 알려줄 것):
@@ -1631,7 +1632,7 @@ select created_by, count(*), min(created_at), max(created_at) from documents gro
 
 ---
 
-## MCP 서버 · 1단계 (2026-09-11 코드 · 2026-09-12 배포) — 읽기 도구 4개 · **운영 동작 확인됨 · ⓑⓔⓕⓖ 남음**
+## MCP 서버 · 1~2단계 (1단계 2026-09-11 코드 · 2026-09-12 배포 · 2단계 2026-09-13 코드 · **미배포**) — 읽기 4개 + 올리기 5개 · **1단계 운영 동작 확인됨 · ⓑⓔⓕⓖ 남음 · 2단계는 아직 배포 전**
 
 Claude Code·Codex CLI 와 claude.ai·ChatGPT 웹에서 DMS 문서를 **찾아 읽고, 분석 결과를
 새 문서나 새 판으로 올리게** 한다. 존재 이유 셋 중 "어디 있는지 못 찾는다"의 연장이다 —
@@ -1736,7 +1737,7 @@ POST 는 `sameSite: lax` 쿠키라 다른 사이트의 폼으로는 세션이 �
 | `get_document` | `id` | 메타 + 버전 전체(`versionNo desc`) | — |
 | `get_download_url` | `id` `versionNo?` | `{ url(5분), fileName, mimeType, sizeBytes }` | `presignDownload` |
 | `find_similar_documents` | `fileName` `folderId` | 새 판 후보 + 판번호 경고 | `findSimilarDocuments` `attachVersionWarning` |
-| `request_upload` | `fileName` `contentType` `size` | `{ s3Key, url(5분), keyToken, contentType, method:'PUT' }` + 안내문 | `buildS3Key` `presignUpload` `signUploadToken` |
+| `request_upload` | `fileName` `contentType` `size` | `{ s3Key, url(5분), keyToken, contentType, method:'PUT', suggestedFolder }` + 안내문 | `buildS3Key` `presignUpload` `signUploadToken` **`classifyFileName`** |
 | `create_document` | `s3Key` `keyToken` `fileName` `mimeType` `title?` `description?` `folderId?` `ignoreSimilar?` | `{ id, title }` | `upload-commit.createDocument` |
 | `add_version` | `documentId` `s3Key` `keyToken` `fileName` `mimeType` `changeNote?` | `{ id, versionNo }` | `upload-commit.addVersion` (소유자 검사 포함) |
 | `discard_upload` | `s3Key` `keyToken` | `{ deleted }` | `uploads/discard` 와 같은 판정 |
@@ -1781,7 +1782,9 @@ claude.ai 는 코드 실행 샌드박스의 네트워크를 "Package managers an
 ### 하지 않는 것
 
 - 서버가 파일 내용을 읽어 돌려주는 도구 (③ B) — 실측 전에는 안 연다
-- 자동 분류(`classify-plan`)를 도구로 — 에이전트는 `list_folders` 로 고른다. 필요가 보이면 다음
+- 자동 분류를 **강제**하는 것 — `request_upload` 는 `classifyFileName` 의 결과를 `suggestedFolder`
+  로 **알려만 준다**(2026-09-13 사람 결정). 최종 `folderId` 는 에이전트가 고르고 서버는 그 값을
+  검사하지 않는다. 폴더 **생성**·`classify-plan` 의 이동 계획은 도구로 열지 않는다 — 화면에서 한다
 - 삭제·복구·영구삭제·태그·폴더 생성 — 읽기와 올리기가 목적이다. 나머지는 화면에서
 - CIMD(client_id 가 URL) — 2026-07-28 스펙이 DCR 대신 미는 방식. claude.ai·ChatGPT·CLI 가 아직 DCR 을 받으므로 v1 은 DCR. 메타데이터에 `client_id_metadata_document_supported: false`
 - 스코프 세분화 — 스코프 하나(`dms`)
@@ -1979,6 +1982,118 @@ PR #1 → `main` 머지(`c2e658d`) → Vercel Production 배포 `success`. 운�
 - **공식 문서** (2026-09-11 검색): claude.ai 커넥터는 OAuth/무인증만 · 콜백
   `https://claude.ai/api/mcp/auth_callback`(claude.com 이전 예고) · DCR 지원. ChatGPT 는
   OAuth 필수 · DCR/CIMD · 콜백 3개. claude.ai 샌드박스에 "specific domains" 네트워크 설정 존재
+
+### 2단계 구현 (2026-09-13) — 파이프라인 `mcp-upload` · 코드 리뷰 6건 반영 · **미배포**
+
+브랜치 `feature/mcp-upload`. `.pipeline/mcp-upload/DESIGN.md` 를 그대로 구현했다. 신규
+소스 2개(`src/lib/upload-commit.ts` · `src/lib/mcp/upload-tools.ts`), 수정 4개
+(`src/lib/mcp/server.ts` · `src/app/api/mcp/route.ts` · `src/app/api/documents/route.ts` ·
+`src/app/api/documents/[id]/versions/route.ts` · `src/app/api/uploads/discard/route.ts` —
+5개), 문서 1개(이 절). 설계의 `TEST_FILES` 중 신규 2개(`upload-commit.test.ts` ·
+`upload-tools.test.ts`)와 수정 2개(`src/lib/mcp/server.test.ts` ·
+`src/app/api/mcp/route.test.ts`)는 이 절 작성 시점에는 검증 단계 몫으로 비어 있었으나,
+아래 "실행해서 확인한 것"이 적힌 시점에는 이미 채워져 통과 상태다 — 파이프라인이 1차
+검증에서 이 두 파일을 고치다 범위 이탈(`FAIL_LOG.md`)로 걸려 설계가 `route.test.ts` 를
+`ALLOWED_FILES`·`TEST_FILES` 에 추가하는 쪽으로 수정·재승인됐고, 그 결과물이 작업
+트리에 그대로 남아 있다. 이 구현 절 자신은 그 두 파일을 새로 쓰지 않았다(구현 단계 금지
+사항). 기존 라우트 테스트 3개는 무수정으로 전부 통과한다.
+
+**설계와 갈린 것 둘 — 둘 다 동작이 아니라 타입·모듈 로딩 문제다.**
+
+1. **`find_similar_documents` 의 `folderId` — 필수가 아니라 선택으로 구현했다.**
+   위 도구 표(`:1739`, 이 절 밖이라 고치지 않음)는 `fileName` `folderId`(필수)라고 적혀
+   있지만, `DESIGN.md` §2-2·§2-4 는 `folderId?`(선택)로 명시했고 판단검증(`JUDGE.md` #33)이
+   이 편차를 확인한 뒤 "설계 방향대로 선택으로 구현, 편차만 기록"으로 정리했다. 동작에는
+   영향이 없다 — `findSimilarDocuments` 가 `folderId === null` 을 빈 배열로 떨어뜨리므로
+   (`similar-document.ts:120`) 미분류 문서는 어느 쪽이든 후보가 없다.
+2. **`upload-commit.ts` 의 세 함수가 `deps: CommitDeps` 전체가 아니라
+   `Omit<CommitDeps, 'deleteObject'>`(`createDocument`·`addVersion`) /
+   `Omit<CommitDeps, 'headObjectSize'>`(`discardUpload`) 를 받는다.** `DESIGN.md` §2-1 코드
+   블록은 세 함수 모두 `CommitDeps` 하나로 적었지만, 그대로 구현하면 `documents/route.ts`·
+   `[id]/versions/route.ts` 는 안 쓰는 `deleteObject` 를, `uploads/discard/route.ts` 는 안
+   쓰는 `headObjectSize` 를 어쩔 수 없이 `@/lib/s3` 에서 새로 import 해야 했다. 그런데 기존
+   세 `route.test.ts` 의 `vi.mock('@/lib/s3', ...)` 는 그 함수를 목에 안 넣어 두었고
+   (`documents/route.test.ts:22` 는 `deleteObject` 없음, `discard/route.test.ts:15` 는
+   `headObjectSize` 없음), vitest 는 목에 없는 named export 를 실제로 참조하는 순간
+   "No 'X' export is defined on the mock" 로 던진다 — **실측**(`npm test` 로 27건 실패 확인
+   후 원인 특정). `Omit` 으로 각 함수가 실제로 쓰는 의존성만 요구하게 좁혀서 라우트가
+   안 쓰는 import 를 하지 않게 했다 — 세 `route.test.ts` 를 한 글자도 안 고치고 그대로
+   통과시키는 것이 설계 §3-A 의 불변식이라 이 좁히기가 필요했다.
+3. **`api/mcp/route.ts` 의 `commitDeps`·`registerDmsTools(...)` 호출 인자는 모듈 최상위가
+   아니라 `createMcpHandler` 팩토리 콜백 안에서 만든다.** `mcp-handler` 가 `legacy: 'stateless'`
+   모드라 이 팩토리는 인증 통과 후 요청마다 새로 불린다(**코드확인**
+   `node_modules/mcp-handler/dist/index.js:39-45`). 처음에 모듈 최상위에 뒀더니 기존
+   `api/mcp/route.test.ts`(`@/lib/s3` 를 `presignDownload` 하나로만 목함)가 **모듈 로딩
+   자체에서** 같은 이유로 깨졌다 — 두 401 전용 테스트는 인증에서 끊겨 이 팩토리를 부른
+   적도 없는데, 최상위 코드는 import 시점에 무조건 실행되기 때문이다. 콜백 안으로
+   옮기니 그 두 테스트가 다시 통과했다.
+4. **`request_upload` 응답의 `instructions` 문구에서 "값이 다르면 S3 가 403 을
+   돌려줍니다"를 뺐다.** `DESIGN.md` §3-B·[사람 확인 필요] 8은 이 주장을 근거로 썼지만
+   판단검증(`JUDGE.md` #18)이 소스로 반박했다 — `@aws-sdk/s3-request-presigner` 가
+   `content-type` 을 unsignable 헤더로 빼므로(`dist-cjs/index.js:47`) 서명 검증에
+   안 들어가고, 값이 달라도 PUT 은 **200 으로 성공**한다. 실제 위험은 403 이 아니라
+   S3 에 저장된 Content-Type 이 DB `mimeType` 과 갈려 미리보기가 깨지는 것이다.
+   `JUDGE.md` 의 지시(§작업 게이트 — 반박된 주장에 기댄 부분은 그대로 구현하지 않는다)에
+   따라 `upload-tools.ts` 의 `toRequestUploadResult` 안내문을 그 근거로 다시 썼다
+   (`src/lib/mcp/upload-tools.ts:125` 부근). 관련 테스트(`upload-tools.test.ts:252-253`)는
+   문구 전체가 아니라 `contentType` 값 포함 여부만 보므로 그대로 통과한다.
+
+**낡은 테스트 2건이 있었고, 이 절을 쓰는 시점에는 이미 해소돼 있다.** 원래
+`server.test.ts:34`(새 `Deps` 타입에 mock 인자가 안 맞음)와 `api/mcp/route.test.ts`
+(`upload-tools.ts` 가 모듈 최상위에서 읽는 `MAX_UPLOAD_BYTES` 가 그 파일의 `@/lib/s3`
+목에 없어 모듈 로딩 자체가 깨짐)이 원인이었다 — 구현 단계 자신은 "테스트 파일을 쓰지
+않는다"는 금지 때문에 둘 다 손대지 않고 검증 단계로 넘겼었다. 그런데 `DESIGN.md` 가
+`route.test.ts` 를 뒤늦게 `ALLOWED_FILES`·`TEST_FILES` 에 넣는 쪽으로 재승인되면서(위
+문단), 두 파일 모두 이미 고쳐진 채로 작업 트리에 남아 있다 — `server.test.ts` 는 mock
+인자에 새 필드 5개를 채우고 등록 도구 단언을 9개로 늘렸고, `route.test.ts` 는
+`vi.mock('@/lib/s3', ...)` 에 `MAX_UPLOAD_BYTES: 100 * 1024 * 1024` 한 줄을 더했다
+(둘 다 설계 §5-C 가 적어 둔 방법 그대로). 그래서 이 구현 절이 새로 만들 "인계 항목"은
+없다.
+
+**실행해서 확인한 것** (이 절 작성 시점, 작업 트리 전체 기준) —
+
+```
+$ npx vitest run
+ Test Files  54 passed (54)
+      Tests  804 passed (804)
+
+$ npm run lint
+> dms@0.1.0 lint
+> eslint
+(출력 없음 = 경고·에러 0)
+
+$ npm run build
+✓ Compiled successfully in 803ms
+  Running TypeScript ... Finished TypeScript in 1709ms ...
+(라우트 목록에 새 엔드포인트 없음, ƒ Proxy (Middleware) 있음)
+```
+
+`npm test && npm run lint && npm run build` 전부 통과 — 이 파이프라인 단계의 검증 게이트
+기준으로 초록이다.
+
+#### 코드 리뷰 (2026-09-13) — 6건, 전부 수정
+
+파이프라인 완주 뒤 `/code-review high` 를 작업 트리에 돌렸다. **6건이 전부 MCP 도구 경로에
+있었다** — 라우트 껍데기화(단계 순서·에러 해석·제목 판정 쿼리 합치기)는 지적 0건이다.
+화면에는 사람과 선택기가 있어서 닿지 않던 입력 표면이 도구로 열린 것이 공통 원인이다.
+
+| 등급 | 결함 | 수정 | 회귀 테스트 |
+|---|---|---|---|
+| 중간 | 없는 `folderId` 를 아무도 안 봐서 `document.create` 가 P2003 으로 던지고 **500 + S3 고아** | `version-create.ts` 에 `isMissingRelation`, `createDocument` 가 400 `폴더를 찾을 수 없습니다`로 | `upload-commit.test.ts` — P2003 이면 400 이고 알림 안 감 |
+| 중간 | `request_upload` 가 분류 실패 시 `folderId: null` 을 주는데 `create_document` 스키마가 `null` 을 **거부** — 받은 값을 그대로 넘기는 흐름이 깨지고 객체는 고아 | 두 스키마를 `.nullish()` 로, 도구 안에서 `?? undefined` 로 모음 | 스키마가 `null` 수용 · `null` 이면 후보 조회 없이 폴더 없이 커밋 |
+| 중간 | 실패·거절 응답에 `s3Key` 도 뒷정리 안내도 없다. 화면은 `upload-flow.ts:88` 이 항상 discard 를 쏘는데 도구 경로엔 그 자리가 없어 **최대 100MB 가 S3 에 남는다** | `uploadFailure(error, s3Key, extra?)` 로 통일 — `error`·`s3Key`·`discard_upload` 안내 | `uploadFailure` 단위 2건 + `create_document`·`add_version` 응답 2건 |
+| 낮음 | `request_upload` 의 `size` 가 받기만 하고 안 쓰인다. presign 은 content-length 를 서명하지 않아 `size:1` 로 받아 500MB 를 PUT 해도 통과 — **가짜 보증** | 주석으로 "미리 거르는 용도, 실제 상한은 커밋 때 HeadObject" 를 못박음 | (기존 스키마 테스트 유지) |
+| 낮음 | 도구 경로가 `titleFromFileName` 을 스키마 밖에서 불러 **화면이 거부하는 200자 초과 제목**을 저장할 수 있다 | `toolTitle()` 이 `TITLE_MAX_LENGTH` 에서 자른다 | 250자 파일명 → 제목 200자 |
+| 낮음 | `ignoreSimilar: true` 여도 활성 문서 전체를 긁는 후보 조회를 먼저 돌린다 (커넥션 상한 5) | `folder !== undefined && !ignoreSimilar` 로 조회 자체를 안 함 | `documentFindMany` 미호출 단언 |
+
+**도구 실패 응답의 계약이 바뀌었다** — 평문에서 JSON(`{error, s3Key, hint}`)으로. 그래서
+`server.test.ts` 의 낡은 단언 2건을 고쳤다. **화면 라우트 3개의 테스트는 여전히 무수정**이다.
+
+**화면 동작이 한 군데 바뀐다**: 없는 `folderId` 로 `POST /api/documents` 하면 500 → 400 이다.
+화면은 선택기에서 고르므로 실제로 닿기 어렵고, 모르는 오류로 흘리는 것보다 400 이 맞다.
+
+**검증** (실측, 수정 후) — `npx vitest run` **54파일 815건**(파이프라인 완주 시점 806 + 9) ·
+`tsc --noEmit` · eslint(변경 영역) · `npm run build` 라우트 27개 + `ƒ Proxy (Middleware)`.
 
 ---
 
