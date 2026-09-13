@@ -887,6 +887,13 @@ UI 작업은 터널 없이도 진행할 수 있다.
       pdf·이미지는 제외 — 파서를 새로 들여야 해서다 ⓑ **크기 상한: 원본 1MB 이하.** 천장인 Vercel 응답
       4.5MB 보다 훨씬 아래이고, 오늘 본 가장 큰 문서(175KB)도 여유 있게 들어간다(실측).
       제외 형식이나 1MB 초과를 받았을 때 무엇을 돌려줄지는 설계 몫이다
+      ⓒ **형식 판정은 파일명 확장자 우선** (사람 결정 2026-09-13) — mimeType 은 보조다. 빈 값이
+      `application/octet-stream` 으로 저장되는 경로가 있다(`upload-dialog.tsx:131`). 운영 활성 문서
+      35건은 xlsx 18 · html 17 이고 전부 mimeType 이 확장자와 일치했다 — md·csv·txt 는 0건이라
+      그쪽 신고값은 모른다(실측, `search_documents` take 50)
+      ⓓ **CSV/TXT 는 UTF-8 만 읽는다** (사람 결정 2026-09-13) — 깨진 바이트는 U+FFFD 로 두고
+      응답에 경고를 싣는다. EUC-KR 재시도는 넣지 않는다: 운영에 csv·txt 가 0건이고, 로컬 Node
+      v24.10.0 은 `TextDecoder('euc-kr')` 를 지원하지만(실측) Vercel 런타임은 확인하지 못했다
    2. **xlsx 파서는 새로 들이지 않는다** — `exceljs 4.4.0` 이 이미 의존성이다(`package.json:35`).
       지금은 미리보기가 브라우저에서 `import('exceljs')` 로 쓴다(`spreadsheet-preview.tsx:247`).
       셀 값 서식 함수(`formatCellValue` 등)를 서버에서 재사용할 수 있는지는 확인하지 않았다(추정).
