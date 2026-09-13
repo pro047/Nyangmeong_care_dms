@@ -2,23 +2,47 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { McpServer } from '@modelcontextprotocol/server'
 import type { PrismaClient } from '@/generated/prisma/client'
 import { registerDmsTools } from '@/lib/mcp/server'
+import { SIMILAR_CANDIDATES_EXIST } from '@/lib/mcp/upload-tools'
 import { ACTIVE_DOCUMENT_NOT_FOUND } from '@/lib/trash'
+import { VERSION_FORBIDDEN } from '@/lib/ownership'
+import { titleFromFileName } from '@/lib/title'
 
 // 실제 DB·S3 없이 "도구가 무엇을 어떤 인자로 조회하고 무엇을 돌려주는가"만 본다.
-// server.ts 가 prisma·presignDownload 를 주입받게 된 이유가 이 테스트다.
+// server.ts 가 prisma·presign·commit 을 주입받게 된 이유가 이 테스트다.
 type ToolResult = {
   content: { type: string; text: string }[]
   structuredContent?: Record<string, unknown>
   isError?: boolean
 }
 type ToolCallback = (args: Record<string, unknown>, ctx: unknown) => Promise<ToolResult>
+type ZodLike = { parse: (v: unknown) => Record<string, unknown>; safeParse: unknown }
 
 const documentFindMany = vi.fn()
 const documentFindFirst = vi.fn()
 const folderFindMany = vi.fn()
 const presignDownload = vi.fn()
+const presignUpload = vi.fn()
+const buildS3Key = vi.fn()
+const signUploadToken = vi.fn()
+const commitCreateDocument = vi.fn()
+const commitAddVersion = vi.fn()
+const commitDiscardUpload = vi.fn()
 
 const tools = new Map<string, { config: { inputSchema?: unknown }; cb: ToolCallback }>()
+
+const ADMIN_DISCORD_ID = '375871831044915200'
+const VIEWER = { id: 'user_1', discordId: '1000000000000000001', username: '홍길동' }
+// auth.ts(verifyMcpBearer)가 만드는 모양 — 사용자 값은 extra 에 있다.
+const AUTH_CTX = {
+  http: {
+    authInfo: {
+      token: 't',
+      clientId: 'c',
+      scopes: ['dms'],
+      extra: { userId: VIEWER.id, discordId: VIEWER.discordId, username: VIEWER.username },
+    },
+  },
+}
 
 function setup() {
   tools.clear()
@@ -31,7 +55,19 @@ function setup() {
     document: { findMany: documentFindMany, findFirst: documentFindFirst },
     folder: { findMany: folderFindMany },
   } as unknown as PrismaClient
-  registerDmsTools(server, { prisma, presignDownload })
+  registerDmsTools(server, {
+    prisma,
+    presignDownload,
+    presignUpload,
+    buildS3Key,
+    signUploadToken,
+    adminDiscordId: ADMIN_DISCORD_ID,
+    commit: {
+      createDocument: commitCreateDocument,
+      addVersion: commitAddVersion,
+      discardUpload: commitDiscardUpload,
+    },
+  })
 }
 
 function call(name: string, args: Record<string, unknown>) {
@@ -40,18 +76,43 @@ function call(name: string, args: Record<string, unknown>) {
   return tool.cb(args, {})
 }
 
+// SDK 는 콜백 전에 inputSchema 로 파싱한다(기본값 적용 포함). 올리기 도구는 그걸 흉내 낸다.
+function callWithAuth(name: string, args: Record<string, unknown>, ctx: unknown = AUTH_CTX) {
+  const tool = tools.get(name)
+  if (!tool) throw new Error(`도구 ${name} 이 등록되지 않았다`)
+  return tool.cb((tool.config.inputSchema as ZodLike).parse(args), ctx)
+}
+
 beforeEach(() => {
   documentFindMany.mockReset().mockResolvedValue([])
   documentFindFirst.mockReset()
   folderFindMany.mockReset().mockResolvedValue([])
   presignDownload.mockReset()
+  presignUpload.mockReset().mockResolvedValue('https://s3.example/put?X-Amz-Signature=abc')
+  buildS3Key.mockReset().mockReturnValue('documents/new-uuid.pdf')
+  signUploadToken.mockReset().mockResolvedValue('key_token_1')
+  commitCreateDocument.mockReset().mockResolvedValue({ ok: true, status: 201, value: { id: 'doc_new', title: '보고서' } })
+  commitAddVersion
+    .mockReset()
+    .mockResolvedValue({ ok: true, status: 201, value: { id: 'doc_1', title: '문서', versionNo: 3 } })
+  commitDiscardUpload.mockReset().mockResolvedValue({ ok: true, status: 200, value: { deleted: true } })
   setup()
 })
 
 describe('registerDmsTools — 등록', () => {
-  it('1단계 도구 4개만 등록해야 한다 (업로드 도구는 2단계)', () => {
+  it('읽기 4개와 올리기 5개, 도구 9개를 등록해야 한다 (MILESTONES 도구 표)', () => {
     expect([...tools.keys()].sort()).toEqual(
-      ['get_document', 'get_download_url', 'list_folders', 'search_documents'].sort(),
+      [
+        'search_documents',
+        'list_folders',
+        'get_document',
+        'get_download_url',
+        'find_similar_documents',
+        'request_upload',
+        'create_document',
+        'add_version',
+        'discard_upload',
+      ].sort(),
     )
   })
 
@@ -254,5 +315,341 @@ describe('list_folders', () => {
     expect(result.structuredContent).toEqual({
       folders: [{ id: 'f1', name: '회의록', parentId: null, documentCount: 2 }],
     })
+  })
+})
+
+describe('s3Key 노출 — 읽기 도구는 감추고 request_upload 만 방금 발급한 키를 싣는다', () => {
+  it('search_documents·list_folders 조회 select 에 s3Key 가 없어야 한다', async () => {
+    await call('search_documents', { take: 20 })
+    await call('list_folders', {})
+
+    expect(JSON.stringify(documentFindMany.mock.calls[0][0].select)).not.toContain('s3Key')
+    expect(JSON.stringify(folderFindMany.mock.calls[0][0].select)).not.toContain('s3Key')
+  })
+
+  it('request_upload 응답에는 방금 발급한 s3Key 가 있어야 한다', async () => {
+    const result = await callWithAuth('request_upload', {
+      fileName: '보고서.pdf',
+      contentType: 'application/pdf',
+      size: 1234,
+    })
+
+    expect(result.structuredContent).toHaveProperty('s3Key', 'documents/new-uuid.pdf')
+  })
+})
+
+describe('올리기 도구 5개 — 인증 정보가 없으면 아무것도 부르지 않는다', () => {
+  const CASES: [string, Record<string, unknown>][] = [
+    ['find_similar_documents', { fileName: '설계서_v0.6.html', folderId: 'f1' }],
+    ['request_upload', { fileName: '보고서.pdf', contentType: 'application/pdf', size: 1234 }],
+    [
+      'create_document',
+      { s3Key: 'documents/a.pdf', keyToken: 't', fileName: '보고서.pdf', mimeType: 'application/pdf', folderId: 'f1' },
+    ],
+    [
+      'add_version',
+      { documentId: 'doc_1', s3Key: 'documents/a.pdf', keyToken: 't', fileName: '보고서.pdf', mimeType: 'application/pdf' },
+    ],
+    ['discard_upload', { s3Key: 'documents/a.pdf', keyToken: 't' }],
+  ]
+
+  const CTXS: [string, unknown][] = [
+    ['ctx 에 http 없음', {}],
+    ['authInfo 없음', { http: {} }],
+    ['extra 에 사용자 값 없음', { http: { authInfo: { token: 't', clientId: 'c', scopes: ['dms'], extra: {} } } }],
+  ]
+
+  for (const [name, args] of CASES) {
+    it.each(CTXS)(`${name}: %s 이면 isError 이고 prisma·S3·commit 을 부르지 않아야 한다`, async (_label, ctx) => {
+      const result = await callWithAuth(name, args, ctx)
+
+      expect(result.isError).toBe(true)
+      expect(result.content[0].text).toBe('인증 정보를 읽을 수 없습니다.')
+      for (const fn of [
+        documentFindMany,
+        documentFindFirst,
+        folderFindMany,
+        presignUpload,
+        buildS3Key,
+        signUploadToken,
+        commitCreateDocument,
+        commitAddVersion,
+        commitDiscardUpload,
+      ]) {
+        expect(fn).not.toHaveBeenCalled()
+      }
+    })
+  }
+})
+
+describe('find_similar_documents', () => {
+  const FOLDER = 'folder_screen_main'
+  const row = (id: string, createdById: string, fileName: string) => ({
+    id,
+    folderId: FOLDER,
+    createdById,
+    versions: [{ fileName }],
+  })
+
+  it('folderId 가 없으면 후보 조회 자체를 하지 않고 빈 배열이어야 한다', async () => {
+    const result = await callWithAuth('find_similar_documents', { fileName: '03_메인페이지_화면설계서_v0.6.html' })
+
+    expect(documentFindMany).not.toHaveBeenCalled()
+    expect(result.structuredContent).toEqual({ candidates: [] })
+  })
+
+  it('같은 폴더의 내 문서만 후보로 내고 각 후보에 판번호 경고를 얹어야 한다', async () => {
+    documentFindMany.mockResolvedValue([
+      row('doc_mine', VIEWER.id, '03_메인페이지_화면설계서_v0.3_20260819.html'),
+      // 남의 문서 — 붙이면 403 이라 후보에서 빠진다 (새 권한 개념이 아니라 기존 소유자 경계).
+      row('doc_other', 'user_2', '03_메인페이지_화면설계서_v0.2_20260801.html'),
+    ])
+
+    const result = await callWithAuth('find_similar_documents', {
+      fileName: '03_메인페이지_화면설계서_v0.6_20260826.html',
+      folderId: FOLDER,
+    })
+
+    expect(result.isError).toBeUndefined()
+    expect(result.structuredContent).toEqual({
+      candidates: [
+        { documentId: 'doc_mine', latestFileName: '03_메인페이지_화면설계서_v0.3_20260819.html', warning: null },
+      ],
+    })
+    expect(JSON.parse(result.content[0].text)).toEqual(result.structuredContent)
+    // 후보의 최신 파일명은 versionNo desc 로 고른 판이다.
+    expect(documentFindMany.mock.calls[0][0].select.versions.orderBy).toEqual({ versionNo: 'desc' })
+  })
+
+  it('토큰 사용자가 관리자 discordId 면 남의 문서도 후보로 내야 한다 (adminDiscordId 전달)', async () => {
+    documentFindMany.mockResolvedValue([row('doc_other', 'user_2', '03_메인페이지_화면설계서_v0.3_20260819.html')])
+    const adminCtx = {
+      http: {
+        authInfo: {
+          ...AUTH_CTX.http.authInfo,
+          extra: { ...AUTH_CTX.http.authInfo.extra, discordId: ADMIN_DISCORD_ID },
+        },
+      },
+    }
+
+    const result = await callWithAuth(
+      'find_similar_documents',
+      { fileName: '03_메인페이지_화면설계서_v0.6_20260826.html', folderId: FOLDER },
+      adminCtx,
+    )
+
+    const candidates = (result.structuredContent as { candidates: { documentId: string }[] }).candidates
+    expect(candidates.map((c) => c.documentId)).toEqual(['doc_other'])
+  })
+})
+
+describe('request_upload — 파일은 앱 서버를 거치지 않는다', () => {
+  const ARGS = { fileName: '01_요구사항 정의서_v0.3.xlsx', contentType: 'application/vnd.ms-excel', size: 1234 }
+
+  it('buildS3Key → presignUpload(key, contentType) → signUploadToken(key, viewer.id) 순으로 불러야 한다', async () => {
+    await callWithAuth('request_upload', ARGS)
+
+    expect(buildS3Key).toHaveBeenCalledWith(ARGS.fileName)
+    expect(presignUpload).toHaveBeenCalledWith('documents/new-uuid.pdf', ARGS.contentType)
+    expect(signUploadToken).toHaveBeenCalledWith('documents/new-uuid.pdf', VIEWER.id)
+    const order = [buildS3Key, presignUpload, signUploadToken].map((fn) => fn.mock.invocationCallOrder[0])
+    expect(order).toEqual([...order].sort((a, b) => a - b))
+  })
+
+  it('presigned PUT URL·keyToken·자동 분류 제안을 싣고 content 와 structuredContent 가 같아야 한다', async () => {
+    folderFindMany.mockResolvedValue([{ id: 'f-req', name: '요구사항정의서', parentId: null, aliases: [] }])
+
+    const result = await callWithAuth('request_upload', ARGS)
+
+    expect(folderFindMany.mock.calls[0][0].select).toEqual({ id: true, name: true, parentId: true, aliases: true })
+    expect(result.structuredContent).toMatchObject({
+      s3Key: 'documents/new-uuid.pdf',
+      url: 'https://s3.example/put?X-Amz-Signature=abc',
+      keyToken: 'key_token_1',
+      contentType: ARGS.contentType,
+      method: 'PUT',
+      expiresInSeconds: 300,
+      suggestedFolder: { folderId: 'f-req', name: '요구사항정의서' },
+    })
+    expect(JSON.parse(result.content[0].text)).toEqual(result.structuredContent)
+  })
+})
+
+describe('create_document — 후보 거절 게이트', () => {
+  const FOLDER = 'folder_screen_main'
+  const FILE = {
+    s3Key: 'documents/new-uuid.html',
+    keyToken: 'key_token_1',
+    fileName: '03_메인페이지_화면설계서_v0.6_20260826.html',
+    mimeType: 'text/html',
+  }
+
+  beforeEach(() => {
+    documentFindMany.mockResolvedValue([
+      {
+        id: 'doc_1',
+        folderId: FOLDER,
+        createdById: VIEWER.id,
+        versions: [{ fileName: '03_메인페이지_화면설계서_v0.3_20260819.html' }],
+      },
+    ])
+  })
+
+  it('folderId 에 후보가 있고 ignoreSimilar 가 없으면 isError + 후보 목록이고 커밋하지 않아야 한다', async () => {
+    const result = await callWithAuth('create_document', { ...FILE, folderId: FOLDER })
+
+    expect(result.isError).toBe(true)
+    const payload = JSON.parse(result.content[0].text)
+    expect(payload.error).toBe(SIMILAR_CANDIDATES_EXIST)
+    expect(payload.candidates.map((c: { documentId: string }) => c.documentId)).toEqual(['doc_1'])
+    expect(commitCreateDocument).not.toHaveBeenCalled()
+  })
+
+  it('같은 상황에서 ignoreSimilar: true 면 커밋해야 한다', async () => {
+    const result = await callWithAuth('create_document', { ...FILE, folderId: FOLDER, ignoreSimilar: true })
+
+    expect(commitCreateDocument).toHaveBeenCalledTimes(1)
+    expect(result.isError).toBeUndefined()
+    expect(result.structuredContent).toEqual({ id: 'doc_new', title: '보고서' })
+    expect(JSON.parse(result.content[0].text)).toEqual(result.structuredContent)
+  })
+
+  // 결과를 버릴 조회다. 커넥션 상한이 5라 한 번이 아깝다.
+  it('ignoreSimilar: true 면 후보 조회 자체를 하지 않아야 한다', async () => {
+    await callWithAuth('create_document', { ...FILE, folderId: FOLDER, ignoreSimilar: true })
+
+    expect(documentFindMany).not.toHaveBeenCalled()
+  })
+
+  // request_upload 의 suggestedFolder.folderId 는 분류 실패 시 null 이다 — 미분류와 같은 뜻이라
+  // 후보 조회 없이 폴더 없는 문서로 만든다.
+  it('folderId 가 null 이면 후보 조회 없이 folderId 없이 커밋해야 한다', async () => {
+    const result = await callWithAuth('create_document', { ...FILE, folderId: null })
+
+    expect(documentFindMany).not.toHaveBeenCalled()
+    expect(commitCreateDocument).toHaveBeenCalledTimes(1)
+    expect(commitCreateDocument.mock.calls[0][0].folderId).toBeUndefined()
+    expect(result.isError).toBeUndefined()
+  })
+
+  it('folderId 의 후보가 남의 문서뿐이면 거절하지 않고 folderId 를 실어 커밋해야 한다', async () => {
+    documentFindMany.mockResolvedValue([
+      {
+        id: 'doc_other',
+        folderId: FOLDER,
+        createdById: 'user_2',
+        versions: [{ fileName: '03_메인페이지_화면설계서_v0.3_20260819.html' }],
+      },
+    ])
+
+    const result = await callWithAuth('create_document', { ...FILE, folderId: FOLDER })
+
+    expect(documentFindMany).toHaveBeenCalledTimes(1)
+    expect(result.isError).toBeUndefined()
+    expect(commitCreateDocument).toHaveBeenCalledTimes(1)
+    expect(commitCreateDocument.mock.calls[0][0].folderId).toBe(FOLDER)
+  })
+
+  it('folderId 가 없으면 후보 조회를 아예 하지 않고 커밋해야 한다', async () => {
+    await callWithAuth('create_document', FILE)
+
+    expect(documentFindMany).not.toHaveBeenCalled()
+    expect(commitCreateDocument).toHaveBeenCalledTimes(1)
+  })
+
+  it('title 을 안 주면 titleFromFileName(fileName) 으로 커밋하고 ignoreSimilar 는 넘기지 않아야 한다', async () => {
+    await callWithAuth('create_document', FILE)
+
+    const [input, uploader] = commitCreateDocument.mock.calls[0]
+    expect(input).toEqual({ ...FILE, folderId: undefined, title: titleFromFileName(FILE.fileName) })
+    expect(input).not.toHaveProperty('ignoreSimilar')
+    expect(uploader).toEqual(VIEWER)
+  })
+
+  it('title 을 주면 그 값으로 커밋해야 한다', async () => {
+    await callWithAuth('create_document', { ...FILE, title: '메인 화면설계서' })
+
+    expect(commitCreateDocument.mock.calls[0][0].title).toBe('메인 화면설계서')
+  })
+
+  it('커밋이 ok:false 면 isError 와 그 문구를 돌려줘야 한다', async () => {
+    commitCreateDocument.mockResolvedValue({ ok: false, status: 400, error: '업로드된 파일을 찾을 수 없습니다.' })
+
+    const result = await callWithAuth('create_document', FILE)
+
+    expect(result.isError).toBe(true)
+    expect(JSON.parse(result.content[0].text)).toMatchObject({
+      error: '업로드된 파일을 찾을 수 없습니다.',
+      s3Key: FILE.s3Key,
+    })
+  })
+
+  // 화면은 실패·취소 때 upload-flow.ts 가 discard 를 쏘는데 도구 경로엔 그 자리가 없다 —
+  // 안내를 안 실으면 최대 100MB 객체가 S3 에 고아로 남는다.
+  it('실패 응답은 s3Key 와 discard_upload 안내를 실어야 한다', async () => {
+    commitCreateDocument.mockResolvedValue({ ok: false, status: 400, error: '업로드된 파일을 찾을 수 없습니다.' })
+
+    const result = await callWithAuth('create_document', FILE)
+
+    expect(JSON.parse(result.content[0].text).hint).toContain('discard_upload')
+  })
+})
+
+describe('add_version', () => {
+  const ARGS = {
+    documentId: 'doc_1',
+    s3Key: 'documents/new-uuid.pdf',
+    keyToken: 'key_token_1',
+    fileName: '보고서_v2.pdf',
+    mimeType: 'application/pdf',
+  }
+
+  it('commit.addVersion(documentId, 파일 입력, 토큰의 사용자) 로 넘기고 {id, versionNo} 를 돌려줘야 한다', async () => {
+    const result = await callWithAuth('add_version', ARGS)
+
+    const { documentId, ...file } = ARGS
+    expect(commitAddVersion).toHaveBeenCalledWith(documentId, file, VIEWER)
+    expect(result.structuredContent).toEqual({ id: 'doc_1', versionNo: 3 })
+    expect(JSON.parse(result.content[0].text)).toEqual(result.structuredContent)
+  })
+
+  it('남의 문서라 ok:false 면 isError 와 VERSION_FORBIDDEN 문구여야 한다', async () => {
+    commitAddVersion.mockResolvedValue({ ok: false, status: 403, error: VERSION_FORBIDDEN })
+
+    const result = await callWithAuth('add_version', ARGS)
+
+    expect(result.isError).toBe(true)
+    expect(JSON.parse(result.content[0].text)).toMatchObject({
+      error: VERSION_FORBIDDEN,
+      s3Key: ARGS.s3Key,
+    })
+    expect(result.structuredContent).toBeUndefined()
+  })
+})
+
+describe('discard_upload', () => {
+  const ARGS = { s3Key: 'documents/new-uuid.pdf', keyToken: 'key_token_1' }
+
+  it('commit.discardUpload(입력, 토큰의 사용자) 결과를 그대로 실어야 한다', async () => {
+    commitDiscardUpload.mockResolvedValue({ ok: true, status: 200, value: { deleted: false } })
+
+    const result = await callWithAuth('discard_upload', ARGS)
+
+    expect(commitDiscardUpload).toHaveBeenCalledWith(ARGS, VIEWER)
+    expect(result.structuredContent).toEqual({ deleted: false })
+    expect(JSON.parse(result.content[0].text)).toEqual(result.structuredContent)
+  })
+
+  it('토큰 불일치로 ok:false 면 isError 여야 한다', async () => {
+    commitDiscardUpload.mockResolvedValue({
+      ok: false,
+      status: 400,
+      error: '업로드 정보가 만료되었거나 올바르지 않습니다.',
+    })
+
+    const result = await callWithAuth('discard_upload', ARGS)
+
+    expect(result.isError).toBe(true)
+    expect(result.content[0].text).toBe('업로드 정보가 만료되었거나 올바르지 않습니다.')
   })
 })

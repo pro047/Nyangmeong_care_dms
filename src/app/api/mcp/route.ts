@@ -1,16 +1,50 @@
 import { createMcpHandler, withMcpAuth } from 'mcp-handler'
 import { env } from '@/lib/env'
 import { prisma } from '@/lib/prisma'
-import { presignDownload } from '@/lib/s3'
+import { presignDownload, presignUpload, buildS3Key, headObjectSize, deleteObject } from '@/lib/s3'
+import { verifyUploadToken, signUploadToken } from '@/lib/upload-token'
+import { notifyUpload } from '@/lib/discord'
 import { verifyMcpBearer } from '@/lib/mcp/auth'
 import { registerDmsTools } from '@/lib/mcp/server'
+import { createDocument, addVersion, discardUpload } from '@/lib/upload-commit'
+import type { Uploader } from '@/lib/upload-commit'
+import type { Viewer } from '@/lib/ownership'
 
 export const dynamic = 'force-dynamic'
 
+// stateless 모드라 이 팩토리는 요청마다 다시 불린다(인증 통과 후). 여기 안에 두어야
+// api/mcp/route.test.ts(401 경계만 보는 테스트, @/lib/s3 를 presignDownload 하나로만
+// 목한다)가 인증 실패 케이스에서 headObjectSize·deleteObject 를 건드리지 않는다.
 const handler = withMcpAuth(
-  createMcpHandler((server) => registerDmsTools(server, { prisma, presignDownload }), {
-    serverInfo: { name: 'dms', version: '1' },
-  }),
+  createMcpHandler(
+    (server) => {
+      const commitDeps = {
+        prisma,
+        verifyUploadToken,
+        headObjectSize,
+        deleteObject,
+        notifyUpload,
+        adminDiscordId: env.ADMIN_DISCORD_ID,
+      }
+      registerDmsTools(server, {
+        prisma,
+        presignDownload,
+        presignUpload,
+        buildS3Key,
+        signUploadToken,
+        adminDiscordId: env.ADMIN_DISCORD_ID,
+        commit: {
+          createDocument: (input, uploader: Uploader) => createDocument(input, uploader, commitDeps),
+          addVersion: (documentId, input, uploader: Uploader) =>
+            addVersion(documentId, input, uploader, commitDeps),
+          discardUpload: (input, viewer: Viewer) => discardUpload(input, viewer, commitDeps),
+        },
+      })
+    },
+    {
+      serverInfo: { name: 'dms', version: '1' },
+    },
+  ),
   verifyMcpBearer,
   {
     required: true,
