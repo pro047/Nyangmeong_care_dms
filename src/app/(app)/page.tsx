@@ -37,10 +37,11 @@ async function getDocuments(where: Prisma.DocumentWhereInput) {
       folder: { select: { name: true } },
       // 순서를 정해 두지 않으면 같은 문서의 칩 순서가 요청마다 흔들린다.
       tags: { include: { tag: true }, orderBy: { tag: { name: 'asc' } } },
-      // 목록에는 최신 버전 정보만 필요하다.
+      // **전량을 읽는다.** 목록이 이력을 펼쳐 보여주기 때문이다(2026-09-13). 운영 실측으로
+      // 문서 33건에 버전 47행이라 `take: 1` 을 떼는 비용이 무시할 수준이고, 펼칠 때 왕복을
+      // 새로 내면 사람이 기다린다. 활성 문서의 30%가 이력을 갖고 있어 드문 경로도 아니다.
       versions: {
         orderBy: { versionNo: 'desc' },
-        take: 1,
         include: { uploadedBy: { select: { username: true } } },
       },
     },

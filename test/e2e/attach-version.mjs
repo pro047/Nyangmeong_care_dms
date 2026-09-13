@@ -124,7 +124,7 @@ try {
   const optionText = (await attachSelect(F_NEXT).locator('option').allInnerTexts())
     .map((t) => t.trim())
   check('C3', '후보 옵션이 기존 판의 파일명을 말한다',
-        optionText.includes(`‘${F_BASE}’ 의 새 판으로 붙이기`),
+        optionText.includes(`‘${F_BASE}’ 의 새 버전으로 올리기`),
         `옵션=${JSON.stringify(optionText)}`)
 
   // ── C4 더 높은 판을 붙일 때는 경고가 없다
@@ -132,7 +132,7 @@ try {
   const targetValue = await options[1].getAttribute('value')
   await attachSelect(F_NEXT).selectOption(targetValue)
   await page.waitForTimeout(200)
-  const warned = await dialog().getByText(/보다 낮은|같은 v|판번호를 읽을 수 없어/).count()
+  const warned = await dialog().getByText(/보다 낮은|같은 v|버전을 읽을 수 없어/).count()
   check('C4', 'v0.3 → v0.6 은 판번호 경고가 없다', warned === 0, `경고=${warned}`)
   await page.screenshot({ path: `${SHOT}/ATTACH-choice.png` })
 
@@ -151,7 +151,7 @@ try {
   const oldOptions = await attachSelect(F_OLD).locator('option').all()
   await attachSelect(F_OLD).selectOption(await oldOptions[1].getAttribute('value'))
   await page.waitForTimeout(200)
-  const danger = dialog().getByText(/현재 판 v0\.6 보다 낮은 v0\.1 입니다/)
+  const danger = dialog().getByText(/현재 버전 v0\.6 보다 낮은 v0\.1 입니다/)
   check('C6', '낮은 판을 붙이려 하면 두 판을 짚어 경고한다', (await danger.count()) === 1,
         `경고=${(await danger.count())}`)
   await page.screenshot({ path: `${SHOT}/ATTACH-warning.png` })

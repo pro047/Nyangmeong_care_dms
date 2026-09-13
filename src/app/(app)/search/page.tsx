@@ -22,9 +22,9 @@ async function searchDocuments(q: string) {
     include: {
       folder: { select: { name: true } },
       tags: { include: { tag: true }, orderBy: { tag: { name: 'asc' } } },
+      // 목록과 같은 표를 쓰므로 include 모양이 같아야 한다 — 이력 펼치기가 여기서도 돈다.
       versions: {
         orderBy: { versionNo: 'desc' },
-        take: 1,
         include: { uploadedBy: { select: { username: true } } },
       },
     },

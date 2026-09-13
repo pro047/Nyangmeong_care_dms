@@ -202,7 +202,9 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border text-left text-xs text-ink-muted">
-              <th scope="col" className="w-20 px-4 py-2.5 font-medium">버전</th>
+              {/* 목록의 `버전` 열은 파일명에서 읽은 `v0.6`(팀이 문서에 매긴 번호)이고
+                  여기는 앱이 센 업로드 횟수다. 같은 이름으로 다른 숫자를 말하면 안 된다. */}
+              <th scope="col" className="w-20 px-4 py-2.5 font-medium">회차</th>
               <th scope="col" className="px-4 py-2.5 font-medium">파일</th>
               <th scope="col" className="hidden px-4 py-2.5 font-medium sm:table-cell">크기</th>
               <th scope="col" className="hidden px-4 py-2.5 font-medium lg:table-cell">올린 사람</th>
@@ -215,7 +217,7 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
             {document.versions.map((version) => (
               <tr key={version.id} className="border-b border-border last:border-0 hover:bg-canvas">
                 <td className="px-4 py-3 whitespace-nowrap">
-                  <span className="font-medium text-ink">v{version.versionNo}</span>
+                  <span className="font-medium text-ink">{version.versionNo}회</span>
                   {version.versionNo === latest?.versionNo && (
                     <span className="ml-1.5 rounded bg-accent-soft px-1.5 py-0.5 text-xs font-medium text-accent">
                       최신
@@ -245,7 +247,7 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
                 <td className="px-4 py-3">
                   <a
                     href={`/api/documents/${document.id}/download?v=${version.versionNo}`}
-                    aria-label={`v${version.versionNo} 다운로드`}
+                    aria-label={`${version.versionNo}회차 다운로드`}
                     className="flex h-7 w-7 items-center justify-center rounded-lg text-ink-subtle transition-colors hover:bg-accent-soft hover:text-accent"
                   >
                     <Download className="h-4 w-4" />

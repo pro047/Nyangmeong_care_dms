@@ -49,7 +49,9 @@ page.on('response', async (res) => {
   await res.json().then((b) => b.key && presignedKeys.push(b.key)).catch(() => {})
 })
 
-/** 타임라인 행을 "v2최신…" 같은 원문 그대로 받는다. 버전 셀에는 배지가 붙어 exact 매칭이 안 된다. */
+/** 타임라인 행을 "2회최신…" 같은 원문 그대로 받는다. 회차 셀에는 배지가 붙어 exact 매칭이 안 된다.
+    열 이름은 2026-09-13 에 `버전` → `회차` 로 바뀌었다 — 목록의 `버전`(파일명 v0.6)과
+    다른 숫자를 같은 이름으로 부르고 있었다. */
 const timeline = () => page.locator('tbody tr').allInnerTexts()
 
 /**
@@ -71,7 +73,7 @@ try {
   await page.waitForURL(`**/documents/${DOC}`)
   let rows = await timeline()
   await page.screenshot({ path: `${SHOT}/B1-detail.png`, fullPage: true })
-  check('B1', '목록 제목 클릭 → 상세, 타임라인에 v1', rows.some((r) => r.startsWith('v1')), `행수=${rows.length}`)
+  check('B1', '목록 제목 클릭 → 상세, 타임라인에 1회', rows.some((r) => r.startsWith('1회')), `행수=${rows.length}`)
 
   // ── B8 없는 id → not-found (앱 셸 유지)
   await page.goto('/documents/does-not-exist-xyz')
@@ -100,12 +102,12 @@ try {
   await page.getByRole('button', { name: /로 올리기/ }).click()
   await page.waitForSelector('text=새 버전을 올렸습니다.', { timeout: 30000 })
   await page.getByRole('button', { name: '완료' }).click()
-  await page.waitForFunction(() => !!document.body.textContent?.includes('v2'), null, { timeout: 8000 })
+  await page.waitForFunction(() => !!document.body.textContent?.includes('2회'), null, { timeout: 8000 })
   rows = await timeline()
-  const v1 = rows.find((r) => r.startsWith('v1')) ?? ''
-  const v2 = rows.find((r) => r.startsWith('v2')) ?? ''
+  const v1 = rows.find((r) => r.startsWith('1회')) ?? ''
+  const v2 = rows.find((r) => r.startsWith('2회')) ?? ''
   await page.screenshot({ path: `${SHOT}/B3-timeline.png`, fullPage: true })
-  check('B3', '재업로드 → v2 행·메모·"최신" 배지가 v2 로 이동',
+  check('B3', '재업로드 → 2회 행·메모·"최신" 배지가 2회 로 이동',
         !!v2 && v2.includes('자동 검증 v2 메모') && v2.includes('최신') && !v1.includes('최신'),
         `v2행=${!!v2} 배지v1=${v1.includes('최신')}`)
 
