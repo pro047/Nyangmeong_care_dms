@@ -1,7 +1,7 @@
 import { createMcpHandler, withMcpAuth } from 'mcp-handler'
 import { env } from '@/lib/env'
 import { prisma } from '@/lib/prisma'
-import { presignDownload, presignUpload, buildS3Key, headObjectSize, deleteObject } from '@/lib/s3'
+import { presignDownload, presignUpload, buildS3Key, headObjectSize, deleteObject, getObjectBytes } from '@/lib/s3'
 import { verifyUploadToken, signUploadToken } from '@/lib/upload-token'
 import { notifyUpload } from '@/lib/discord'
 import { verifyMcpBearer } from '@/lib/mcp/auth'
@@ -33,6 +33,7 @@ const handler = withMcpAuth(
         buildS3Key,
         signUploadToken,
         adminDiscordId: env.ADMIN_DISCORD_ID,
+        getObjectBytes,
         commit: {
           createDocument: (input, uploader: Uploader) => createDocument(input, uploader, commitDeps),
           addVersion: (documentId, input, uploader: Uploader) =>

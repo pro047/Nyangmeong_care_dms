@@ -2057,7 +2057,7 @@ V19(낮은 순 정렬 + "낮다고 틀린 것이 아닙니다"). **다섯 다 �
 
 ---
 
-## MCP 서버 · 1~2단계 (1단계 2026-09-12 배포 · 2단계 2026-09-13 배포) — 읽기 4개 + 올리기 5개 · **운영 동작 확인됨 · 다음은 3단계(웹챗에서 문서 읽기)**
+## MCP 서버 · 1~3단계 (1단계 2026-09-12 배포 · 2단계 2026-09-13 배포 · 3단계 2026-09-14 코드 완료) — 읽기 4개 + 올리기 5개 + 본문 읽기 1개 · **1~2단계 운영 동작 확인됨 · 3단계는 미배포**
 
 
 Claude Code·Codex CLI 와 claude.ai·ChatGPT 웹에서 DMS 문서를 **찾아 읽고, 분석 결과를
@@ -2150,7 +2150,7 @@ POST 는 `sameSite: lax` 쿠키라 다른 사이트의 폼으로는 세션이 �
    `route.test.ts` 가 그대로 통과하는 것이 그 증거다. `denyIfNotOwner` 는 `NextResponse`
    를 돌려주므로 여기서는 `canManageDocument` 를 직접 부른다.
 
-### MCP 도구 (v1 · 9개)
+### MCP 도구 (v1 · 9개 + 3단계 `read_document` = 10개)
 
 사용자 = 액세스 토큰의 `sub`. 모든 조회는 `activeDocumentWhere()` 를 탄다(휴지통 제외).
 `GET /api/documents`(정합성 저장소 계약, 페이지네이션 금지)는 **건드리지 않는다** —
@@ -2167,6 +2167,7 @@ POST 는 `sameSite: lax` 쿠키라 다른 사이트의 폼으로는 세션이 �
 | `create_document` | `s3Key` `keyToken` `fileName` `mimeType` `title?` `description?` `folderId?` `ignoreSimilar?` | `{ id, title }` | `upload-commit.createDocument` |
 | `add_version` | `documentId` `s3Key` `keyToken` `fileName` `mimeType` `changeNote?` | `{ id, versionNo }` | `upload-commit.addVersion` (소유자 검사 포함) |
 | `discard_upload` | `s3Key` `keyToken` | `{ deleted }` | `uploads/discard` 와 같은 판정 |
+| `read_document` (3단계) | `id` `versionNo?` `offset?` `limit?` `format?` | 메타(`kind`·`sizeBytes`·`nextOffset`·`encodingWarning` 등) + 본문 청크. `s3Key` 미노출 | `read-tools.ts` `html-text.ts` `xlsx-text.ts`, xlsx 는 `exceljs`(신규 의존성 아님) |
 
 **`create_document` 는 후보가 있으면 거절한다.** `folderId` 가 있고
 `find_similar_documents` 가 후보를 내는데 `ignoreSimilar: true` 가 없으면 후보 목록과
@@ -2550,6 +2551,118 @@ PR #3 → `main` 머지(`f04dd12`) → Vercel Production `success`. 확인은 **
   통해 옛 코드에 조용히 붙는다.** 확인 전에 `lsof -iTCP:3002` 의 `cwd` 를 볼 것
 - 다른 포트는 대안이 안 된다 — `infra/s3-cors.json` 이 `localhost:3002` 와 운영만 허용하고
   디스코드 콜백도 3002 로만 등록돼 있다
+
+### 3단계 결정 사항 — 설계 확정 (2026-09-14, `DESIGN.md` §3-2·§3-7·§3-8)
+
+| # | 결정 | 이유 |
+|---|---|---|
+| 확장자 판정 | 파일명 끝의 `/\.([a-z][a-z0-9]{0,9})$/i` 로만 확장자를 뽑는다 — **첫 글자가 영문이어야** 확장자로 본다 | 이 팀 파일명은 `…_v0.3` 처럼 판번호에 점이 들어간다(`server.test.ts` 픽스처). 숫자로 시작하는 꼬리를 확장자로 읽으면 `설계서_v0.3` 이 확장자 `3`(읽을 수 없음)으로 떨어져 mimeType 보조 판정까지 막힌다. 확장자가 표에 있으면 mimeType 은 아예 안 본다 — `보고서.pdf` 가 `text/plain` 으로 잘못 신고돼도 PDF 바이트를 UTF-8 로 풀지 않는다 |
+| 페이지 자르기 | 기본 `limit 20,000`자·최대 100,000자. 자르는 지점은 뒤쪽 절반 구간의 마지막 개행 뒤로 당기고(행이 반으로 안 잘림), 없으면 서로게이트 쌍 경계만 피한다. `nextOffset` 을 그대로 돌려주면 클라이언트가 이어 받는다 | 1MB CSV 는 100만 자에 육박해 자르지 않으면 클라이언트(웹챗) 결과 상한에 걸려 뒷부분이 **조용히** 사라진다. 기본값 20,000 은 **추정**이다(클라이언트 토큰 상한 미확인, `JUDGE.md` #45) — 사람 확인(H3) 뒤 바뀔 수 있다 |
+| 응답 모양 | 본문은 `content` 배열의 **두 번째** 텍스트 블록에만 싣는다(`structuredContent` 는 메타만). 실패 응답에는 예외 메시지·스택·`s3Key` 를 담지 않는다 | 본문을 `structuredContent` 에도 넣으면 같은 내용이 두 번(한쪽은 JSON 이스케이프까지) 실려 크기가 2배 이상 된다. 두 번째 블록이 클라이언트(webchat)에 실제로 보이는지는 **미확인**(`JUDGE.md` #46, 구현 전 유일한 미해소 항목) — 응답 조립을 `server.ts` 한 곳에 가둬 뒤집기 비용을 낮췄다 |
+
+### 3단계 구현 (2026-09-14) — 파이프라인 `mcp-webchat-read` · 소스 완료 · **미배포**
+
+브랜치 `feature/mcp-read`. `.pipeline/mcp-webchat-read/DESIGN.md` 를 그대로 구현했다
+(judge 판정: 반박 0 · 미확인 10, 전부 "그대로 진행해도 되는 것"으로 분류돼 재설계 없이
+착수). 신규 소스 3개(`src/lib/mcp/read-tools.ts` · `src/lib/mcp/html-text.ts` ·
+`src/lib/mcp/xlsx-text.ts`), 수정 3개(`src/lib/s3.ts` · `src/lib/mcp/server.ts` ·
+`src/app/api/mcp/route.ts`), 문서 1개(이 절). `next.config.ts` 는 **손대지 않았다** —
+§3-10 의 조건(exceljs 가 Route Handler 번들에서 실제로 컴파일 실패할 때만)이 발생하지
+않았다(아래 "실행해서 확인한 것"). 설계의 `TEST_FILES` 6개(`read-tools.test.ts` 등)는
+구현 단계 금지 사항이라 새로 쓰지 않았다 — 검증 단계 몫이다.
+
+**설계와 갈린 것은 없다.** `readVersionQuery` 의 반환 타입만 설계 문서의 설명용 타입
+표기 대신, 이 리포의 기존 관례(`similar-document.ts:35` `similarCandidateQuery()`)를
+그대로 따라 `satisfies { where: Prisma.DocumentWhereInput; select: Prisma.DocumentSelect }`
+로 좁혔다 — `Prisma.DocumentFindFirstArgs` 전체로 타입을 못박으면 `versions` 의
+`orderBy·take` / `where` 두 갈래 리터럴이 넓혀져 `prisma.document.findFirst()` 의
+제네릭 추론이 깨질 위험이 있어서다(설계도 "타입 표기는 설명용"이라 적어 뒀다).
+
+**낡은 테스트 인계 — `src/lib/mcp/server.test.ts:58,104`.** 이 파일은 설계의
+`TEST_FILES` 이고 구현 단계가 고칠 수 없다.
+- `:58` `registerDmsTools(server, {...})` 호출의 mock 객체에 `getObjectBytes` 필드가
+  없다 — `Deps` 타입에 그 필드가 추가돼 `tsc`(`npm run build` 의 타입 검사 단계)가
+  `TS2345: Property 'getObjectBytes' is missing in type ... but required in type 'Deps'`
+  로 죽는다.
+- `:104` `읽기 4개와 올리기 5개, 도구 9개를 등록해야 한다` 테스트가 등록 도구 이름
+  배열을 9개로 단언한다 — 이제 10개(`read_document` 추가)라 실패한다.
+- **바뀐 기대값**: `setup()` 의 mock 에 `getObjectBytes: vi.fn()` 한 줄과, 단언 배열에
+  `'read_document'` 한 항목을 더하면 둘 다 푼다(설계 §6 T-V1·T-V2 가 이미 이 모양을
+  요구한다). 1·2단계에서도 같은 패턴(도구 개수·`Deps` mock 확장)이 반복돼 왔다
+  (`MILESTONES.md` 2043-2053 의 2단계 인계 기록).
+
+**실행해서 확인한 것** (이 절 작성 시점, 작업 트리 전체 기준) —
+
+```
+$ npx tsc --noEmit
+src/lib/mcp/server.test.ts(58,28): error TS2345: ... Property 'getObjectBytes' is missing ...
+(이 한 줄뿐 — 신규·수정 소스 파일에서 나는 오류는 0건)
+
+$ npm run lint
+> dms@0.1.0 lint
+> eslint
+(출력 없음 = 경고·에러 0)
+
+$ npx vitest run
+ Test Files  1 failed | 53 passed (54)
+      Tests  1 failed | 814 passed (815)
+(실패 1건 = 위 server.test.ts:104 도구 개수 단언. 그 밖의 기존 813건 전부 통과 —
+ route.test.ts 의 401 테스트 2건 포함, getObjectBytes 를 팩토리 콜백 안에서만
+ 참조했다는 증거)
+
+$ npm run build
+✓ Compiled successfully in 1983ms
+  Running TypeScript ...
+src/lib/mcp/server.test.ts(58,28): error TS2345: ...
+Failed to type check.
+(컴파일 자체는 성공 — exceljs 동적 import 가 Route Handler 번들을 못 깨뜨렸다.
+ 타입 검사만 위 낡은 테스트 때문에 실패)
+```
+
+**exceljs 관련 §3-10 확인**: `npm run build` 가 "Compiled successfully" 까지 갔으므로
+`next.config.ts` 에 `serverExternalPackages: ['exceljs']` 를 추가할 조건(컴파일·번들
+실패)은 발생하지 않았다. `parseXlsx` 안의 동적 `import('exceljs')` 는 실제로 호출되지
+않는 한 정적 분석에 안 걸리는 것으로 보인다(**추정** — 이 조합을 실제로 exceljs 를
+호출해 확인한 것은 아니다. xlsx 실측은 검증 단계의 X8·H5 몫).
+
+**다음 단계(검증)가 알아야 할 것** — 위 낡은 테스트 인계 항목 두 줄을 먼저 고친 뒤
+설계 §6 의 `[테스트 가능]` 전부(`T-K`~`T-A`)를 새로 쓰고, `[사람 확인 필요]` H1(웹챗에서
+두 번째 content 블록이 실제로 보이는지)을 배포 뒤 가장 먼저 본다 — 설계가 이 항목을
+"구현 전에 해소해야 할 것"의 유일한 미확인으로 꼽았다(`JUDGE.md`).
+
+> 위 "낡은 테스트"·"실행해서 확인한 것"은 **구현 단계 시점**의 기록이다. 검증 단계가
+> `server.test.ts` 를 고치고 신규 테스트 4개 파일을 써서 파이프라인이 `DONE`
+> (`npm test && npm run lint && npm run build` 통과, 888건)으로 끝났다. 지금 기준은 아래 절이다.
+
+### 3단계 검증·리뷰 (2026-09-14) — 자동 검증 통과 · **사람 확인 H1~H7 미실시**
+
+**검증 단계가 찾은 결함 2건 — 세션에서 고쳤다.** 설계 §6 기준 밖의 입력이라 파이프라인은
+테스트로 고정하지 않고 보고만 했다(`VERIFY.md` §4).
+
+| # | 결함 | 조치 |
+|---|---|---|
+| F1 | `htmlToText` 가 `&constructor;` 를 `function Object() { [native code] }` 로 바꿨다 — 엔티티 표가 일반 객체라 `Object.prototype` 멤버가 걸렸다 | `Object.hasOwn` 으로 자기 키만 본다. 회귀 테스트 1건 |
+| F2 | `sliceText('😀x', 0, 1)` 이 빈 청크 + `nextOffset === offset` — 따라가는 클라이언트가 같은 호출을 **무한 반복**한다. 설계 §3-7 규칙 자체의 경계(구현 편차 아님) | 당기면 한 글자도 못 나갈 때는 서로게이트 쌍을 통째로 넣는다(`limit` 을 1 넘길 수 있다). 회귀 테스트 2건(limit 1 이어 읽기 포함) |
+
+**`/code-review high` — low 2건, 둘 다 고쳤다.**
+
+| # | 발견 | 조치 |
+|---|---|---|
+| R1 | 속성 붙은 `<br class="x">` 가 개행 없이 지워져 줄이 합쳐졌다 | `/<br\b[^>]*>/gi` |
+| R2 | 닫는 `</td>` 를 생략한 표(유효한 HTML)에서 셀 구분자가 안 들어가 값이 붙었다 | 구분자를 **여는** `<td>`·`<th>` 에 붙이고, 행 앞에 생기는 탭 하나를 줄 정리에서 걷는다. 빈 첫 셀은 탭 하나로 자리를 지킨다. 테스트 2건 |
+
+운영 html 17건에 R1·R2 모양이 실제로 있는지는 확인하지 않았다(**추정**).
+
+**`/security-review` — 신뢰도 8 이상 0건.** 확인한 것: 인증은 기존 `withMcpAuth(required)` 안 ·
+휴지통 제외(`deletedAt: null`)·판은 그 문서 관계 안에서만 · S3 키는 DB 값뿐(사용자 입력이
+닿지 않음) · exceljs(saxes)에 외부 엔티티 경로 없음·zip 은 메모리 안 · 응답에 `s3Key`·스택 없음.
+
+**최종 실측**: 단위 58파일 894건 · lint 0 · build(`/api/mcp`·`ƒ Proxy (Middleware)`) 통과.
+
+**남은 것 — 배포 뒤 사람 확인** (`VERIFY.md` §5): **H1 두 번째 content 블록이 웹챗에 보이는가
+(가장 먼저)** · H2 xlsx(Route Handler 번들에서 exceljs 가 도는가, `JUDGE.md` #43) · H3 175KB
+이어 읽기·기본 limit · H4 1MB 초과·빈 파일·EUC-KR 경고 · H5 응답 시간 · H6 Claude Code CLI ·
+H7 기존 9개 도구 회귀.
 
 ---
 
