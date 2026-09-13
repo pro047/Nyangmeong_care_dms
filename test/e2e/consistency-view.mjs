@@ -261,6 +261,31 @@ try {
     docLinks === linkableIds.length && goneShown === 19 - linkableIds.length,
     `링크 ${docLinks}개 · 링크없음 ${goneShown}개`)
 
+  // ── 메인(전체 문서)에서만 뜨나 ───────────────────────────────
+  // 지표는 폴더와 무관하게 전체를 본 결과라, 좁힌 화면에 두면 그 폴더 것으로 읽힌다.
+  // 검색·휴지통·상세는 애초에 이 컴포넌트를 안 쓰지만 **메인의 필터는 같은 페이지**라
+  // 코드로 막아야 하고, 막힌 것을 여기서 본다.
+  // **실제로 있는 폴더 id 여야 한다.** 없는 폴더면 앱이 필터를 안 걸고 전체 목록으로
+  // 떨어뜨리므로(page.tsx, 죽은 링크 대응) 밴드가 뜨는 것이 맞다 — 처음에 없는 id 를
+  // 넣었다가 이 검사가 헛돌았다.
+  const folder = await withDb((c) => c.query('select id from folders limit 1'))
+  const folderId = folder.rows[0]?.id
+  if (folderId === undefined) throw new Error('폴더가 하나도 없어 V20 을 못 본다')
+
+  const elsewhere = []
+  for (const [name, path] of [
+    ['폴더 필터', `/?folder=${folderId}`],
+    ['태그 필터', '/?tag=아무태그'],
+    ['검색', '/search?q=ㄱ'],
+    ['휴지통', '/trash'],
+  ]) {
+    await page.goto(`${APP}${path}`, { waitUntil: 'networkidle' })
+    const n = await page.locator(BAND).count()
+    if (n > 0) elsewhere.push(`${name}(${n})`)
+  }
+  check('V20', '메인 말고 다른 화면에는 안 뜬다', elsewhere.length === 0,
+    elsewhere.join(' / ') || '없음')
+
   check('V11', '콘솔 에러가 없다', pageErrors.length === 0, pageErrors.join(' / ') || '없음')
 } finally {
   await browser.close()

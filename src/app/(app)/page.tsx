@@ -116,6 +116,10 @@ export default async function DocumentsPage({
   const documentCounts = new Map(folderRows.map((row) => [row.id, row._count.documents]))
   const activeFolder = folderId ? (folderRows.find((row) => row.id === folderId) ?? null) : null
 
+  const activeTag = typeof tag === 'string' && tag !== '' ? tag : null
+  // 조회보다 먼저 계산한다 — 정합성 스냅샷을 읽을지 말지가 여기에 달렸다.
+  const filtered = activeFolder !== null || activeTag !== null
+
   // 구버전 판정은 화면에 그릴 집합과 따로 읽는다(latest.ts 참고). 목록 조회와 서로
   // 기다릴 이유가 없어 같이 보낸다 — 함수 리전이 서울이라 왕복 하나가 95ms 다.
   // 붙이기 후보도 같이 읽는다. 업로드 모달이 파일을 담는 순간 판정해야 하는데, 그 시점에
@@ -127,6 +131,10 @@ export default async function DocumentsPage({
   // 두 판정이 한 조회를 공유하면 한쪽 요구로 컬럼을 고칠 때 다른 쪽이 조용히 따라 바뀐다.
   // 정합성 스냅샷도 같이 읽는다. 측정이 한 번도 안 왔으면 null 이고 그때는 아무것도 안 그린다 —
   // 빈 상자를 띄우면 "지표가 0" 으로 읽힌다.
+  //
+  // **폴더·태그를 걸면 아예 안 읽는다** (2026-09-14, 사람 지시). 지표는 전체 문서를 본
+  // 결과라 좁힌 화면에 두면 *그 폴더의 지표* 로 읽힌다. 안 그릴 것을 읽을 이유도 없다 —
+  // findings 284행이 딸린 조회다.
   const [documents, latestRows, similarRows, snapshot, activeRows] = await Promise.all([
     getDocuments({
       AND: [
@@ -137,7 +145,7 @@ export default async function DocumentsPage({
     }),
     prisma.document.findMany(latestCandidateQuery()),
     prisma.document.findMany(similarCandidateQuery()),
-    latestConsistencySnapshot(),
+    filtered ? null : latestConsistencySnapshot(),
     // 링크를 걸 수 있는지 판정할 집합. dmsId 에 FK 가 없어 사라진 문서가 섞여 있다.
     // **`latestCandidateQuery()` 를 재사용하지 않는다** — 그쪽은 폴더 기반 구버전 판정용이고
     // `latest.ts` 가 "두 판정이 한 조회를 공유하면 한쪽 요구로 컬럼을 고칠 때 다른 쪽이
@@ -147,9 +155,6 @@ export default async function DocumentsPage({
   ])
   const supersededIds = supersededDocumentIds(latestRows)
   const activeDocumentIds = new Set(activeRows.map((row) => row.id))
-
-  const activeTag = typeof tag === 'string' && tag !== '' ? tag : null
-  const filtered = activeFolder !== null || activeTag !== null
 
   const children = activeFolder
     ? childFolderCards(activeFolder.id, folderRows, documentCounts)
@@ -208,8 +213,8 @@ export default async function DocumentsPage({
         </p>
       )}
 
-      {/* 필터를 걸어도 그대로 둔다 — 측정은 폴더·태그와 무관하게 전체 문서를 본 결과라
-          목록이 좁아졌다고 지표를 감추면 숫자가 그 폴더 것으로 읽힌다. */}
+      {/* 메인(전체 문서)에서만 그린다. 폴더·태그를 걸면 숨긴다 — 측정은 폴더와 무관하게
+          전체를 본 결과라 좁힌 화면에 두면 그 폴더 것으로 읽힌다. */}
       {snapshot && (
         <ConsistencyPanel
           snapshot={{
