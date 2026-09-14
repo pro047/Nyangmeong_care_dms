@@ -2124,6 +2124,13 @@ OAuth 로 붙으므로 **토큰 발급 화면을 따로 만들지 않는다** �
 
 - `https://claude.ai/api/mcp/auth_callback` · `https://claude.com/api/mcp/auth_callback` (문서가 이전을 예고)
 - `https://chatgpt.com/connector_platform_oauth_redirect` · `https://chatgpt.com/oauth/callback` · `https://chat.openai.com/oauth/callback`
+- `https://chatgpt.com/connector/oauth/<id>` — **2026-09-14 추가.** ChatGPT 는 인가 서버가 RFC 9207
+  (`authorization_response_iss_parameter_supported` + 모든 인가 응답에 `iss`)을 광고하지 않으면 위의
+  고정 콜백 대신 **커넥터마다 다른 이 주소**를 쓴다. 첫 ChatGPT(Plus, 개발자 모드) 등록이
+  `invalid_redirect_uri` 로 거절되어 드러났다. id 한 세그먼트만 가변이고 나머지는 완전일치다.
+  **RFC 9207 을 구현하는 안(B)은 버렸다** — 인가 응답 전 경로(성공·오류 · 페이지·라우트)에 `iss` 를
+  싣고 메타데이터를 바꿔야 해, 이미 운영 확인된 claude.ai·Codex 가 `iss` 를 검증하기 시작하는
+  변화를 떠안는다. 받는 쪽이 여전히 chatgpt.com 이라 A 가 노출을 늘리지 않는다
 - `http://localhost:<아무 포트>/…` · `http://127.0.0.1:<아무 포트>/…` — CLI 가 임시 포트로 받는다. 루프백은 **포트만 가변**, https 는 **완전일치** (RFC 8252 §7.3)
 
 **동의 화면을 둔다.** 세션이 있다고 바로 코드를 내면 로그인된 브라우저를 어디로든
