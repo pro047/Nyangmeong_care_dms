@@ -55,6 +55,28 @@ describe('isAllowedRedirectUri', () => {
   it('https 루프백은 목록에 없으므로 거부해야 한다', () => {
     expect(isAllowedRedirectUri('https://localhost:1/')).toBe(false)
   })
+
+  it('ChatGPT 커넥터별 콜백(connector/oauth/<id>)은 통과해야 한다', () => {
+    expect(isAllowedRedirectUri('https://chatgpt.com/connector/oauth/abc_DEF-123')).toBe(true)
+  })
+
+  it('ChatGPT 커넥터별 콜백의 변형은 거부해야 한다', () => {
+    const variants = [
+      'https://chatgpt.com/connector/oauth/', // id 없음
+      'https://chatgpt.com/connector/oauth/abc/def', // 세그먼트 추가
+      'https://chatgpt.com/connector/oauth/abc?x=1',
+      'https://chatgpt.com/connector/oauth/abc#x',
+      'http://chatgpt.com/connector/oauth/abc',
+      'https://chatgpt.com:443/connector/oauth/abc', // 정규화되면 원문과 달라진다
+      'https://chatgpt.com/x/../connector/oauth/abc',
+      'https://evil@chatgpt.com/connector/oauth/abc',
+      'https://chatgpt.com.evil.com/connector/oauth/abc',
+      'https://evil.com/connector/oauth/abc',
+    ]
+    for (const uri of variants) {
+      expect(isAllowedRedirectUri(uri), uri).toBe(false)
+    }
+  })
 })
 
 describe('matchesRegisteredRedirectUri', () => {
@@ -81,6 +103,16 @@ describe('matchesRegisteredRedirectUri', () => {
       matchesRegisteredRedirectUri('http://localhost:41234/cb', [
         'https://claude.ai/api/mcp/auth_callback',
       ]),
+    ).toBe(false)
+  })
+
+  it('ChatGPT 커넥터별 콜백은 등록한 id 와 완전일치만 매칭해야 한다', () => {
+    const registered = ['https://chatgpt.com/connector/oauth/abc']
+    expect(
+      matchesRegisteredRedirectUri('https://chatgpt.com/connector/oauth/abc', registered),
+    ).toBe(true)
+    expect(
+      matchesRegisteredRedirectUri('https://chatgpt.com/connector/oauth/other', registered),
     ).toBe(false)
   })
 

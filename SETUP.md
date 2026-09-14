@@ -347,6 +347,11 @@ url = "<APP_URL>/api/mcp"
 Client Secret 칸은 비운다 — 공개 클라이언트만 받는다(`register/route.ts:39`).
 등록 뒤 **연결**을 눌러야 동의 화면이 열린다.
 
+ChatGPT 는 설정 → 앱 → 고급 설정 → **개발자 모드**를 켠 뒤 만들기에서 등록한다(Plus 에도 있다,
+2026-09-14 사람 확인). 인증은 OAuth, Client ID·Secret 은 비운다. *커넥터 생성 중 오류 —
+`invalid_redirect_uri`* 가 뜨면 서버가 `chatgpt.com/connector/oauth/<id>` 를 받기 전 배포다
+(`redirect-uri.ts` 의 `isChatgptCallbackIdUri`).
+
 > **파일 내용 분석은 별개다.** 도구는 presigned URL 만 준다. claude.ai 채팅에서 그 URL 을
 > 열어 요약하게 하려면 컨테이너 네트워크 허용 목록에 S3 버킷 도메인이 있어야 하고,
 > URL 이 5분 안에 쓰여야 한다. 2026-09-12 1차 시도는 둘이 섞여 실패했다 —
