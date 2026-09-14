@@ -115,6 +115,23 @@ export function UploadDialog({
     setItems((prev) => prev.map((i) => (i.id === id ? { ...i, ...patch } : i)))
   }, [])
 
+  // 아직 아무것도 안 나간 건(미리보기·선택 대기)에만 버튼을 단다. 목록에서 빼는 것으로
+  // 끝난다 — 예전엔 하나만 잘못 담아도 전부 취소하고 다시 담아야 했다.
+  const removeItem = useCallback((id: string) => {
+    setItems((prev) => prev.filter((i) => i.id !== id))
+  }, [])
+
+  const renderRemoveButton = (item: Item) => (
+    <button
+      type="button"
+      onClick={() => removeItem(item.id)}
+      aria-label={`${item.file.name} 목록에서 빼기`}
+      className="shrink-0 rounded-lg p-1 text-ink-subtle transition-colors hover:bg-danger-soft hover:text-danger"
+    >
+      <X className="h-3.5 w-3.5" />
+    </button>
+  )
+
   /**
    * 이 파일을 새 판으로 붙일 만한 기존 문서들. 목적지 폴더가 정해져야 판정할 수 있다 —
    * 미분류(null)와 아직 없는 새 폴더는 원리상 후보가 없다(findSimilarDocuments 가 거른다).
@@ -577,7 +594,10 @@ export function UploadDialog({
         <ul className="mt-2 space-y-2">
           {group.map(({ item, dest }) => (
             <li key={item.id} className="rounded-lg border border-border px-3.5 py-2.5">
-              <p className="truncate-cell text-sm text-ink">{item.file.name}</p>
+              <div className="flex items-center gap-2">
+                <p className="truncate-cell min-w-0 flex-1 text-sm text-ink">{item.file.name}</p>
+                {renderRemoveButton(item)}
+              </div>
               <p className="mt-0.5 text-xs text-ink-muted">{item.result?.reason}</p>
               <select
                 value={destValue(dest)}
@@ -811,6 +831,7 @@ export function UploadDialog({
                         <span className="shrink-0 text-xs text-ink-muted">
                           {formatBytes(item.file.size)}
                         </span>
+                        {item.status === 'waiting' && renderRemoveButton(item)}
                       </div>
 
                       {item.status === 'uploading' && (
