@@ -2371,6 +2371,9 @@ eslint(변경 영역) · `npm run build` 라우트 27개 + `ƒ Proxy (Middleware
 
 ### 배포와 사람 확인 (2026-09-12) — 운영에서 통과 6 · 남음 4
 
+> **2026-09-14 갱신:** ⓑ Codex 통과, ChatGPT 웹 행(✚) 추가·통과. ⓕ 는 B안으로 대체되어 닫혔다.
+> 남은 것은 ⓔ 리프레시 · ⓖ 비길드 차단 둘이다. 제목의 숫자는 09-12 당시 그대로 둔다.
+
 PR #1 → `main` 머지(`c2e658d`) → Vercel Production 배포 `success`. 운영 URL
 `https://nyangmeong-care-dms.vercel.app`.
 
@@ -2382,7 +2385,8 @@ PR #1 → `main` 머지(`c2e658d`) → Vercel Production 배포 `success`. 운�
 | ⓒ | claude.ai 커스텀 커넥터(DCR) | **통과** — 추가 화면에서 인증 `지금 로그인`·클라이언트 `자동으로 등록`이 **"감지됨"** 으로 떴다(= 우리 401 챌린지와 `registration_endpoint` 를 저쪽이 읽었다는 뜻). 연결 후 도구 4개 노출, 채팅에서 검색·URL 발급 동작 |
 | ⓓ | 다운로드 URL 200 → 5분 뒤 403 | **통과** — 발급 직후 206(앞 100바이트만 요청), 320초 뒤 **403** |
 | ✚ | `client_id` 를 `dms_session` 쿠키에 넣기 | **통과(차단됨)** — `/` 와 다운로드 API 모두 401, 쿠키 없음·`garbage` 쿠키와 같은 응답 |
-| ⓑ | Codex CLI | **미확인** |
+| ⓑ | Codex CLI | **통과** (2026-09-14, 0.153.4) — `codex mcp add` 가 OAuth 를 감지해 로그인까지 끝냈고 `list_folders` 24건. 루프백 콜백은 `127.0.0.1:<포트>/callback/<랜덤>` 이다. `codex exec` 는 MCP 도구 승인이 기본 차단이라 `-c 'mcp_servers.dms.default_tools_approval_mode="approve"'` 가 필요했다(서버 문제 아님) |
+| ✚ | ChatGPT 웹 커넥터 (Plus · 개발자 모드) | **통과** (2026-09-14, 사람 확인) — 첫 생성이 DCR `invalid_redirect_uri` 로 거절됐다. RFC 9207 을 광고하지 않는 인가 서버에는 커넥터별 `chatgpt.com/connector/oauth/<id>` 를 쓰기 때문이다. 허용 목록 추가(PR #9 → `7d15767`) 배포 후 생성·로그인·도구 호출 통과. 개발자 모드는 웹 전용이라 ChatGPT 앱에서는 못 쓴다 |
 | ⓔ | 1시간 뒤 리프레시 | **미확인** — 액세스 만료를 기다려야 한다 |
 | ⓕ | ③ A 실측 (claude.ai 샌드박스가 S3 에 직접 붙는가) | **원인 확인: 허용 목록** (2026-09-13 사람 확인). 허용 목록에 넣는 재시도는 하지 않기로 했다 — **B(서버가 텍스트로 싣기)로 확정**, 설계 결정 표 '웹챗 읽기' 행 |
 | ⓖ | 비길드 계정 차단 | **미확인** — 부계정이 없다. 코드·테스트로만 확인됨(`callback/route.ts:25`, `route.test.ts:67`) |
