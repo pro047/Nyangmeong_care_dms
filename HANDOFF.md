@@ -822,8 +822,23 @@ UI 작업은 터널 없이도 진행할 수 있다.
    **남은 것 (전부 계기 대기 — 실사용에서 문제가 보이면 본다)**:
    - 3단계: H3 175KB 이어 읽기·기본 limit 20,000 · H4 1MB 초과·빈 파일·EUC-KR 경고 · H5 xlsx 응답 시간 ·
      H7 기존 9개 도구 회귀
-   - 1단계: ⓑ Codex · ⓔ 1시간 뒤 리프레시 · ⓖ 비길드 차단(부계정이 없어 미확인).
-     ⓕ ③ A(샌드박스가 S3 에 직접)는 3단계 B안으로 대체되어 닫혔다
+   - 1단계: ⓔ 1시간 뒤 리프레시 · ⓖ 비길드 차단(부계정이 없어 미확인).
+     ⓕ ③ A(샌드박스가 S3 에 직접)는 3단계 B안으로 대체되어 닫혔다.
+     **ⓑ Codex 와 ChatGPT 웹은 2026-09-14 에 닫혔다** — *이 절 머리말은 그 전부터 "ChatGPT 가
+     읽는다"고 적고 있었지만 ChatGPT 는 그날 전까지 한 번도 붙어 본 적이 없었다.*
+     - **Codex CLI** (0.153.4): `codex mcp add dms --url …/api/mcp` 가 OAuth 를 스스로 감지해
+       로그인까지 끝냈고 `list_folders` 가 24건을 돌려줬다. **지뢰: `codex exec` 는 MCP 도구 호출을
+       승인 정책으로 막는다** (`requires approval, but approval policy is never`) — 서버 문제가
+       아니다. `-c 'mcp_servers.dms.default_tools_approval_mode="approve"'` 로 통과한다
+       (값은 `auto`·`prompt`·`writes`·`approve`). `enabled_tools` 를 `-c` 로 넘기면 도구가 아예 안 보였다
+     - **ChatGPT** (Plus · 개발자 모드 — Plus 에도 있다): 첫 커넥터 생성이 DCR 에서
+       `invalid_redirect_uri` 로 거절됐다. 인가 서버가 RFC 9207(`iss`)을 광고하지 않으면
+       ChatGPT 는 고정 콜백 대신 커넥터별 `https://chatgpt.com/connector/oauth/<id>` 를 쓴다.
+       허용 목록에 넣어(PR #9 → `7d15767`) 배포한 뒤 **사람이 생성·로그인·도구 호출까지 확인했다.**
+       RFC 9207 구현안을 버린 근거는 `MILESTONES.md` redirect_uri 절. **ChatGPT 는 개발자 모드가
+       웹 전용이라 데스크톱·모바일 앱에서는 못 쓴다**(OpenAI 도움말)
+     - 남은 클라이언트 쪽 미확인: Claude 데스크톱·모바일 앱(웹에서 추가한 커넥터가 따라온다는 것은
+       도움말 기준) · 웹챗에서 올리기 도구
    - 2단계: 화면 회귀 — dev 에서 `npm run test:e2e:orphan`(X1·X2·X3 취소·X6~X9).
      **3002 의 `cwd` 부터 확인할 것** — 다른 체크아웃의 서버면 거짓 초록불이다
    - `CLAUDE.md` 인증 절에 MCP 한 줄은 아직 안 넣었다(보호 파일 — 사람이 세션에서)
