@@ -1,0 +1,351 @@
+{
+  "groups": [
+    {
+      "docKey": "SCR-MAN",
+      "keepId": "cmt9naqxk000204l1oosigunf",
+      "keepFileName": "03_메인페이지_화면설계서_v0.6_20260826.html",
+      "order": [
+        {
+          "id": "cmt9naqxk000204l1oosigunf",
+          "fileName": "03_메인페이지_화면설계서_v0.6_20260826.html",
+          "label": "v0.6",
+          "versionCount": 2
+        },
+        {
+          "id": "cmtzr8mv5000004joa1f2wps1",
+          "fileName": "메인페이지_화면설계서_v0.9_20260911.html",
+          "label": "v0.9",
+          "versionCount": 1
+        }
+      ],
+      "retitle": {
+        "from": "03_메인페이지_화면설계서_v0.6_20260826",
+        "to": "메인페이지_화면설계서_v0.9_20260911"
+      }
+    },
+    {
+      "docKey": "SCR-MYP",
+      "keepId": "cmturac6y000004l8lhb7x5p8",
+      "keepFileName": "03_마이페이지_화면설계서_v0_5_2026_09_08.html",
+      "order": [
+        {
+          "id": "cmt9nuuwh000004jr2yqopg2v",
+          "fileName": "03_마이페이지_화면설계서_v0_4_260825.html",
+          "label": "v0.4",
+          "versionCount": 2
+        },
+        {
+          "id": "cmturac6y000004l8lhb7x5p8",
+          "fileName": "03_마이페이지_화면설계서_v0_5_2026_09_08.html",
+          "label": "v0.5",
+          "versionCount": 1
+        },
+        {
+          "id": "cmu0o3va5000004jwiuauc2m5",
+          "fileName": "마이페이지_화면설계서_v0.5_20260913.html",
+          "label": "v0.5",
+          "versionCount": 1
+        },
+        {
+          "id": "cmu1wtziy000004kzbghgle1h",
+          "fileName": "마이페이지_화면설계서_v0.5_20260914.html",
+          "label": "v0.5",
+          "versionCount": 1
+        },
+        {
+          "id": "cmu51kk5p000004lcsaw7wkeu",
+          "fileName": "마이페이지_화면설계서_v0.5_260916.html",
+          "label": "v0.5",
+          "versionCount": 1
+        },
+        {
+          "id": "cmu95uptq000004jndk4qox3t",
+          "fileName": "마이페이지_화면설계서_v0.5_260920.html",
+          "label": "v0.5",
+          "versionCount": 1
+        },
+        {
+          "id": "cmuagt6r8000004js3z549ngo",
+          "fileName": "마이페이지_화면설계서_v0.5_20260921.html",
+          "label": "v0.5",
+          "versionCount": 1
+        },
+        {
+          "id": "cmucepip2000004l6rd5xo54y",
+          "fileName": "마이페이지_화면설계서_v0.5_260921.html",
+          "label": "v0.5",
+          "versionCount": 1
+        }
+      ],
+      "retitle": {
+        "from": "03_마이페이지_화면설계서_v0_5_2026_09_08",
+        "to": "마이페이지_화면설계서_v0.5_260921"
+      }
+    },
+    {
+      "docKey": "FN-MYP",
+      "keepId": "cmturac7o000004kwx1dfqifh",
+      "keepFileName": "04_마이페이지_기능명세서_v0_2_2026_09_08.xlsx",
+      "order": [
+        {
+          "id": "cmt9ny39l000204jp7plf5ol1",
+          "fileName": "04_기능명세서_마이페이지_v0.1_260826.xlsx",
+          "label": "v0.1",
+          "versionCount": 1
+        },
+        {
+          "id": "cmturac7o000004kwx1dfqifh",
+          "fileName": "04_마이페이지_기능명세서_v0_2_2026_09_08.xlsx",
+          "label": "v0.2",
+          "versionCount": 1
+        },
+        {
+          "id": "cmu0o3vov000204jwzx96ocry",
+          "fileName": "마이페이지_기능명세서_v0.2_20260913.xlsx",
+          "label": "v0.2",
+          "versionCount": 1
+        },
+        {
+          "id": "cmu1wtzku000004jkk7bkkokh",
+          "fileName": "마이페이지_기능명세서_v0.2_20260914.xlsx",
+          "label": "v0.2",
+          "versionCount": 1
+        },
+        {
+          "id": "cmu51kjku000004l8h5kmrwjo",
+          "fileName": "마이페이지_기능명세서_v0.2_260916.xlsx",
+          "label": "v0.2",
+          "versionCount": 1
+        },
+        {
+          "id": "cmu95upcq000004kx6olwkopf",
+          "fileName": "마이페이지_기능명세서_v0.3_260920.xlsx",
+          "label": "v0.3",
+          "versionCount": 1
+        },
+        {
+          "id": "cmuagt5x0000004ju0f0rb76o",
+          "fileName": "마이페이지_기능명세서_v0.3_260921.xlsx",
+          "label": "v0.3",
+          "versionCount": 1
+        }
+      ],
+      "retitle": {
+        "from": "04_마이페이지_기능명세서_v0_2_2026_09_08",
+        "to": "마이페이지_기능명세서_v0.3_260921"
+      }
+    },
+    {
+      "docKey": "FN-CSC",
+      "keepId": "cmt9o61zu000404jpnoii7p8r",
+      "keepFileName": "고객센터_기능명세서_v0_2.xlsx",
+      "order": [
+        {
+          "id": "cmt9o61zu000404jpnoii7p8r",
+          "fileName": "고객센터_기능명세서_v0_2.xlsx",
+          "label": "v0.2",
+          "versionCount": 1
+        },
+        {
+          "id": "cmuc6i0tm000604jv1kggsxw5",
+          "fileName": "고객센터_기능명세서_v0.3_20260922.xlsx",
+          "label": "v0.3",
+          "versionCount": 1
+        }
+      ],
+      "retitle": {
+        "from": "고객센터_기능명세서_v0_2",
+        "to": "고객센터_기능명세서_v0.3_20260922"
+      }
+    },
+    {
+      "docKey": "SCR-CSC",
+      "keepId": "cmt9o620k000204jrfz6odxbw",
+      "keepFileName": "07_고객센터_화면설계서_v0.2_260826.html",
+      "order": [
+        {
+          "id": "cmt9o620k000204jrfz6odxbw",
+          "fileName": "07_고객센터_화면설계서_v0.2_260826.html",
+          "label": "v0.2",
+          "versionCount": 1
+        },
+        {
+          "id": "cmuc6g5wb000204jvx88v4u7s",
+          "fileName": "고객센터_화면설계서_v0.2_20260922.html",
+          "label": "v0.2",
+          "versionCount": 1
+        }
+      ],
+      "retitle": {
+        "from": "07_고객센터_화면설계서_v0.2_260826",
+        "to": "고객센터_화면설계서_v0.2_20260922"
+      }
+    },
+    {
+      "docKey": "SCR-CMU",
+      "keepId": "cmt9o62lz000004l8e7u5doaj",
+      "keepFileName": "06_커뮤니티_화면설계서_v0_2_260826.html",
+      "order": [
+        {
+          "id": "cmt9o62lz000004l8e7u5doaj",
+          "fileName": "06_커뮤니티_화면설계서_v0_2_260826.html",
+          "label": "v0.2",
+          "versionCount": 1
+        },
+        {
+          "id": "cmu26z8ro000004l5780cp6me",
+          "fileName": "커뮤니티_화면설계서_v0.3_20260915.html",
+          "label": "v0.3",
+          "versionCount": 1
+        },
+        {
+          "id": "cmu3lhlog000004jt7exyzeju",
+          "fileName": "커뮤니티_화면설계서_v0.3_20260916.html",
+          "label": "v0.3",
+          "versionCount": 1
+        },
+        {
+          "id": "cmuc31573000004ju4mjxawpf",
+          "fileName": "커뮤니티_화면설계서_v0.4_20260921.html",
+          "label": "v0.4",
+          "versionCount": 1
+        }
+      ],
+      "retitle": {
+        "from": "06_커뮤니티_화면설계서_v0_2_260826",
+        "to": "커뮤니티_화면설계서_v0.4_20260921"
+      }
+    },
+    {
+      "docKey": "FN-CMU",
+      "keepId": "cmt9o6350000204l87o8bc0pw",
+      "keepFileName": "커뮤니티_기능명세서_v0_2_.xlsx",
+      "order": [
+        {
+          "id": "cmt9o6350000204l87o8bc0pw",
+          "fileName": "커뮤니티_기능명세서_v0_2_.xlsx",
+          "label": "v0.2",
+          "versionCount": 1
+        },
+        {
+          "id": "cmu3igt03000004l57s9m4yx9",
+          "fileName": "커뮤니티_기능명세서_v0.3_20260916.xlsx",
+          "label": "v0.3",
+          "versionCount": 1
+        },
+        {
+          "id": "cmuc6qmmb000004jz2koprvxv",
+          "fileName": "커뮤니티_기능명세서_v0.4_20260922.xlsx",
+          "label": "v0.4",
+          "versionCount": 1
+        }
+      ],
+      "retitle": {
+        "from": "커뮤니티_기능명세서_v0_2_",
+        "to": "커뮤니티_기능명세서_v0.4_20260922"
+      }
+    },
+    {
+      "docKey": "FN-ACC",
+      "keepId": "cmt9pk9rp000004l7dydooqbp",
+      "keepFileName": "06_로그인_회원가입_기능명세서_v0.2_260908.xlsx",
+      "order": [
+        {
+          "id": "cmt9pk9rp000004l7dydooqbp",
+          "fileName": "06_로그인_회원가입_기능명세서_v0.2_260908.xlsx",
+          "label": "v0.2",
+          "versionCount": 2
+        },
+        {
+          "id": "cmtzzzui4000004jxg68iox8m",
+          "fileName": "로그인·회원가입_기능명세서_v0.3_20260913.xlsx",
+          "label": "v0.3",
+          "versionCount": 1
+        },
+        {
+          "id": "cmuazhyw8000204jmpke2bq4p",
+          "fileName": "로그인·회원가입_기능명세서_v0.4_20260921.xlsx",
+          "label": "v0.4",
+          "versionCount": 1
+        },
+        {
+          "id": "cmuc36p04000204juiq962pqx",
+          "fileName": "로그인·회원가입_기능명세서_v0.5_20260922.xlsx",
+          "label": "v0.5",
+          "versionCount": 1
+        }
+      ],
+      "retitle": {
+        "from": "06_로그인_회원가입_기능명세서_v0.2_260908",
+        "to": "로그인·회원가입_기능명세서_v0.5_20260922"
+      }
+    },
+    {
+      "docKey": "SCR-PLC",
+      "keepId": "cmtwg6mlu000004l4vms18pw9",
+      "keepFileName": "플레이스_화면설계서_v0.4_2026_09_08.html",
+      "order": [
+        {
+          "id": "cmtwg6mlu000004l4vms18pw9",
+          "fileName": "플레이스_화면설계서_v0.4_2026_09_08.html",
+          "label": "v0.4",
+          "versionCount": 1
+        },
+        {
+          "id": "cmub0qoib000004i4p8alvif7",
+          "fileName": "플레이스_화면설계서_v0.5_20260921.html",
+          "label": "v0.5",
+          "versionCount": 1
+        }
+      ],
+      "retitle": {
+        "from": "플레이스_화면설계서_v0.4_2026_09_08",
+        "to": "플레이스_화면설계서_v0.5_20260921"
+      }
+    }
+  ],
+  "skipped": [
+    {
+      "reason": "[로그인와이어프레임회원가입] 꼬리연구소 병행 판이 섞여 있다 — 합치지 않는다 (2026-09-10 팀장 결정)",
+      "files": [
+        "06_로그인_회원가입_와이어프레임.html",
+        "06_로그인_회원가입_와이어프레임_v0.5_260908.html"
+      ]
+    },
+    {
+      "reason": "[건강기록기능명세서] ⓐ 불가 — 묶음 안의 남길 문서가 0건이다",
+      "files": [
+        "04_건강기록_기능명세서_v0_5_2026_08_31.xlsx",
+        "건강기록_기능명세서_v0.6_20260912.xlsx",
+        "건강기록_기능명세서_v0.6_20260914.xlsx",
+        "건강기록_기능명세서_v0.6_20260914.xlsx",
+        "건강기록_기능명세서_v0_7_20260916.xlsx",
+        "건강기록_기능명세서_v0.7_20260916.xlsx",
+        "건강기록_기능명세서_v0.8_20260917.xlsx",
+        "건강기록_기능명세서_v0.8_20260922.xlsx",
+        "건강기록_기능명세서_v0.8_20260922.xlsx"
+      ]
+    },
+    {
+      "reason": "[건강기록화면설계서] ⓐ 불가 — 묶음 안의 남길 문서가 0건이다",
+      "files": [
+        "건강기록_화면설계서_v0.6_20260912.html",
+        "건강기록_화면설계서_v0.6_20260914.html",
+        "건강기록_화면설계서_v0.6_20260914.html",
+        "건강기록_화면설계서_v0_7_20260916.html",
+        "건강기록_화면설계서_v0.7_20260916.html",
+        "건강기록_화면설계서_v0.8_20260917.html",
+        "건강기록_화면설계서_v0.8_20260922.html",
+        "건강기록_화면설계서_v0.8_20260922.html"
+      ]
+    },
+    {
+      "reason": "[로그인회원가입화면설계서] ⓐ 불가 — 묶음 안의 남길 문서가 0건이다",
+      "files": [
+        "로그인·회원가입_화면설계서_v0.6_20260913.html",
+        "로그인·회원가입_화면설계서_v0.7_20260921.html",
+        "로그인·회원가입_화면설계서_v0.8_20260922.html"
+      ]
+    }
+  ]
+}
