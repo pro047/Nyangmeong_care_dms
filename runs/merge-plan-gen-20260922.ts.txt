@@ -1,0 +1,95 @@
+// Merge plan generator (2026-09-22). Run as a throwaway vitest file so it can import the app's
+// judgment functions: copy to src/lib/zz-merge-plan.test.ts, run with PLAN_DB_URL, delete.
+//   PLAN_DB_URL  database to read (vitest overrides DATABASE_URL with a dummy)
+//   PLAN_OUT     output path (required)
+//   PLAN_FOLDER  only this folder id (dev fixture runs)
+//   PLAN_KEEP    comma-separated survivor ids (overrides the §4 docKey map)
+import { it } from 'vitest'
+import { writeFileSync } from 'node:fs'
+import pg from 'pg'
+import { documentMatchKey, compareCandidatesByRecency, type SimilarCandidate } from '@/lib/similar-document'
+import { fileVersionLabel } from '@/lib/file-version'
+import { retitleOnReupload } from '@/lib/title'
+
+// Handoff §4 docKey documents — option ⓐ keeps these ids.
+const DOCKEY: Record<string, string> = {
+  cmtrysbjs000204jrz79h47dz: 'REQ', cmt9oj5yx000604l8r6c3y9qr: 'SCR-COM', cmt9saj1p000404jipaf35bew: 'SCR-ACC',
+  cmt9naqxk000204l1oosigunf: 'SCR-MAN', cmtsab94u000004l5gqm8atja: 'SCR-HLT', cmt9oixlu000404l8wnn4k3jq: 'SCR-AIM',
+  cmtwg6mlu000004l4vms18pw9: 'SCR-PLC', cmturac6y000004l8lhb7x5p8: 'SCR-MYP', cmt9o62lz000004l8e7u5doaj: 'SCR-CMU',
+  cmt9o620k000204jrfz6odxbw: 'SCR-CSC', cmt9p2ys3000804jrsoy89020: 'FN-COM', cmt9pk9rp000004l7dydooqbp: 'FN-ACC',
+  cmt9naqyh000304l17rbumn8w: 'FN-MAN', cmtsab94z000004jtc5l19o13: 'FN-HLT', cmtwkb4h9000104latsavkapc: 'FN-AIM',
+  cmt9pk9ry000004jlh8zvhrtg: 'FN-PLC', cmturac7o000004kwx1dfqifh: 'FN-MYP', cmt9o6350000204l87o8bc0pw: 'FN-CMU',
+  cmt9o61zu000404jpnoii7p8r: 'FN-CSC',
+}
+// Parallel edition by another team — never merged (team-lead decision 2026-09-10).
+const PARALLEL = new Set(['cmt88cywk000104l5g2o4rqry'])
+
+it('merge plan', async () => {
+  const out = process.env.PLAN_OUT
+  if (!out) throw new Error('PLAN_OUT required')
+  const onlyFolder = process.env.PLAN_FOLDER
+  // Scope must be explicit: an empty PLAN_FOLDER (e.g. a failed shell substitution) must not
+  // silently widen the plan to the whole database.
+  if (!onlyFolder && process.env.PLAN_SCOPE !== 'all') throw new Error('set PLAN_FOLDER or PLAN_SCOPE=all')
+  const keepOverride = new Set((process.env.PLAN_KEEP ?? '').split(',').filter(Boolean))
+
+  const c = new pg.Client({ connectionString: process.env.PLAN_DB_URL })
+  await c.connect()
+  const { rows } = await c.query(
+    `select d.id, d.title, d.folder_id, d.created_by,
+            json_agg(json_build_object('no', v.version_no, 'file', v.file_name, 'at', v.created_at)
+                     order by v.version_no desc) as versions
+       from documents d join document_versions v on v.document_id = d.id
+      where d.deleted_at is null and d.folder_id is not null ${onlyFolder ? 'and d.folder_id = $1' : ''}
+      group by d.id`,
+    onlyFolder ? [onlyFolder] : [],
+  )
+  await c.end()
+
+  type Row = { id: string; title: string; folder_id: string; created_by: string; versions: { no: number; file: string; at: string }[] }
+  const groups = new Map<string, Row[]>()
+  for (const d of rows as Row[]) {
+    const key = documentMatchKey(d.versions[0].file)
+    if (key === null) continue
+    const g = `${d.folder_id}|${d.created_by}|${key}`
+    groups.set(g, [...(groups.get(g) ?? []), d])
+  }
+
+  const isKeep = (id: string) => (keepOverride.size > 0 ? keepOverride.has(id) : id in DOCKEY)
+  const plan: { groups: unknown[]; skipped: { reason: string; files: string[] }[] } = { groups: [], skipped: [] }
+  for (const [g, members] of groups) {
+    if (members.length < 2) continue
+    const byId = new Map(members.map((m) => [m.id, m]))
+    const cands: SimilarCandidate[] = members.map((m) => ({
+      id: m.id, folderId: m.folder_id, createdById: m.created_by,
+      latestFileName: m.versions[0].file, latestVersionCreatedAt: new Date(m.versions[0].at),
+    }))
+    const ordered = [...cands].sort(compareCandidatesByRecency).reverse()
+    const files = ordered.map((x) => x.latestFileName)
+    const key = g.split('|')[2]
+    if (members.some((m) => PARALLEL.has(m.id))) {
+      plan.skipped.push({ reason: `[${key}] 꼬리연구소 병행 판이 섞여 있다 — 합치지 않는다 (2026-09-10 팀장 결정)`, files })
+      continue
+    }
+    const keeps = members.filter((m) => isKeep(m.id))
+    if (keeps.length !== 1) {
+      plan.skipped.push({ reason: `[${key}] ⓐ 불가 — 묶음 안의 남길 문서가 ${keeps.length}건이다`, files })
+      continue
+    }
+    const keep = keeps[0]
+    const last = ordered.at(-1)!
+    const to = last.id === keep.id ? null : retitleOnReupload(keep.title, keep.versions[0].file, last.latestFileName)
+    plan.groups.push({
+      docKey: DOCKEY[keep.id] ?? null,
+      keepId: keep.id,
+      keepFileName: keep.versions[0].file,
+      order: ordered.map((x) => ({
+        id: x.id, fileName: x.latestFileName,
+        label: fileVersionLabel(x.latestFileName) ?? '판번호 없음',
+        versionCount: byId.get(x.id)!.versions.length,
+      })),
+      ...(to ? { retitle: { from: keep.title, to } } : {}),
+    })
+  }
+  writeFileSync(out, JSON.stringify(plan, null, 2))
+})

@@ -1,0 +1,1586 @@
+{
+  "plan": "runs/merge-plan-prod-20260922.json",
+  "applied": true,
+  "mappingSent": true,
+  "at": "2026-09-22T14:27:12.299Z",
+  "groups": [
+    {
+      "keepId": "cmt9naqxk000204l1oosigunf",
+      "before": [
+        {
+          "id": "cmtzr8mv5000004joa1f2wps1",
+          "title": "메인페이지_화면설계서_v0.9_20260911",
+          "description": null
+        },
+        {
+          "id": "cmt9naqxk000204l1oosigunf",
+          "title": "03_메인페이지_화면설계서_v0.6_20260826",
+          "description": null
+        }
+      ],
+      "order": [
+        {
+          "id": "cmt9naqxk000204l1oosigunf",
+          "fileName": "03_메인페이지_화면설계서_v0.6_20260826.html",
+          "label": "v0.6",
+          "versionCount": 2
+        },
+        {
+          "id": "cmtzr8mv5000004joa1f2wps1",
+          "fileName": "메인페이지_화면설계서_v0.9_20260911.html",
+          "label": "v0.9",
+          "versionCount": 1
+        }
+      ],
+      "versions": [
+        {
+          "id": "cmt88is7g000904l5zgenmvn0",
+          "from": "cmt9naqxk000204l1oosigunf",
+          "fromNo": 1,
+          "toNo": 1
+        },
+        {
+          "id": "cmt9naqzi000404l1oq4g8ket",
+          "from": "cmt9naqxk000204l1oosigunf",
+          "fromNo": 2,
+          "toNo": 2
+        },
+        {
+          "id": "cmtzr8mxa000104jozzo45gbj",
+          "from": "cmtzr8mv5000004joa1f2wps1",
+          "fromNo": 1,
+          "toNo": 3
+        }
+      ],
+      "retitle": {
+        "from": "03_메인페이지_화면설계서_v0.6_20260826",
+        "to": "메인페이지_화면설계서_v0.9_20260911"
+      },
+      "movingTags": [],
+      "applied": true,
+      "backup": {
+        "documents": [
+          {
+            "id": "cmtzr8mv5000004joa1f2wps1",
+            "title": "메인페이지_화면설계서_v0.9_20260911",
+            "description": null,
+            "folder_id": "475edcee-5c49-4e65-979a-3e1e77cd0834",
+            "created_by": "cmt88if4d000704l50fsa18pa",
+            "created_at": "2026-09-13T11:52:46.529",
+            "updated_at": "2026-09-13T11:52:46.529",
+            "deleted_at": null
+          },
+          {
+            "id": "cmt9naqxk000204l1oosigunf",
+            "title": "03_메인페이지_화면설계서_v0.6_20260826",
+            "description": null,
+            "folder_id": "475edcee-5c49-4e65-979a-3e1e77cd0834",
+            "created_by": "cmt88if4d000704l50fsa18pa",
+            "created_at": "2026-08-26T05:20:26.072",
+            "updated_at": "2026-08-26T05:20:26.072",
+            "deleted_at": null
+          }
+        ],
+        "versions": [
+          {
+            "id": "cmt88is7g000904l5zgenmvn0",
+            "document_id": "cmt9naqxk000204l1oosigunf",
+            "version_no": 1,
+            "s3_key": "documents/f1076970-8493-40e3-86fe-06244fd69b85.html",
+            "file_name": "03_메인페이지_화면설계서_v0.3_20260819.html",
+            "mime_type": "text/html",
+            "size_bytes": 19451,
+            "change_note": null,
+            "uploaded_by": "cmt88if4d000704l50fsa18pa",
+            "created_at": "2026-08-25T05:39:00.343"
+          },
+          {
+            "id": "cmt9naqzi000404l1oq4g8ket",
+            "document_id": "cmt9naqxk000204l1oosigunf",
+            "version_no": 2,
+            "s3_key": "documents/e4093afd-0a29-48bf-9205-082ceb75cb5a.html",
+            "file_name": "03_메인페이지_화면설계서_v0.6_20260826.html",
+            "mime_type": "text/html",
+            "size_bytes": 23776,
+            "change_note": null,
+            "uploaded_by": "cmt88if4d000704l50fsa18pa",
+            "created_at": "2026-08-26T05:20:26.072"
+          },
+          {
+            "id": "cmtzr8mxa000104jozzo45gbj",
+            "document_id": "cmtzr8mv5000004joa1f2wps1",
+            "version_no": 1,
+            "s3_key": "documents/7aedca53-0e82-402e-90ad-12bea13450d3.html",
+            "file_name": "메인페이지_화면설계서_v0.9_20260911.html",
+            "mime_type": "text/html",
+            "size_bytes": 31271,
+            "change_note": null,
+            "uploaded_by": "cmt88if4d000704l50fsa18pa",
+            "created_at": "2026-09-13T11:52:46.529"
+          }
+        ],
+        "tags": []
+      }
+    },
+    {
+      "keepId": "cmturac6y000004l8lhb7x5p8",
+      "before": [
+        {
+          "id": "cmturac6y000004l8lhb7x5p8",
+          "title": "03_마이페이지_화면설계서_v0_5_2026_09_08",
+          "description": null
+        },
+        {
+          "id": "cmu1wtziy000004kzbghgle1h",
+          "title": "마이페이지_화면설계서_v0.5_20260914",
+          "description": null
+        },
+        {
+          "id": "cmu51kk5p000004lcsaw7wkeu",
+          "title": "마이페이지_화면설계서_v0.5_260916",
+          "description": null
+        },
+        {
+          "id": "cmt9nuuwh000004jr2yqopg2v",
+          "title": "03_마이페이지_화면설계서_v0_4_260825",
+          "description": null
+        },
+        {
+          "id": "cmu0o3va5000004jwiuauc2m5",
+          "title": "마이페이지_화면설계서_v0.5_20260913",
+          "description": null
+        },
+        {
+          "id": "cmu95uptq000004jndk4qox3t",
+          "title": "마이페이지_화면설계서_v0.5_260920",
+          "description": null
+        },
+        {
+          "id": "cmuagt6r8000004js3z549ngo",
+          "title": "마이페이지_화면설계서_v0.5_20260921",
+          "description": null
+        },
+        {
+          "id": "cmucepip2000004l6rd5xo54y",
+          "title": "마이페이지_화면설계서_v0.5_20260921",
+          "description": null
+        }
+      ],
+      "order": [
+        {
+          "id": "cmt9nuuwh000004jr2yqopg2v",
+          "fileName": "03_마이페이지_화면설계서_v0_4_260825.html",
+          "label": "v0.4",
+          "versionCount": 2
+        },
+        {
+          "id": "cmturac6y000004l8lhb7x5p8",
+          "fileName": "03_마이페이지_화면설계서_v0_5_2026_09_08.html",
+          "label": "v0.5",
+          "versionCount": 1
+        },
+        {
+          "id": "cmu0o3va5000004jwiuauc2m5",
+          "fileName": "마이페이지_화면설계서_v0.5_20260913.html",
+          "label": "v0.5",
+          "versionCount": 1
+        },
+        {
+          "id": "cmu1wtziy000004kzbghgle1h",
+          "fileName": "마이페이지_화면설계서_v0.5_20260914.html",
+          "label": "v0.5",
+          "versionCount": 1
+        },
+        {
+          "id": "cmu51kk5p000004lcsaw7wkeu",
+          "fileName": "마이페이지_화면설계서_v0.5_260916.html",
+          "label": "v0.5",
+          "versionCount": 1
+        },
+        {
+          "id": "cmu95uptq000004jndk4qox3t",
+          "fileName": "마이페이지_화면설계서_v0.5_260920.html",
+          "label": "v0.5",
+          "versionCount": 1
+        },
+        {
+          "id": "cmuagt6r8000004js3z549ngo",
+          "fileName": "마이페이지_화면설계서_v0.5_20260921.html",
+          "label": "v0.5",
+          "versionCount": 1
+        },
+        {
+          "id": "cmucepip2000004l6rd5xo54y",
+          "fileName": "마이페이지_화면설계서_v0.5_260921.html",
+          "label": "v0.5",
+          "versionCount": 1
+        }
+      ],
+      "versions": [
+        {
+          "id": "cmt88h3ts000504l5ym9n438n",
+          "from": "cmt9nuuwh000004jr2yqopg2v",
+          "fromNo": 1,
+          "toNo": 1
+        },
+        {
+          "id": "cmt9nuuyh000104jrnagzba0p",
+          "from": "cmt9nuuwh000004jr2yqopg2v",
+          "fromNo": 2,
+          "toNo": 2
+        },
+        {
+          "id": "cmturac95000104l8n9vgne7o",
+          "from": "cmturac6y000004l8lhb7x5p8",
+          "fromNo": 1,
+          "toNo": 3
+        },
+        {
+          "id": "cmu0o3vc4000104jwk0oio84l",
+          "from": "cmu0o3va5000004jwiuauc2m5",
+          "fromNo": 1,
+          "toNo": 4
+        },
+        {
+          "id": "cmu1wtzl3000104kzjhukm1ib",
+          "from": "cmu1wtziy000004kzbghgle1h",
+          "fromNo": 1,
+          "toNo": 5
+        },
+        {
+          "id": "cmu51kk7n000104lcevtikusy",
+          "from": "cmu51kk5p000004lcsaw7wkeu",
+          "fromNo": 1,
+          "toNo": 6
+        },
+        {
+          "id": "cmu95upvo000104jn14gzauzy",
+          "from": "cmu95uptq000004jndk4qox3t",
+          "fromNo": 1,
+          "toNo": 7
+        },
+        {
+          "id": "cmuagt6t7000104jshtqj8czo",
+          "from": "cmuagt6r8000004js3z549ngo",
+          "fromNo": 1,
+          "toNo": 8
+        },
+        {
+          "id": "cmucepir5000104l6l8acoljc",
+          "from": "cmucepip2000004l6rd5xo54y",
+          "fromNo": 1,
+          "toNo": 9
+        }
+      ],
+      "retitle": {
+        "from": "03_마이페이지_화면설계서_v0_5_2026_09_08",
+        "to": "마이페이지_화면설계서_v0.5_260921"
+      },
+      "movingTags": [],
+      "applied": true,
+      "backup": {
+        "documents": [
+          {
+            "id": "cmturac6y000004l8lhb7x5p8",
+            "title": "03_마이페이지_화면설계서_v0_5_2026_09_08",
+            "description": null,
+            "folder_id": "768b6958-427b-4790-ade9-f3b749debfbf",
+            "created_by": "cmt88ff5u000304l5iscv2fou",
+            "created_at": "2026-09-09T23:55:15.131",
+            "updated_at": "2026-09-09T23:55:15.131",
+            "deleted_at": null
+          },
+          {
+            "id": "cmu1wtziy000004kzbghgle1h",
+            "title": "마이페이지_화면설계서_v0.5_20260914",
+            "description": null,
+            "folder_id": "768b6958-427b-4790-ade9-f3b749debfbf",
+            "created_by": "cmt88ff5u000304l5iscv2fou",
+            "created_at": "2026-09-15T00:04:53.146",
+            "updated_at": "2026-09-15T00:04:53.146",
+            "deleted_at": null
+          },
+          {
+            "id": "cmu51kk5p000004lcsaw7wkeu",
+            "title": "마이페이지_화면설계서_v0.5_260916",
+            "description": null,
+            "folder_id": "768b6958-427b-4790-ade9-f3b749debfbf",
+            "created_by": "cmt88ff5u000304l5iscv2fou",
+            "created_at": "2026-09-17T04:40:49.934",
+            "updated_at": "2026-09-17T04:40:49.934",
+            "deleted_at": null
+          },
+          {
+            "id": "cmt9nuuwh000004jr2yqopg2v",
+            "title": "03_마이페이지_화면설계서_v0_4_260825",
+            "description": null,
+            "folder_id": "768b6958-427b-4790-ade9-f3b749debfbf",
+            "created_by": "cmt88ff5u000304l5iscv2fou",
+            "created_at": "2026-08-26T05:36:04.338",
+            "updated_at": "2026-08-26T05:36:04.338",
+            "deleted_at": null
+          },
+          {
+            "id": "cmu0o3va5000004jwiuauc2m5",
+            "title": "마이페이지_화면설계서_v0.5_20260913",
+            "description": null,
+            "folder_id": "768b6958-427b-4790-ade9-f3b749debfbf",
+            "created_by": "cmt88ff5u000304l5iscv2fou",
+            "created_at": "2026-09-14T03:12:51.485",
+            "updated_at": "2026-09-14T03:12:51.485",
+            "deleted_at": null
+          },
+          {
+            "id": "cmu95uptq000004jndk4qox3t",
+            "title": "마이페이지_화면설계서_v0.5_260920",
+            "description": null,
+            "folder_id": "768b6958-427b-4790-ade9-f3b749debfbf",
+            "created_by": "cmt88ff5u000304l5iscv2fou",
+            "created_at": "2026-09-20T01:51:47.006",
+            "updated_at": "2026-09-20T01:51:47.006",
+            "deleted_at": null
+          },
+          {
+            "id": "cmuagt6r8000004js3z549ngo",
+            "title": "마이페이지_화면설계서_v0.5_20260921",
+            "description": null,
+            "folder_id": "768b6958-427b-4790-ade9-f3b749debfbf",
+            "created_by": "cmt88ff5u000304l5iscv2fou",
+            "created_at": "2026-09-20T23:46:17.588",
+            "updated_at": "2026-09-20T23:46:17.588",
+            "deleted_at": null
+          },
+          {
+            "id": "cmucepip2000004l6rd5xo54y",
+            "title": "마이페이지_화면설계서_v0.5_20260921",
+            "description": null,
+            "folder_id": "768b6958-427b-4790-ade9-f3b749debfbf",
+            "created_by": "cmt88ff5u000304l5iscv2fou",
+            "created_at": "2026-09-22T08:22:59.558",
+            "updated_at": "2026-09-22T08:24:34.694",
+            "deleted_at": null
+          }
+        ],
+        "versions": [
+          {
+            "id": "cmt88h3ts000504l5ym9n438n",
+            "document_id": "cmt9nuuwh000004jr2yqopg2v",
+            "version_no": 1,
+            "s3_key": "documents/90a82f62-f382-4858-9527-8e9498e24f9e.html",
+            "file_name": "03_마이페이지_화면설계서_v0_3_260817.html",
+            "mime_type": "text/html",
+            "size_bytes": 102058,
+            "change_note": null,
+            "uploaded_by": "cmt88ff5u000304l5iscv2fou",
+            "created_at": "2026-08-25T05:37:42.089"
+          },
+          {
+            "id": "cmt9nuuyh000104jrnagzba0p",
+            "document_id": "cmt9nuuwh000004jr2yqopg2v",
+            "version_no": 2,
+            "s3_key": "documents/781384ba-297d-4409-9345-8c915d0c3fe3.html",
+            "file_name": "03_마이페이지_화면설계서_v0_4_260825.html",
+            "mime_type": "text/html",
+            "size_bytes": 110275,
+            "change_note": null,
+            "uploaded_by": "cmt88ff5u000304l5iscv2fou",
+            "created_at": "2026-08-26T05:36:04.338"
+          },
+          {
+            "id": "cmturac95000104l8n9vgne7o",
+            "document_id": "cmturac6y000004l8lhb7x5p8",
+            "version_no": 1,
+            "s3_key": "documents/318ba0ec-d31b-4fbd-832e-5360868cb6ab.html",
+            "file_name": "03_마이페이지_화면설계서_v0_5_2026_09_08.html",
+            "mime_type": "text/html",
+            "size_bytes": 174960,
+            "change_note": null,
+            "uploaded_by": "cmt88ff5u000304l5iscv2fou",
+            "created_at": "2026-09-09T23:55:15.131"
+          },
+          {
+            "id": "cmu0o3vc4000104jwk0oio84l",
+            "document_id": "cmu0o3va5000004jwiuauc2m5",
+            "version_no": 1,
+            "s3_key": "documents/05e19b3f-953d-4583-a952-387f4b93cf04.html",
+            "file_name": "마이페이지_화면설계서_v0.5_20260913.html",
+            "mime_type": "text/html",
+            "size_bytes": 175957,
+            "change_note": null,
+            "uploaded_by": "cmt88ff5u000304l5iscv2fou",
+            "created_at": "2026-09-14T03:12:51.485"
+          },
+          {
+            "id": "cmu1wtzl3000104kzjhukm1ib",
+            "document_id": "cmu1wtziy000004kzbghgle1h",
+            "version_no": 1,
+            "s3_key": "documents/ea21afc9-57dd-4900-b40e-2a6661e344e3.html",
+            "file_name": "마이페이지_화면설계서_v0.5_20260914.html",
+            "mime_type": "text/html",
+            "size_bytes": 189016,
+            "change_note": null,
+            "uploaded_by": "cmt88ff5u000304l5iscv2fou",
+            "created_at": "2026-09-15T00:04:53.146"
+          },
+          {
+            "id": "cmu51kk7n000104lcevtikusy",
+            "document_id": "cmu51kk5p000004lcsaw7wkeu",
+            "version_no": 1,
+            "s3_key": "documents/c83923ff-776a-4690-a28b-6dbb362b9dd5.html",
+            "file_name": "마이페이지_화면설계서_v0.5_260916.html",
+            "mime_type": "text/html",
+            "size_bytes": 186242,
+            "change_note": null,
+            "uploaded_by": "cmt88ff5u000304l5iscv2fou",
+            "created_at": "2026-09-17T04:40:49.934"
+          },
+          {
+            "id": "cmu95upvo000104jn14gzauzy",
+            "document_id": "cmu95uptq000004jndk4qox3t",
+            "version_no": 1,
+            "s3_key": "documents/f7d3149f-d200-4dca-b77f-c60452cdb088.html",
+            "file_name": "마이페이지_화면설계서_v0.5_260920.html",
+            "mime_type": "text/html",
+            "size_bytes": 197971,
+            "change_note": null,
+            "uploaded_by": "cmt88ff5u000304l5iscv2fou",
+            "created_at": "2026-09-20T01:51:47.006"
+          },
+          {
+            "id": "cmuagt6t7000104jshtqj8czo",
+            "document_id": "cmuagt6r8000004js3z549ngo",
+            "version_no": 1,
+            "s3_key": "documents/69ed777d-9883-4c90-9908-ea4aab6ed447.html",
+            "file_name": "마이페이지_화면설계서_v0.5_20260921.html",
+            "mime_type": "text/html",
+            "size_bytes": 199909,
+            "change_note": null,
+            "uploaded_by": "cmt88ff5u000304l5iscv2fou",
+            "created_at": "2026-09-20T23:46:17.588"
+          },
+          {
+            "id": "cmucepir5000104l6l8acoljc",
+            "document_id": "cmucepip2000004l6rd5xo54y",
+            "version_no": 1,
+            "s3_key": "documents/34c21f17-c260-4ce3-892d-f97920e5e9b3.html",
+            "file_name": "마이페이지_화면설계서_v0.5_260921.html",
+            "mime_type": "text/html",
+            "size_bytes": 199909,
+            "change_note": null,
+            "uploaded_by": "cmt88ff5u000304l5iscv2fou",
+            "created_at": "2026-09-22T08:22:59.558"
+          }
+        ],
+        "tags": []
+      }
+    },
+    {
+      "keepId": "cmturac7o000004kwx1dfqifh",
+      "before": [
+        {
+          "id": "cmu51kjku000004l8h5kmrwjo",
+          "title": "마이페이지_기능명세서_v0.2_260916",
+          "description": null
+        },
+        {
+          "id": "cmturac7o000004kwx1dfqifh",
+          "title": "04_마이페이지_기능명세서_v0_2_2026_09_08",
+          "description": null
+        },
+        {
+          "id": "cmt9ny39l000204jp7plf5ol1",
+          "title": "04_기능명세서_마이페이지_v0.1_260826",
+          "description": null
+        },
+        {
+          "id": "cmu0o3vov000204jwzx96ocry",
+          "title": "마이페이지_기능명세서_v0.2_20260913",
+          "description": null
+        },
+        {
+          "id": "cmu1wtzku000004jkk7bkkokh",
+          "title": "마이페이지_기능명세서_v0.2_20260914",
+          "description": null
+        },
+        {
+          "id": "cmu95upcq000004kx6olwkopf",
+          "title": "마이페이지_기능명세서_v0.3_260920",
+          "description": null
+        },
+        {
+          "id": "cmuagt5x0000004ju0f0rb76o",
+          "title": "마이페이지_기능명세서_v0.3_260921",
+          "description": null
+        }
+      ],
+      "order": [
+        {
+          "id": "cmt9ny39l000204jp7plf5ol1",
+          "fileName": "04_기능명세서_마이페이지_v0.1_260826.xlsx",
+          "label": "v0.1",
+          "versionCount": 1
+        },
+        {
+          "id": "cmturac7o000004kwx1dfqifh",
+          "fileName": "04_마이페이지_기능명세서_v0_2_2026_09_08.xlsx",
+          "label": "v0.2",
+          "versionCount": 1
+        },
+        {
+          "id": "cmu0o3vov000204jwzx96ocry",
+          "fileName": "마이페이지_기능명세서_v0.2_20260913.xlsx",
+          "label": "v0.2",
+          "versionCount": 1
+        },
+        {
+          "id": "cmu1wtzku000004jkk7bkkokh",
+          "fileName": "마이페이지_기능명세서_v0.2_20260914.xlsx",
+          "label": "v0.2",
+          "versionCount": 1
+        },
+        {
+          "id": "cmu51kjku000004l8h5kmrwjo",
+          "fileName": "마이페이지_기능명세서_v0.2_260916.xlsx",
+          "label": "v0.2",
+          "versionCount": 1
+        },
+        {
+          "id": "cmu95upcq000004kx6olwkopf",
+          "fileName": "마이페이지_기능명세서_v0.3_260920.xlsx",
+          "label": "v0.3",
+          "versionCount": 1
+        },
+        {
+          "id": "cmuagt5x0000004ju0f0rb76o",
+          "fileName": "마이페이지_기능명세서_v0.3_260921.xlsx",
+          "label": "v0.3",
+          "versionCount": 1
+        }
+      ],
+      "versions": [
+        {
+          "id": "cmt9ny3bj000304jpn63zof5k",
+          "from": "cmt9ny39l000204jp7plf5ol1",
+          "fromNo": 1,
+          "toNo": 1
+        },
+        {
+          "id": "cmturac9n000104kw6jv8gupa",
+          "from": "cmturac7o000004kwx1dfqifh",
+          "fromNo": 1,
+          "toNo": 2
+        },
+        {
+          "id": "cmu0o3vqt000304jw4uw30gey",
+          "from": "cmu0o3vov000204jwzx96ocry",
+          "fromNo": 1,
+          "toNo": 3
+        },
+        {
+          "id": "cmu1wtzmt000104jkadmuv2a0",
+          "from": "cmu1wtzku000004jkk7bkkokh",
+          "fromNo": 1,
+          "toNo": 4
+        },
+        {
+          "id": "cmu51kjmz000104l84w4m13zn",
+          "from": "cmu51kjku000004l8h5kmrwjo",
+          "fromNo": 1,
+          "toNo": 5
+        },
+        {
+          "id": "cmu95upev000104kxqf1twytz",
+          "from": "cmu95upcq000004kx6olwkopf",
+          "fromNo": 1,
+          "toNo": 6
+        },
+        {
+          "id": "cmuagt5z3000104ju3x21w5t3",
+          "from": "cmuagt5x0000004ju0f0rb76o",
+          "fromNo": 1,
+          "toNo": 7
+        }
+      ],
+      "retitle": {
+        "from": "04_마이페이지_기능명세서_v0_2_2026_09_08",
+        "to": "마이페이지_기능명세서_v0.3_260921"
+      },
+      "movingTags": [],
+      "applied": true,
+      "backup": {
+        "documents": [
+          {
+            "id": "cmu51kjku000004l8h5kmrwjo",
+            "title": "마이페이지_기능명세서_v0.2_260916",
+            "description": null,
+            "folder_id": "7119992c-9f2e-458b-85b2-dc93adedea29",
+            "created_by": "cmt88ff5u000304l5iscv2fou",
+            "created_at": "2026-09-17T04:40:49.183",
+            "updated_at": "2026-09-17T04:40:49.183",
+            "deleted_at": null
+          },
+          {
+            "id": "cmturac7o000004kwx1dfqifh",
+            "title": "04_마이페이지_기능명세서_v0_2_2026_09_08",
+            "description": null,
+            "folder_id": "7119992c-9f2e-458b-85b2-dc93adedea29",
+            "created_by": "cmt88ff5u000304l5iscv2fou",
+            "created_at": "2026-09-09T23:55:15.156",
+            "updated_at": "2026-09-09T23:55:15.156",
+            "deleted_at": null
+          },
+          {
+            "id": "cmt9ny39l000204jp7plf5ol1",
+            "title": "04_기능명세서_마이페이지_v0.1_260826",
+            "description": null,
+            "folder_id": "7119992c-9f2e-458b-85b2-dc93adedea29",
+            "created_by": "cmt88ff5u000304l5iscv2fou",
+            "created_at": "2026-08-26T05:38:35.145",
+            "updated_at": "2026-08-26T05:38:35.145",
+            "deleted_at": null
+          },
+          {
+            "id": "cmu0o3vov000204jwzx96ocry",
+            "title": "마이페이지_기능명세서_v0.2_20260913",
+            "description": null,
+            "folder_id": "7119992c-9f2e-458b-85b2-dc93adedea29",
+            "created_by": "cmt88ff5u000304l5iscv2fou",
+            "created_at": "2026-09-14T03:12:52.015",
+            "updated_at": "2026-09-14T03:12:52.015",
+            "deleted_at": null
+          },
+          {
+            "id": "cmu1wtzku000004jkk7bkkokh",
+            "title": "마이페이지_기능명세서_v0.2_20260914",
+            "description": null,
+            "folder_id": "7119992c-9f2e-458b-85b2-dc93adedea29",
+            "created_by": "cmt88ff5u000304l5iscv2fou",
+            "created_at": "2026-09-15T00:04:53.214",
+            "updated_at": "2026-09-15T00:04:53.214",
+            "deleted_at": null
+          },
+          {
+            "id": "cmu95upcq000004kx6olwkopf",
+            "title": "마이페이지_기능명세서_v0.3_260920",
+            "description": null,
+            "folder_id": "7119992c-9f2e-458b-85b2-dc93adedea29",
+            "created_by": "cmt88ff5u000304l5iscv2fou",
+            "created_at": "2026-09-20T01:51:46.394",
+            "updated_at": "2026-09-20T01:51:46.394",
+            "deleted_at": null
+          },
+          {
+            "id": "cmuagt5x0000004ju0f0rb76o",
+            "title": "마이페이지_기능명세서_v0.3_260921",
+            "description": null,
+            "folder_id": "7119992c-9f2e-458b-85b2-dc93adedea29",
+            "created_by": "cmt88ff5u000304l5iscv2fou",
+            "created_at": "2026-09-20T23:46:16.5",
+            "updated_at": "2026-09-20T23:46:16.5",
+            "deleted_at": null
+          }
+        ],
+        "versions": [
+          {
+            "id": "cmt9ny3bj000304jpn63zof5k",
+            "document_id": "cmt9ny39l000204jp7plf5ol1",
+            "version_no": 1,
+            "s3_key": "documents/07b1e5bf-f4df-4e29-91dc-ca934254e28e.xlsx",
+            "file_name": "04_기능명세서_마이페이지_v0.1_260826.xlsx",
+            "mime_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "size_bytes": 15442,
+            "change_note": null,
+            "uploaded_by": "cmt88ff5u000304l5iscv2fou",
+            "created_at": "2026-08-26T05:38:35.145"
+          },
+          {
+            "id": "cmturac9n000104kw6jv8gupa",
+            "document_id": "cmturac7o000004kwx1dfqifh",
+            "version_no": 1,
+            "s3_key": "documents/d892a729-2218-400d-80ab-b6a09634ccdf.xlsx",
+            "file_name": "04_마이페이지_기능명세서_v0_2_2026_09_08.xlsx",
+            "mime_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "size_bytes": 23649,
+            "change_note": null,
+            "uploaded_by": "cmt88ff5u000304l5iscv2fou",
+            "created_at": "2026-09-09T23:55:15.156"
+          },
+          {
+            "id": "cmu0o3vqt000304jw4uw30gey",
+            "document_id": "cmu0o3vov000204jwzx96ocry",
+            "version_no": 1,
+            "s3_key": "documents/60e4fb46-7b1a-45c3-b06f-53fac3fab9f4.xlsx",
+            "file_name": "마이페이지_기능명세서_v0.2_20260913.xlsx",
+            "mime_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "size_bytes": 23724,
+            "change_note": null,
+            "uploaded_by": "cmt88ff5u000304l5iscv2fou",
+            "created_at": "2026-09-14T03:12:52.015"
+          },
+          {
+            "id": "cmu1wtzmt000104jkadmuv2a0",
+            "document_id": "cmu1wtzku000004jkk7bkkokh",
+            "version_no": 1,
+            "s3_key": "documents/2e613847-a603-421d-a8f0-1ce19760d6e7.xlsx",
+            "file_name": "마이페이지_기능명세서_v0.2_20260914.xlsx",
+            "mime_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "size_bytes": 25551,
+            "change_note": null,
+            "uploaded_by": "cmt88ff5u000304l5iscv2fou",
+            "created_at": "2026-09-15T00:04:53.214"
+          },
+          {
+            "id": "cmu51kjmz000104l84w4m13zn",
+            "document_id": "cmu51kjku000004l8h5kmrwjo",
+            "version_no": 1,
+            "s3_key": "documents/9e5c6472-9dcc-45b2-bf38-53c055d2b861.xlsx",
+            "file_name": "마이페이지_기능명세서_v0.2_260916.xlsx",
+            "mime_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "size_bytes": 26291,
+            "change_note": null,
+            "uploaded_by": "cmt88ff5u000304l5iscv2fou",
+            "created_at": "2026-09-17T04:40:49.183"
+          },
+          {
+            "id": "cmu95upev000104kxqf1twytz",
+            "document_id": "cmu95upcq000004kx6olwkopf",
+            "version_no": 1,
+            "s3_key": "documents/bad2bf32-566c-4514-a03e-6ee3db55b8f3.xlsx",
+            "file_name": "마이페이지_기능명세서_v0.3_260920.xlsx",
+            "mime_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "size_bytes": 28380,
+            "change_note": null,
+            "uploaded_by": "cmt88ff5u000304l5iscv2fou",
+            "created_at": "2026-09-20T01:51:46.394"
+          },
+          {
+            "id": "cmuagt5z3000104ju3x21w5t3",
+            "document_id": "cmuagt5x0000004ju0f0rb76o",
+            "version_no": 1,
+            "s3_key": "documents/b1da2724-197a-4668-9f2c-90ec1a144387.xlsx",
+            "file_name": "마이페이지_기능명세서_v0.3_260921.xlsx",
+            "mime_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "size_bytes": 28881,
+            "change_note": null,
+            "uploaded_by": "cmt88ff5u000304l5iscv2fou",
+            "created_at": "2026-09-20T23:46:16.5"
+          }
+        ],
+        "tags": []
+      }
+    },
+    {
+      "keepId": "cmt9o61zu000404jpnoii7p8r",
+      "before": [
+        {
+          "id": "cmt9o61zu000404jpnoii7p8r",
+          "title": "고객센터_기능명세서_v0_2",
+          "description": null
+        },
+        {
+          "id": "cmuc6i0tm000604jv1kggsxw5",
+          "title": "고객센터_기능명세서_v0.3_20260922",
+          "description": null
+        }
+      ],
+      "order": [
+        {
+          "id": "cmt9o61zu000404jpnoii7p8r",
+          "fileName": "고객센터_기능명세서_v0_2.xlsx",
+          "label": "v0.2",
+          "versionCount": 1
+        },
+        {
+          "id": "cmuc6i0tm000604jv1kggsxw5",
+          "fileName": "고객센터_기능명세서_v0.3_20260922.xlsx",
+          "label": "v0.3",
+          "versionCount": 1
+        }
+      ],
+      "versions": [
+        {
+          "id": "cmt9o621s000504jpfusdxy83",
+          "from": "cmt9o61zu000404jpnoii7p8r",
+          "fromNo": 1,
+          "toNo": 1
+        },
+        {
+          "id": "cmuc6i0vj000704jvi0iun5e0",
+          "from": "cmuc6i0tm000604jv1kggsxw5",
+          "fromNo": 1,
+          "toNo": 2
+        }
+      ],
+      "retitle": {
+        "from": "고객센터_기능명세서_v0_2",
+        "to": "고객센터_기능명세서_v0.3_20260922"
+      },
+      "movingTags": [],
+      "applied": true,
+      "backup": {
+        "documents": [
+          {
+            "id": "cmt9o61zu000404jpnoii7p8r",
+            "title": "고객센터_기능명세서_v0_2",
+            "description": null,
+            "folder_id": "a741030e-8657-4074-a6aa-89949884594e",
+            "created_by": "cmt8b6exm000004kywvbhkfea",
+            "created_at": "2026-08-26T05:44:46.746",
+            "updated_at": "2026-08-26T05:44:46.746",
+            "deleted_at": null
+          },
+          {
+            "id": "cmuc6i0tm000604jv1kggsxw5",
+            "title": "고객센터_기능명세서_v0.3_20260922",
+            "description": null,
+            "folder_id": "a741030e-8657-4074-a6aa-89949884594e",
+            "created_by": "cmt8b6exm000004kywvbhkfea",
+            "created_at": "2026-09-22T04:33:12.874",
+            "updated_at": "2026-09-22T04:33:12.874",
+            "deleted_at": null
+          }
+        ],
+        "versions": [
+          {
+            "id": "cmt9o621s000504jpfusdxy83",
+            "document_id": "cmt9o61zu000404jpnoii7p8r",
+            "version_no": 1,
+            "s3_key": "documents/7a7a0705-8789-4130-b256-78e8da3d4766.xlsx",
+            "file_name": "고객센터_기능명세서_v0_2.xlsx",
+            "mime_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "size_bytes": 10065,
+            "change_note": null,
+            "uploaded_by": "cmt8b6exm000004kywvbhkfea",
+            "created_at": "2026-08-26T05:44:46.746"
+          },
+          {
+            "id": "cmuc6i0vj000704jvi0iun5e0",
+            "document_id": "cmuc6i0tm000604jv1kggsxw5",
+            "version_no": 1,
+            "s3_key": "documents/64f8dd78-bfb2-440a-94f7-db2ec234d3d9.xlsx",
+            "file_name": "고객센터_기능명세서_v0.3_20260922.xlsx",
+            "mime_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "size_bytes": 12498,
+            "change_note": null,
+            "uploaded_by": "cmt8b6exm000004kywvbhkfea",
+            "created_at": "2026-09-22T04:33:12.874"
+          }
+        ],
+        "tags": []
+      }
+    },
+    {
+      "keepId": "cmt9o620k000204jrfz6odxbw",
+      "before": [
+        {
+          "id": "cmt9o620k000204jrfz6odxbw",
+          "title": "07_고객센터_화면설계서_v0.2_260826",
+          "description": null
+        },
+        {
+          "id": "cmuc6g5wb000204jvx88v4u7s",
+          "title": "고객센터_화면설계서_v0.2_20260922",
+          "description": null
+        }
+      ],
+      "order": [
+        {
+          "id": "cmt9o620k000204jrfz6odxbw",
+          "fileName": "07_고객센터_화면설계서_v0.2_260826.html",
+          "label": "v0.2",
+          "versionCount": 1
+        },
+        {
+          "id": "cmuc6g5wb000204jvx88v4u7s",
+          "fileName": "고객센터_화면설계서_v0.2_20260922.html",
+          "label": "v0.2",
+          "versionCount": 1
+        }
+      ],
+      "versions": [
+        {
+          "id": "cmt9o622i000304jrs04qh3x6",
+          "from": "cmt9o620k000204jrfz6odxbw",
+          "fromNo": 1,
+          "toNo": 1
+        },
+        {
+          "id": "cmuc6g5y9000304jvmodanzvm",
+          "from": "cmuc6g5wb000204jvx88v4u7s",
+          "fromNo": 1,
+          "toNo": 2
+        }
+      ],
+      "retitle": {
+        "from": "07_고객센터_화면설계서_v0.2_260826",
+        "to": "고객센터_화면설계서_v0.2_20260922"
+      },
+      "movingTags": [],
+      "applied": true,
+      "backup": {
+        "documents": [
+          {
+            "id": "cmt9o620k000204jrfz6odxbw",
+            "title": "07_고객센터_화면설계서_v0.2_260826",
+            "description": null,
+            "folder_id": "cc1eafd4-4bd0-44e7-8609-315576cb9708",
+            "created_by": "cmt8b6exm000004kywvbhkfea",
+            "created_at": "2026-08-26T05:44:46.772",
+            "updated_at": "2026-08-26T05:44:46.772",
+            "deleted_at": null
+          },
+          {
+            "id": "cmuc6g5wb000204jvx88v4u7s",
+            "title": "고객센터_화면설계서_v0.2_20260922",
+            "description": null,
+            "folder_id": "cc1eafd4-4bd0-44e7-8609-315576cb9708",
+            "created_by": "cmt8b6exm000004kywvbhkfea",
+            "created_at": "2026-09-22T04:31:46.139",
+            "updated_at": "2026-09-22T04:31:46.139",
+            "deleted_at": null
+          }
+        ],
+        "versions": [
+          {
+            "id": "cmt9o622i000304jrs04qh3x6",
+            "document_id": "cmt9o620k000204jrfz6odxbw",
+            "version_no": 1,
+            "s3_key": "documents/ac7b7c6b-9edd-4e13-b22a-83c3b87c2722.html",
+            "file_name": "07_고객센터_화면설계서_v0.2_260826.html",
+            "mime_type": "text/html",
+            "size_bytes": 26618,
+            "change_note": null,
+            "uploaded_by": "cmt8b6exm000004kywvbhkfea",
+            "created_at": "2026-08-26T05:44:46.772"
+          },
+          {
+            "id": "cmuc6g5y9000304jvmodanzvm",
+            "document_id": "cmuc6g5wb000204jvx88v4u7s",
+            "version_no": 1,
+            "s3_key": "documents/869f481a-f693-465a-9fa6-89d74601dcf3.html",
+            "file_name": "고객센터_화면설계서_v0.2_20260922.html",
+            "mime_type": "text/html",
+            "size_bytes": 45453,
+            "change_note": null,
+            "uploaded_by": "cmt8b6exm000004kywvbhkfea",
+            "created_at": "2026-09-22T04:31:46.139"
+          }
+        ],
+        "tags": []
+      }
+    },
+    {
+      "keepId": "cmt9o62lz000004l8e7u5doaj",
+      "before": [
+        {
+          "id": "cmu26z8ro000004l5780cp6me",
+          "title": "커뮤니티_화면설계서_v0.3_20260915",
+          "description": null
+        },
+        {
+          "id": "cmu3lhlog000004jt7exyzeju",
+          "title": "커뮤니티_화면설계서_v0.3_20260916",
+          "description": null
+        },
+        {
+          "id": "cmt9o62lz000004l8e7u5doaj",
+          "title": "06_커뮤니티_화면설계서_v0_2_260826",
+          "description": null
+        },
+        {
+          "id": "cmuc31573000004ju4mjxawpf",
+          "title": "커뮤니티_화면설계서_v0.4_20260921",
+          "description": null
+        }
+      ],
+      "order": [
+        {
+          "id": "cmt9o62lz000004l8e7u5doaj",
+          "fileName": "06_커뮤니티_화면설계서_v0_2_260826.html",
+          "label": "v0.2",
+          "versionCount": 1
+        },
+        {
+          "id": "cmu26z8ro000004l5780cp6me",
+          "fileName": "커뮤니티_화면설계서_v0.3_20260915.html",
+          "label": "v0.3",
+          "versionCount": 1
+        },
+        {
+          "id": "cmu3lhlog000004jt7exyzeju",
+          "fileName": "커뮤니티_화면설계서_v0.3_20260916.html",
+          "label": "v0.3",
+          "versionCount": 1
+        },
+        {
+          "id": "cmuc31573000004ju4mjxawpf",
+          "fileName": "커뮤니티_화면설계서_v0.4_20260921.html",
+          "label": "v0.4",
+          "versionCount": 1
+        }
+      ],
+      "versions": [
+        {
+          "id": "cmt9o62nx000104l85azgo6lr",
+          "from": "cmt9o62lz000004l8e7u5doaj",
+          "fromNo": 1,
+          "toNo": 1
+        },
+        {
+          "id": "cmu26z8uw000104l51yuei2gk",
+          "from": "cmu26z8ro000004l5780cp6me",
+          "fromNo": 1,
+          "toNo": 2
+        },
+        {
+          "id": "cmu3lhlqi000104jtbzx27eea",
+          "from": "cmu3lhlog000004jt7exyzeju",
+          "fromNo": 1,
+          "toNo": 3
+        },
+        {
+          "id": "cmuc31591000104jug6volpq3",
+          "from": "cmuc31573000004ju4mjxawpf",
+          "fromNo": 1,
+          "toNo": 4
+        }
+      ],
+      "retitle": {
+        "from": "06_커뮤니티_화면설계서_v0_2_260826",
+        "to": "커뮤니티_화면설계서_v0.4_20260921"
+      },
+      "movingTags": [],
+      "applied": true,
+      "backup": {
+        "documents": [
+          {
+            "id": "cmu26z8ro000004l5780cp6me",
+            "title": "커뮤니티_화면설계서_v0.3_20260915",
+            "description": null,
+            "folder_id": "02184e98-fbcd-41e2-aaba-031ab5111932",
+            "created_by": "cmt8b6exm000004kywvbhkfea",
+            "created_at": "2026-09-15T04:48:54.564",
+            "updated_at": "2026-09-15T04:48:54.564",
+            "deleted_at": null
+          },
+          {
+            "id": "cmu3lhlog000004jt7exyzeju",
+            "title": "커뮤니티_화면설계서_v0.3_20260916",
+            "description": null,
+            "folder_id": "02184e98-fbcd-41e2-aaba-031ab5111932",
+            "created_by": "cmt8b6exm000004kywvbhkfea",
+            "created_at": "2026-09-16T04:22:51.904",
+            "updated_at": "2026-09-16T04:22:51.904",
+            "deleted_at": null
+          },
+          {
+            "id": "cmt9o62lz000004l8e7u5doaj",
+            "title": "06_커뮤니티_화면설계서_v0_2_260826",
+            "description": null,
+            "folder_id": "02184e98-fbcd-41e2-aaba-031ab5111932",
+            "created_by": "cmt8b6exm000004kywvbhkfea",
+            "created_at": "2026-08-26T05:44:47.543",
+            "updated_at": "2026-08-26T05:44:47.543",
+            "deleted_at": null
+          },
+          {
+            "id": "cmuc31573000004ju4mjxawpf",
+            "title": "커뮤니티_화면설계서_v0.4_20260921",
+            "description": null,
+            "folder_id": "02184e98-fbcd-41e2-aaba-031ab5111932",
+            "created_by": "cmt8b6exm000004kywvbhkfea",
+            "created_at": "2026-09-22T02:56:06.543",
+            "updated_at": "2026-09-22T02:56:06.543",
+            "deleted_at": null
+          }
+        ],
+        "versions": [
+          {
+            "id": "cmt9o62nx000104l85azgo6lr",
+            "document_id": "cmt9o62lz000004l8e7u5doaj",
+            "version_no": 1,
+            "s3_key": "documents/8e9e161a-2acf-4933-841f-3eaa8a5299ed.html",
+            "file_name": "06_커뮤니티_화면설계서_v0_2_260826.html",
+            "mime_type": "text/html",
+            "size_bytes": 97822,
+            "change_note": null,
+            "uploaded_by": "cmt8b6exm000004kywvbhkfea",
+            "created_at": "2026-08-26T05:44:47.543"
+          },
+          {
+            "id": "cmu26z8uw000104l51yuei2gk",
+            "document_id": "cmu26z8ro000004l5780cp6me",
+            "version_no": 1,
+            "s3_key": "documents/e08a90ca-777b-41f1-9e0f-3fb020b99604.html",
+            "file_name": "커뮤니티_화면설계서_v0.3_20260915.html",
+            "mime_type": "text/html",
+            "size_bytes": 172259,
+            "change_note": null,
+            "uploaded_by": "cmt8b6exm000004kywvbhkfea",
+            "created_at": "2026-09-15T04:48:54.564"
+          },
+          {
+            "id": "cmu3lhlqi000104jtbzx27eea",
+            "document_id": "cmu3lhlog000004jt7exyzeju",
+            "version_no": 1,
+            "s3_key": "documents/2b14efe7-8d0a-4069-a1e2-5a14cf17edd5.html",
+            "file_name": "커뮤니티_화면설계서_v0.3_20260916.html",
+            "mime_type": "text/html",
+            "size_bytes": 178722,
+            "change_note": null,
+            "uploaded_by": "cmt8b6exm000004kywvbhkfea",
+            "created_at": "2026-09-16T04:22:51.904"
+          },
+          {
+            "id": "cmuc31591000104jug6volpq3",
+            "document_id": "cmuc31573000004ju4mjxawpf",
+            "version_no": 1,
+            "s3_key": "documents/5db88038-0365-4100-bcc5-2b35f40eb257.html",
+            "file_name": "커뮤니티_화면설계서_v0.4_20260921.html",
+            "mime_type": "text/html",
+            "size_bytes": 183159,
+            "change_note": null,
+            "uploaded_by": "cmt8b6exm000004kywvbhkfea",
+            "created_at": "2026-09-22T02:56:06.543"
+          }
+        ],
+        "tags": []
+      }
+    },
+    {
+      "keepId": "cmt9o6350000204l87o8bc0pw",
+      "before": [
+        {
+          "id": "cmu3igt03000004l57s9m4yx9",
+          "title": "커뮤니티_기능명세서_v0.3_20260916",
+          "description": null
+        },
+        {
+          "id": "cmt9o6350000204l87o8bc0pw",
+          "title": "커뮤니티_기능명세서_v0_2_",
+          "description": null
+        },
+        {
+          "id": "cmuc6qmmb000004jz2koprvxv",
+          "title": "커뮤니티_기능명세서_v0.4_20260922",
+          "description": null
+        }
+      ],
+      "order": [
+        {
+          "id": "cmt9o6350000204l87o8bc0pw",
+          "fileName": "커뮤니티_기능명세서_v0_2_.xlsx",
+          "label": "v0.2",
+          "versionCount": 1
+        },
+        {
+          "id": "cmu3igt03000004l57s9m4yx9",
+          "fileName": "커뮤니티_기능명세서_v0.3_20260916.xlsx",
+          "label": "v0.3",
+          "versionCount": 1
+        },
+        {
+          "id": "cmuc6qmmb000004jz2koprvxv",
+          "fileName": "커뮤니티_기능명세서_v0.4_20260922.xlsx",
+          "label": "v0.4",
+          "versionCount": 1
+        }
+      ],
+      "versions": [
+        {
+          "id": "cmt9o636y000304l8k7hxd0gd",
+          "from": "cmt9o6350000204l87o8bc0pw",
+          "fromNo": 1,
+          "toNo": 1
+        },
+        {
+          "id": "cmu3igt2a000104l56yvanxuu",
+          "from": "cmu3igt03000004l57s9m4yx9",
+          "fromNo": 1,
+          "toNo": 2
+        },
+        {
+          "id": "cmuc6qmo9000104jzd7wwu707",
+          "from": "cmuc6qmmb000004jz2koprvxv",
+          "fromNo": 1,
+          "toNo": 3
+        }
+      ],
+      "retitle": {
+        "from": "커뮤니티_기능명세서_v0_2_",
+        "to": "커뮤니티_기능명세서_v0.4_20260922"
+      },
+      "movingTags": [],
+      "applied": true,
+      "backup": {
+        "documents": [
+          {
+            "id": "cmu3igt03000004l57s9m4yx9",
+            "title": "커뮤니티_기능명세서_v0.3_20260916",
+            "description": null,
+            "folder_id": "ff7829da-c2df-4ca3-9d74-eba981620398",
+            "created_by": "cmt8b6exm000004kywvbhkfea",
+            "created_at": "2026-09-16T02:58:15.892",
+            "updated_at": "2026-09-16T02:58:15.892",
+            "deleted_at": null
+          },
+          {
+            "id": "cmt9o6350000204l87o8bc0pw",
+            "title": "커뮤니티_기능명세서_v0_2_",
+            "description": null,
+            "folder_id": "ff7829da-c2df-4ca3-9d74-eba981620398",
+            "created_by": "cmt8b6exm000004kywvbhkfea",
+            "created_at": "2026-08-26T05:44:48.228",
+            "updated_at": "2026-08-26T05:44:48.228",
+            "deleted_at": null
+          },
+          {
+            "id": "cmuc6qmmb000004jz2koprvxv",
+            "title": "커뮤니티_기능명세서_v0.4_20260922",
+            "description": null,
+            "folder_id": "ff7829da-c2df-4ca3-9d74-eba981620398",
+            "created_by": "cmt8b6exm000004kywvbhkfea",
+            "created_at": "2026-09-22T04:39:54.371",
+            "updated_at": "2026-09-22T04:39:54.371",
+            "deleted_at": null
+          }
+        ],
+        "versions": [
+          {
+            "id": "cmt9o636y000304l8k7hxd0gd",
+            "document_id": "cmt9o6350000204l87o8bc0pw",
+            "version_no": 1,
+            "s3_key": "documents/fbf2575d-cf9a-4f9a-a2f5-c867ff3fdb71.xlsx",
+            "file_name": "커뮤니티_기능명세서_v0_2_.xlsx",
+            "mime_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "size_bytes": 12965,
+            "change_note": null,
+            "uploaded_by": "cmt8b6exm000004kywvbhkfea",
+            "created_at": "2026-08-26T05:44:48.228"
+          },
+          {
+            "id": "cmu3igt2a000104l56yvanxuu",
+            "document_id": "cmu3igt03000004l57s9m4yx9",
+            "version_no": 1,
+            "s3_key": "documents/cfdf9e83-feec-4f8b-bbb6-ddb3bafdc038.xlsx",
+            "file_name": "커뮤니티_기능명세서_v0.3_20260916.xlsx",
+            "mime_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "size_bytes": 17001,
+            "change_note": null,
+            "uploaded_by": "cmt8b6exm000004kywvbhkfea",
+            "created_at": "2026-09-16T02:58:15.892"
+          },
+          {
+            "id": "cmuc6qmo9000104jzd7wwu707",
+            "document_id": "cmuc6qmmb000004jz2koprvxv",
+            "version_no": 1,
+            "s3_key": "documents/cbc07b5f-a3e5-4d67-8045-07be9cc0e498.xlsx",
+            "file_name": "커뮤니티_기능명세서_v0.4_20260922.xlsx",
+            "mime_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "size_bytes": 16993,
+            "change_note": null,
+            "uploaded_by": "cmt8b6exm000004kywvbhkfea",
+            "created_at": "2026-09-22T04:39:54.371"
+          }
+        ],
+        "tags": []
+      }
+    },
+    {
+      "keepId": "cmt9pk9rp000004l7dydooqbp",
+      "before": [
+        {
+          "id": "cmt9pk9rp000004l7dydooqbp",
+          "title": "06_로그인_회원가입_기능명세서_v0.2_260908",
+          "description": null
+        },
+        {
+          "id": "cmtzzzui4000004jxg68iox8m",
+          "title": "로그인·회원가입_기능명세서_v0.3_20260913",
+          "description": null
+        },
+        {
+          "id": "cmuazhyw8000204jmpke2bq4p",
+          "title": "로그인·회원가입_기능명세서_v0.4_20260921",
+          "description": null
+        },
+        {
+          "id": "cmuc36p04000204juiq962pqx",
+          "title": "로그인·회원가입_기능명세서_v0.5_20260922",
+          "description": null
+        }
+      ],
+      "order": [
+        {
+          "id": "cmt9pk9rp000004l7dydooqbp",
+          "fileName": "06_로그인_회원가입_기능명세서_v0.2_260908.xlsx",
+          "label": "v0.2",
+          "versionCount": 2
+        },
+        {
+          "id": "cmtzzzui4000004jxg68iox8m",
+          "fileName": "로그인·회원가입_기능명세서_v0.3_20260913.xlsx",
+          "label": "v0.3",
+          "versionCount": 1
+        },
+        {
+          "id": "cmuazhyw8000204jmpke2bq4p",
+          "fileName": "로그인·회원가입_기능명세서_v0.4_20260921.xlsx",
+          "label": "v0.4",
+          "versionCount": 1
+        },
+        {
+          "id": "cmuc36p04000204juiq962pqx",
+          "fileName": "로그인·회원가입_기능명세서_v0.5_20260922.xlsx",
+          "label": "v0.5",
+          "versionCount": 1
+        }
+      ],
+      "versions": [
+        {
+          "id": "cmt9pk9uv000104l7sz4mdzgt",
+          "from": "cmt9pk9rp000004l7dydooqbp",
+          "fromNo": 1,
+          "toNo": 1
+        },
+        {
+          "id": "cmtwg6nre000104l56xssmuej",
+          "from": "cmt9pk9rp000004l7dydooqbp",
+          "fromNo": 2,
+          "toNo": 2
+        },
+        {
+          "id": "cmtzzzuk2000104jxlgpsj6oj",
+          "from": "cmtzzzui4000004jxg68iox8m",
+          "fromNo": 1,
+          "toNo": 3
+        },
+        {
+          "id": "cmuazhyy6000404jm3vg7msab",
+          "from": "cmuazhyw8000204jmpke2bq4p",
+          "fromNo": 1,
+          "toNo": 4
+        },
+        {
+          "id": "cmuc36p22000404juobxuomhn",
+          "from": "cmuc36p04000204juiq962pqx",
+          "fromNo": 1,
+          "toNo": 5
+        }
+      ],
+      "retitle": {
+        "from": "06_로그인_회원가입_기능명세서_v0.2_260908",
+        "to": "로그인·회원가입_기능명세서_v0.5_20260922"
+      },
+      "movingTags": [],
+      "applied": true,
+      "backup": {
+        "documents": [
+          {
+            "id": "cmt9pk9rp000004l7dydooqbp",
+            "title": "06_로그인_회원가입_기능명세서_v0.2_260908",
+            "description": null,
+            "folder_id": "6d06beb1-d103-486e-bb8b-d27f99e1040f",
+            "created_by": "cmt88clm4000004l5h60hs82p",
+            "created_at": "2026-08-26T06:23:49.621",
+            "updated_at": "2026-09-11T04:20:00.004",
+            "deleted_at": null
+          },
+          {
+            "id": "cmtzzzui4000004jxg68iox8m",
+            "title": "로그인·회원가입_기능명세서_v0.3_20260913",
+            "description": null,
+            "folder_id": "6d06beb1-d103-486e-bb8b-d27f99e1040f",
+            "created_by": "cmt88clm4000004l5h60hs82p",
+            "created_at": "2026-09-13T15:57:53.068",
+            "updated_at": "2026-09-13T15:57:53.068",
+            "deleted_at": null
+          },
+          {
+            "id": "cmuazhyw8000204jmpke2bq4p",
+            "title": "로그인·회원가입_기능명세서_v0.4_20260921",
+            "description": null,
+            "folder_id": "6d06beb1-d103-486e-bb8b-d27f99e1040f",
+            "created_by": "cmt88clm4000004l5h60hs82p",
+            "created_at": "2026-09-21T08:29:26.888",
+            "updated_at": "2026-09-21T08:29:26.888",
+            "deleted_at": null
+          },
+          {
+            "id": "cmuc36p04000204juiq962pqx",
+            "title": "로그인·회원가입_기능명세서_v0.5_20260922",
+            "description": null,
+            "folder_id": "6d06beb1-d103-486e-bb8b-d27f99e1040f",
+            "created_by": "cmt88clm4000004l5h60hs82p",
+            "created_at": "2026-09-22T03:00:25.492",
+            "updated_at": "2026-09-22T03:00:25.492",
+            "deleted_at": null
+          }
+        ],
+        "versions": [
+          {
+            "id": "cmt9pk9uv000104l7sz4mdzgt",
+            "document_id": "cmt9pk9rp000004l7dydooqbp",
+            "version_no": 1,
+            "s3_key": "documents/9fb9ce32-f215-47b6-98dd-7c23332206dc.xlsx",
+            "file_name": "06_로그인_회원가입_기능명세서_v0.1_260826.xlsx",
+            "mime_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "size_bytes": 15690,
+            "change_note": null,
+            "uploaded_by": "cmt88clm4000004l5h60hs82p",
+            "created_at": "2026-08-26T06:23:49.621"
+          },
+          {
+            "id": "cmtwg6nre000104l56xssmuej",
+            "document_id": "cmt9pk9rp000004l7dydooqbp",
+            "version_no": 2,
+            "s3_key": "documents/a4f4874b-833b-40e6-bfed-17d625ffd894.xlsx",
+            "file_name": "06_로그인_회원가입_기능명세서_v0.2_260908.xlsx",
+            "mime_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "size_bytes": 14588,
+            "change_note": null,
+            "uploaded_by": "cmt88clm4000004l5h60hs82p",
+            "created_at": "2026-09-11T04:20:00.004"
+          },
+          {
+            "id": "cmtzzzuk2000104jxlgpsj6oj",
+            "document_id": "cmtzzzui4000004jxg68iox8m",
+            "version_no": 1,
+            "s3_key": "documents/f81d1cff-0005-427a-9d3a-7522f731b65c.xlsx",
+            "file_name": "로그인·회원가입_기능명세서_v0.3_20260913.xlsx",
+            "mime_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "size_bytes": 18162,
+            "change_note": null,
+            "uploaded_by": "cmt88clm4000004l5h60hs82p",
+            "created_at": "2026-09-13T15:57:53.068"
+          },
+          {
+            "id": "cmuazhyy6000404jm3vg7msab",
+            "document_id": "cmuazhyw8000204jmpke2bq4p",
+            "version_no": 1,
+            "s3_key": "documents/bae6caaa-6eab-478c-bdb8-fc2115453a3e.xlsx",
+            "file_name": "로그인·회원가입_기능명세서_v0.4_20260921.xlsx",
+            "mime_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "size_bytes": 26842,
+            "change_note": null,
+            "uploaded_by": "cmt88clm4000004l5h60hs82p",
+            "created_at": "2026-09-21T08:29:26.888"
+          },
+          {
+            "id": "cmuc36p22000404juobxuomhn",
+            "document_id": "cmuc36p04000204juiq962pqx",
+            "version_no": 1,
+            "s3_key": "documents/e7e65e7d-c3ac-4678-aca5-d43f324f98dd.xlsx",
+            "file_name": "로그인·회원가입_기능명세서_v0.5_20260922.xlsx",
+            "mime_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "size_bytes": 30724,
+            "change_note": null,
+            "uploaded_by": "cmt88clm4000004l5h60hs82p",
+            "created_at": "2026-09-22T03:00:25.492"
+          }
+        ],
+        "tags": []
+      }
+    },
+    {
+      "keepId": "cmtwg6mlu000004l4vms18pw9",
+      "before": [
+        {
+          "id": "cmtwg6mlu000004l4vms18pw9",
+          "title": "플레이스_화면설계서_v0.4_2026_09_08",
+          "description": null
+        },
+        {
+          "id": "cmub0qoib000004i4p8alvif7",
+          "title": "플레이스_화면설계서_v0.5_20260921",
+          "description": null
+        }
+      ],
+      "order": [
+        {
+          "id": "cmtwg6mlu000004l4vms18pw9",
+          "fileName": "플레이스_화면설계서_v0.4_2026_09_08.html",
+          "label": "v0.4",
+          "versionCount": 1
+        },
+        {
+          "id": "cmub0qoib000004i4p8alvif7",
+          "fileName": "플레이스_화면설계서_v0.5_20260921.html",
+          "label": "v0.5",
+          "versionCount": 1
+        }
+      ],
+      "versions": [
+        {
+          "id": "cmtwg6mo8000104l4y8n985w3",
+          "from": "cmtwg6mlu000004l4vms18pw9",
+          "fromNo": 1,
+          "toNo": 1
+        },
+        {
+          "id": "cmub0qoka000104i463306urk",
+          "from": "cmub0qoib000004i4p8alvif7",
+          "fromNo": 1,
+          "toNo": 2
+        }
+      ],
+      "retitle": {
+        "from": "플레이스_화면설계서_v0.4_2026_09_08",
+        "to": "플레이스_화면설계서_v0.5_20260921"
+      },
+      "movingTags": [],
+      "applied": true,
+      "backup": {
+        "documents": [
+          {
+            "id": "cmtwg6mlu000004l4vms18pw9",
+            "title": "플레이스_화면설계서_v0.4_2026_09_08",
+            "description": null,
+            "folder_id": "01bf0f2d-6f7b-4b70-b08d-fa6b615c6754",
+            "created_by": "cmt88clm4000004l5h60hs82p",
+            "created_at": "2026-09-11T04:19:58.578",
+            "updated_at": "2026-09-11T04:19:58.578",
+            "deleted_at": null
+          },
+          {
+            "id": "cmub0qoib000004i4p8alvif7",
+            "title": "플레이스_화면설계서_v0.5_20260921",
+            "description": null,
+            "folder_id": "01bf0f2d-6f7b-4b70-b08d-fa6b615c6754",
+            "created_by": "cmt88clm4000004l5h60hs82p",
+            "created_at": "2026-09-21T09:04:12.947",
+            "updated_at": "2026-09-21T09:04:12.947",
+            "deleted_at": null
+          }
+        ],
+        "versions": [
+          {
+            "id": "cmtwg6mo8000104l4y8n985w3",
+            "document_id": "cmtwg6mlu000004l4vms18pw9",
+            "version_no": 1,
+            "s3_key": "documents/c72e4d22-3b8c-4f4f-964a-0a1a68f371f0.html",
+            "file_name": "플레이스_화면설계서_v0.4_2026_09_08.html",
+            "mime_type": "text/html",
+            "size_bytes": 69665,
+            "change_note": null,
+            "uploaded_by": "cmt88clm4000004l5h60hs82p",
+            "created_at": "2026-09-11T04:19:58.578"
+          },
+          {
+            "id": "cmub0qoka000104i463306urk",
+            "document_id": "cmub0qoib000004i4p8alvif7",
+            "version_no": 1,
+            "s3_key": "documents/c800c471-acb1-4b07-a28e-8bc2a8bb24ee.html",
+            "file_name": "플레이스_화면설계서_v0.5_20260921.html",
+            "mime_type": "text/html",
+            "size_bytes": 74005,
+            "change_note": null,
+            "uploaded_by": "cmt88clm4000004l5h60hs82p",
+            "created_at": "2026-09-21T09:04:12.947"
+          }
+        ],
+        "tags": []
+      }
+    }
+  ]
+}
