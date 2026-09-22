@@ -10,7 +10,9 @@ export type DocumentListItem = {
   title: string
   /** 삭제 버튼을 그릴지 정한다 (ownership.ts). 두 쿼리 모두 include 라 이미 실려 온다. */
   createdById: string
-  /** 정렬 기준과 같은 값이어야 한다 — updatedAt 을 그리면 보이는 날짜와 행 순서가 어긋난다. */
+  /** `lastActivityAt`(latest.ts) 의 폴백값이다 — 버전이 없는 문서에서만 그대로 쓰인다.
+      직접 그리지 않는다: 화면에 찍는 날짜·정렬·구버전 판정은 전부 `lastActivityAt` 을
+      거쳐야 한다 — updatedAt 처럼 버전과 무관한 값을 그리면 날짜와 행 순서가 어긋난다. */
   createdAt: Date
   folder: { name: string } | null
   tags: { tag: { name: string } }[]

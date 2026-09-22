@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { ChevronDown, Download } from 'lucide-react'
 import { DocumentRowActions } from '@/components/document-row-actions'
 import { fileVersionLabel } from '@/lib/file-version'
+import { lastActivityAt } from '@/lib/latest'
 import { canDeleteRow, type DeletePermission } from '@/lib/ownership'
 import { formatBytes, formatDateTime, formatRelative, fileLabel } from '@/lib/format'
 import type { DocumentListItem } from '@/lib/document-list'
@@ -106,7 +107,9 @@ export function DocumentRow({
           {latest ? formatBytes(latest.sizeBytes) : '—'}
         </td>
         <td className={`w-24 px-3 py-3 whitespace-nowrap text-ink-muted ${dim}`}>
-          {formatRelative(doc.createdAt)}
+          {/* "올린 날짜" 가 아니라 "최근 업로드" 다 — 최신 버전이 들어온 시각이지 문서가
+              처음 만들어진 시각이 아니다(latest.ts 의 lastActivityAt). */}
+          {formatRelative(lastActivityAt(doc))}
         </td>
         <td className="px-4 py-3">
           <a

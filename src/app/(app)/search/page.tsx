@@ -9,6 +9,7 @@ import { activeDocumentWhere } from '@/lib/trash'
 import {
   documentListOrderBy,
   latestCandidateQuery,
+  sortByLastActivity,
   supersededDocumentIds,
 } from '@/lib/latest'
 import { documentSearchWhere, normalizeSearchQuery } from '@/lib/search'
@@ -60,10 +61,13 @@ export default async function SearchPage({
 
   // 검색 결과는 폴더를 가로지른다. 그래서 구분이 더 필요하다 — v0.3 과 v0.5 가 나란히
   // 뜰 때 이미 넘어간 쪽이 흐려져 있으면 잘못 받아 갈 일이 준다.
-  const [documents, latestRows] = await Promise.all([
+  const [rawDocuments, latestRows] = await Promise.all([
     searchDocuments(q),
     prisma.document.findMany(latestCandidateQuery()),
   ])
+  // page.tsx 와 같은 이유로 다시 정렬한다 — DB 는 생성순(documentListOrderBy)으로 읽고,
+  // 화면 순서는 lastActivityAt 기준으로 여기서 정한다(latest.ts, 2026-09-20).
+  const documents = sortByLastActivity(rawDocuments)
   const supersededIds = supersededDocumentIds(latestRows)
 
   return (

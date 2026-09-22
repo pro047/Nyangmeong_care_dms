@@ -97,7 +97,13 @@ describe('toSuggestedFolder', () => {
 
 describe('toSimilarMatches', () => {
   function candidate(id: string, latestFileName: string): SimilarCandidate {
-    return { id, folderId: 'f-screen', createdById: USER.id, latestFileName }
+    return {
+      id,
+      folderId: 'f-screen',
+      createdById: USER.id,
+      latestFileName,
+      latestVersionCreatedAt: new Date('2026-08-01'),
+    }
   }
 
   it('낮은 판을 올리면 danger 경고를 붙여야 한다', () => {

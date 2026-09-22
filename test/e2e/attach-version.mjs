@@ -1,13 +1,16 @@
 /**
- * 붙이기 기능(업로드 때 "새 판으로 붙일까, 새 문서로 올릴까") 브라우저 검증.
+ * 붙이기(업로드 때 기존 문서의 새 버전으로 올리기) 브라우저 검증.
  *
- * 전제: `npm run dev`(3002) + 실제 .env (dev 브랜치). 전용 폴더를 하나 만들어 쓰므로
- *       기존 데이터에 의존하지 않는다.
- * 실행:  node --env-file=.env test/e2e/attach-version.mjs
+ * 전제: `npm run dev`(3002) + 실제 .env (dev 브랜치). 전용 폴더를 하나 만들어 쓰고 끝나면
+ *       그 안의 문서·S3 객체를 전부 지운다.
+ * 실행:  npm run test:e2e:attach
  *
- * 여기서만 볼 수 있는 것을 담는다 — 판정 자체(같은 문서인가·판번호 비교)는 순수 함수라
- * vitest 가 덮는다. 이 파일이 보는 것은 **선택이 실제로 서버 경로를 가르는가**다:
- * 붙이기를 고르면 문서가 안 늘고 버전 행만 는다.
+ * **2026-09-22 에 통째로 다시 썼다.** 예전 판은 "후보가 있으면 항상 멈춰 묻고 기본값은 새
+ * 문서"를 검사했는데, 팀원이 그 선택칸의 뜻을 몰라 같은 문서가 여러 건으로 쪼개졌다(운영
+ * 13묶음). 지금은 확실한 경우(버전이 더 높음 · 같은 버전에 날짜가 같거나 늦음)는 묻지 않고
+ * 붙이고, 후보가 여럿이면 가장 최신 문서에 붙는다. 판정 자체는 순수 함수라 vitest
+ * (`attach-plan.test.ts`)가 덮는다 — 여기서 보는 것은 **그 판정이 실제로 서버 경로를
+ * 가르는가**(문서 수와 버전 수)와 화면이 사람에게 무엇을 보여 주는가다.
  */
 import { chromium } from '@playwright/test'
 import { mkdirSync, writeFileSync, rmSync } from 'node:fs'
@@ -19,164 +22,226 @@ const SHOT = 'test/e2e/shots'
 mkdirSync(SHOT, { recursive: true })
 
 /** 이 스위트가 끝까지 갔다면 나와야 할 검사 수. 중간에 죽으면 요약이 거짓말을 한다. */
-const EXPECTED_CHECKS = 7
-
+const EXPECTED_CHECKS = 14
 const results = []
 const check = (id, desc, pass, detail = '') => {
   results.push({ id, desc, pass, detail })
   console.log(`${pass ? 'PASS' : 'FAIL'} ${id} ${desc}${detail ? ` — ${detail}` : ''}`)
 }
 
-const FOLDER = `자동검증_붙이기_${Date.now()}`
-const F_BASE = '자동검증_설계서_v0.3.html'
-const F_NEXT = '자동검증_설계서_v0.6.html'
-const F_OLD = '자동검증_설계서_v0.1.html'
-/** 같은 폴더에 있어도 키가 달라 후보가 되면 안 되는 파일. C2 의 대조군이다. */
+const FOLDER = `자동검증_자동버전_${Date.now()}`
+const F1 = '자동검증_설계서_v0.3_20260901.html'
+const F2 = '자동검증_설계서_v0.4_20260902.html' // higher version
+const F3 = '자동검증_설계서_v0.4_20260903.html' // same version, later date
+const F4 = '자동검증_설계서_v0.4_20260903.html' // same name again (same date)
+const F5 = '자동검증_설계서_v0.2_20260904.html' // lower version
+const F6 = '자동검증_설계서_v0.5_20260905.html' // multiple candidates
+const F7a = '자동검증_설계서_v0.6_20260906.html'
+const F7b = '자동검증_설계서_v0.7_20260907.html' // same batch clash
 const F_OTHER = '자동검증_회의록_v0.2.html'
 
+let seq = 0
 const filePath = (name) => {
-  const p = `${TMP}/${name}`
-  writeFileSync(p, `<p>${name}</p>`)
+  // Same name twice must still be a different body (S3 key is per upload anyway).
+  const dir = `${TMP}/${seq++}`
+  mkdirSync(dir, { recursive: true })
+  const p = `${dir}/${name}`
+  writeFileSync(p, `<p>${name} #${seq}</p>`)
   return p
 }
 
 const token = (await mintSession()).token
 const H = { 'Content-Type': 'application/json', Cookie: `dms_session=${token}` }
-
 const folderRes = await fetch(`${APP}/api/folders`, {
-  method: 'POST',
-  headers: H,
-  body: JSON.stringify({ name: FOLDER }),
+  method: 'POST', headers: H, body: JSON.stringify({ name: FOLDER }),
 })
 if (!folderRes.ok) {
-  console.error(`전제 불충족: 폴더 생성 ${folderRes.status} — 제품 결함이 아니라 픽스처 문제다.`)
-  rmSync(TMP, { recursive: true, force: true })
+  console.error(`전제 불충족: 폴더 생성 ${folderRes.status}`)
   process.exit(2)
 }
 const folderId = (await folderRes.json()).id
 
-/** 이 폴더의 문서와 버전 수. 붙이기가 됐는지는 이 두 수의 관계로만 판정한다. */
 const docsInFolder = () =>
   withDb(async (c) => {
     const { rows } = await c.query(
       `select d.id, d.title,
-              (select count(*)::int from document_versions v where v.document_id = d.id) versions,
-              (select max(v.version_no) from document_versions v where v.document_id = d.id) latest
-         from documents d
-        where d.folder_id = $1
-        order by d.created_at`,
+              (select count(*)::int from document_versions v where v.document_id = d.id) versions
+         from documents d where d.folder_id = $1 order by d.created_at`,
       [folderId],
     )
     return rows
   })
+const shape = (rows) => JSON.stringify(rows.map((r) => [r.title, r.versions]))
 
 const browser = await chromium.launch()
-const ctx = await browser.newContext({ baseURL: APP, viewport: { width: 1440, height: 780 } })
+const ctx = await browser.newContext({ baseURL: APP, viewport: { width: 1440, height: 900 } })
 await ctx.addCookies([cookieFor(token)])
 const page = await ctx.newPage()
 
 const dialog = () => page.getByRole('dialog')
-const modeSelect = () => page.getByLabel('저장할 폴더')
 const attachSelect = (file) => page.getByLabel(`${file} 올리는 방식`)
 const confirmBtn = () => dialog().getByRole('button', { name: '선택 확정하고 올리기' })
 
-/** 다이얼로그를 열고 이 스위트의 폴더를 고른 뒤 파일을 담는다. 셀렉트는 담기 전에만 열린다. */
 async function openWith(files) {
   await page.goto('/')
   await page.getByRole('button', { name: '업로드' }).first().click()
   await dialog().waitFor({ state: 'visible' })
-  await modeSelect().selectOption(folderId)
+  await page.getByLabel('저장할 폴더').selectOption(folderId)
   await page.locator('input[type=file]').setInputFiles(files.map(filePath))
-  await page.waitForTimeout(400)
+  await page.waitForTimeout(500)
 }
-
-/** 업로드가 끝날 때까지 기다린다. 알림(디스코드)까지 await 하는 경로라 넉넉히 준다. */
 async function waitUploadSettled() {
-  await dialog()
-    .getByText(/^완료 \d+건/)
-    .first()
-    .waitFor({ timeout: 60000 })
-    .catch(() => {})
+  await dialog().getByText(/^완료 \d+건/).first().waitFor({ timeout: 60000 }).catch(() => {})
   await page.waitForTimeout(1500)
+}
+async function closeDialog() {
+  await dialog().getByRole('button', { name: /^(완료|닫기|취소)$/ }).last().click()
+  await dialog().waitFor({ state: 'hidden' }).catch(() => {})
 }
 
 try {
-  // ── C1 후보가 없으면 지금까지처럼 담는 즉시 올라간다 (클릭이 안 늘어난다)
-  await openWith([F_BASE])
-  const askedOnFirst = await attachSelect(F_BASE).count()
+  // A1 no candidate → new document, no question
+  await openWith([F1])
+  const asked1 = await attachSelect(F1).count()
   await waitUploadSettled()
-  const afterFirst = await docsInFolder()
-  check('C1', '후보가 없으면 묻지 않고 바로 올라간다',
-        askedOnFirst === 0 && afterFirst.length === 1,
-        `선택칸=${askedOnFirst} 문서=${afterFirst.length}`)
-  await dialog().getByRole('button', { name: '완료' }).click()
+  let rows = await docsInFolder()
+  check('A1', '후보가 없으면 묻지 않고 새 문서', asked1 === 0 && rows.length === 1, `선택칸=${asked1} ${shape(rows)}`)
+  await closeDialog()
 
-  // ── C2 같은 문서의 다음 판을 담으면 멈추고 묻는다. 다른 문서는 안 멈춘다.
-  await openWith([F_NEXT, F_OTHER])
-  const asked = await attachSelect(F_NEXT).count()
-  const notAsked = await attachSelect(F_OTHER).count()
-  const chosen = await attachSelect(F_NEXT).inputValue()
-  check('C2', '후보가 있는 건만 멈춰 묻고, 기본값은 새 문서다',
-        asked === 1 && notAsked === 0 && chosen === '',
-        `후보건 선택칸=${asked} 무관건 선택칸=${notAsked} 기본값="${chosen}"`)
+  // A2 higher version → auto attach, unrelated file stays a new document
+  await openWith([F2, F_OTHER])
+  const asked2 = await attachSelect(F2).count()
+  await waitUploadSettled()
+  const label2 = await dialog().getByText(`‘${F1}’ 의 새 버전으로 올렸습니다`).count()
+  rows = await docsInFolder()
+  const main = () => rows.find((r) => r.title.startsWith('자동검증_설계서'))
+  check('A2', '버전이 더 높으면 묻지 않고 새 버전이 된다',
+    asked2 === 0 && rows.length === 2 && main()?.versions === 2, `선택칸=${asked2} ${shape(rows)}`)
+  check('A3', '자동으로 붙은 행에 어디에 붙었는지 문구가 뜬다', label2 === 1, `문구=${label2}`)
+  await page.screenshot({ path: `${SHOT}/ATTACH-auto.png` })
+  await closeDialog()
 
-  // ── C3 후보를 **파일명**으로 말한다 (제목은 사람이 고칠 수 있어 파일과 어긋난다)
-  const optionText = (await attachSelect(F_NEXT).locator('option').allInnerTexts())
-    .map((t) => t.trim())
-  check('C3', '후보 옵션이 기존 판의 파일명을 말한다',
-        optionText.includes(`‘${F_BASE}’ 의 새 버전으로 올리기`),
-        `옵션=${JSON.stringify(optionText)}`)
+  // A4 same version, later date → auto
+  await openWith([F3])
+  const asked3 = await attachSelect(F3).count()
+  await waitUploadSettled()
+  rows = await docsInFolder()
+  check('A4', '같은 버전·더 늦은 날짜도 자동으로 새 버전', asked3 === 0 && main()?.versions === 3, `선택칸=${asked3} ${shape(rows)}`)
+  await closeDialog()
 
-  // ── C4 더 높은 판을 붙일 때는 경고가 없다
-  const options = await attachSelect(F_NEXT).locator('option').all()
-  const targetValue = await options[1].getAttribute('value')
-  await attachSelect(F_NEXT).selectOption(targetValue)
+  // A5 same file name again (same version, same date) → auto (later upload wins)
+  await openWith([F4])
+  const asked4 = await attachSelect(F4).count()
+  await waitUploadSettled()
+  rows = await docsInFolder()
+  check('A5', '같은 버전·같은 날짜(같은 이름 재업로드)도 자동', asked4 === 0 && main()?.versions === 4, `선택칸=${asked4} ${shape(rows)}`)
+  await closeDialog()
+
+  // A6 lower version → ask, blocked until chosen
+  await openWith([F5])
+  const sel5 = attachSelect(F5)
+  const asked5 = await sel5.count()
+  const value5 = asked5 ? await sel5.inputValue() : 'N/A'
+  const disabledBefore = await confirmBtn().isDisabled()
+  const footer5 = await dialog().getByText('1건은 새 문서인지 기존 문서의 새 버전인지 골라 주세요').count()
+  await page.screenshot({ path: `${SHOT}/ATTACH-ask.png` })
+  check('A6', '더 낮은 버전은 묻고, 고르기 전엔 버튼이 막힌다',
+    asked5 === 1 && value5 === '' && disabledBefore && footer5 === 1,
+    `선택칸=${asked5} 값="${value5}" 버튼막힘=${disabledBefore} 안내=${footer5}`)
+
+  // 후보는 제목이 아니라 **파일명**으로 말한다 — 제목은 사람이 고칠 수 있어 파일과 어긋난다.
+  const optionText = (await sel5.locator('option').allInnerTexts()).map((t) => t.trim())
+  check('A6b', '후보 옵션이 기존 문서의 최신 파일명을 말한다',
+    optionText.includes(`‘${F4}’ 의 새 버전으로 올리기`), `옵션=${JSON.stringify(optionText)}`)
+
+  // 낮은 버전을 붙이려 하면 두 버전을 짚어 경고한다. 이 사고는 앱 어디에도 에러가 안 난다.
+  await sel5.selectOption({ label: `‘${F4}’ 의 새 버전으로 올리기` })
   await page.waitForTimeout(200)
-  const warned = await dialog().getByText(/보다 낮은|같은 v|버전을 읽을 수 없어/).count()
-  check('C4', 'v0.3 → v0.6 은 판번호 경고가 없다', warned === 0, `경고=${warned}`)
-  await page.screenshot({ path: `${SHOT}/ATTACH-choice.png` })
+  const danger = await dialog().getByText(/현재 버전 v0\.4 보다 낮은 v0\.2 입니다/).count()
+  check('A6c', '낮은 버전을 붙이려 하면 두 버전을 짚어 경고한다', danger === 1, `경고=${danger}`)
 
-  // ── C5 붙이기를 고르면 문서가 안 늘고 버전만 는다 (이 기능의 존재 이유)
+  // choose "새 문서" → second document with the same key (sets up multiple candidates)
+  await sel5.selectOption({ label: '새 문서로 올리기' })
+  const enabledAfter = await confirmBtn().isEnabled()
   await confirmBtn().click()
   await waitUploadSettled()
-  const afterAttach = await docsInFolder()
-  const attached = afterAttach.find((r) => r.versions === 2)
-  check('C5', '붙이면 새 문서가 안 생기고 버전이 2가 된다',
-        afterAttach.length === 2 && attached !== undefined && attached.latest === 2,
-        `문서=${JSON.stringify(afterAttach.map((r) => [r.title, r.versions]))}`)
+  rows = await docsInFolder()
+  const sameKey = rows.filter((r) => r.title.startsWith('자동검증_설계서'))
+  check('A7', '"새 문서"를 고르면 버튼이 풀리고 새 문서로 올라간다',
+    enabledAfter && sameKey.length === 2, `버튼=${enabledAfter} ${shape(rows)}`)
+  await closeDialog()
 
-  // ── C6 낮은 판을 붙이려 하면 빨간 경고가 뜬다. 이 사고는 앱 어디에도 에러가 안 난다.
-  await dialog().getByRole('button', { name: '완료' }).click()
-  await openWith([F_OLD])
-  const oldOptions = await attachSelect(F_OLD).locator('option').all()
-  await attachSelect(F_OLD).selectOption(await oldOptions[1].getAttribute('value'))
-  await page.waitForTimeout(200)
-  const danger = dialog().getByText(/현재 버전 v0\.6 보다 낮은 v0\.1 입니다/)
-  check('C6', '낮은 판을 붙이려 하면 두 판을 짚어 경고한다', (await danger.count()) === 1,
-        `경고=${(await danger.count())}`)
-  await page.screenshot({ path: `${SHOT}/ATTACH-warning.png` })
-
-  // ── C7 경고는 막지 않는다. 기본값이 안전한 쪽이므로 여기까지 온 것은 사람의 선택이다.
-  const canProceed = await confirmBtn().isEnabled()
-  await confirmBtn().click()
+  // A8 multiple candidates → attach to the newest one (v0.4 doc, not v0.2 doc)
+  await openWith([F6])
+  const asked6 = await attachSelect(F6).count()
   await waitUploadSettled()
-  const afterOld = await docsInFolder()
-  const grown = afterOld.find((r) => r.versions === 3)
-  check('C7', '경고가 떠도 붙일 수 있다 (판단은 사람이 한다)',
-        canProceed && afterOld.length === 2 && grown?.latest === 3,
-        `버튼=${canProceed} 문서=${JSON.stringify(afterOld.map((r) => [r.title, r.versions]))}`)
+  rows = await docsInFolder()
+  const v04doc = rows.find((r) => r.versions >= 4)
+  const v02doc = rows.find((r) => r.title.includes('v0.2_20260904'))
+  check('A8', '후보가 여럿이면 가장 최신 문서에 붙는다',
+    asked6 === 0 && rows.length === 3 && v04doc?.versions === 5 && v02doc?.versions === 1,
+    `선택칸=${asked6} ${shape(rows)}`)
+  await closeDialog()
+
+  // A9 same-document files in one batch → both ask
+  await openWith([F7a, F7b])
+  const asked7 = (await attachSelect(F7a).count()) + (await attachSelect(F7b).count())
+  const footer7 = await dialog().getByText('2건은 새 문서인지 기존 문서의 새 버전인지 골라 주세요').count()
+  check('A9', '같은 문서의 파일을 한 번에 담으면 둘 다 묻는다', asked7 === 2 && footer7 === 1, `선택칸=${asked7} 안내=${footer7}`)
+  await closeDialog()
+  rows = await docsInFolder()
+
+  // A10 list: newest-activity doc is on top, header "최근 업로드", date "방금"
+  await page.goto('/')
+  await page.waitForTimeout(800)
+  const header = await page.getByRole('columnheader', { name: '최근 업로드' }).count()
+  const titles = await page.locator('tbody tr').allInnerTexts()
+  const firstIdx = titles.findIndex((t) => t.includes('자동검증_'))
+  const first = titles[firstIdx] ?? ''
+  await page.screenshot({ path: `${SHOT}/ATTACH-list.png` })
+  check('A10', '목록 맨 위가 방금 새 버전을 받은 문서이고 날짜가 "방금"이다',
+    header === 1 && firstIdx === 0 && first.includes('v0.5_20260905') && first.includes('방금'),
+    `헤더=${header} 첫 자동검증 행 index=${firstIdx} 내용=${JSON.stringify(first.replace(/\s+/g, ' ').slice(0, 90))} 파일 중 문서=${shape(rows)}`)
+
+  // A11·A12 자동 분류 모드에서 제안 폴더 이름을 **기존 폴더 이름으로 고치면** 시작 시점에 그
+  // 폴더로 흡수된다. 미리보기도 같은 폴더로 후보를 봐야 한다 — 안 그러면 셀렉트 없이 시작돼
+  // 사람이 본 적 없는 선택으로 붙는다(2026-09-22 코드 리뷰가 찾은 회귀).
+  const F_AUTO = '자동검증_설계서_v0.6_20260910.html'
+  const target = rows.find((r) => r.title.startsWith('자동검증_설계서_v0.5'))
+  await page.goto('/')
+  await page.getByRole('button', { name: '업로드' }).first().click()
+  await dialog().waitFor({ state: 'visible' })
+  await page.getByLabel('저장할 폴더').selectOption('__auto__')
+  await page.locator('input[type=file]').setInputFiles([filePath(F_AUTO)])
+  await page.waitForTimeout(500)
+  await page.getByLabel(`${F_AUTO} 새 폴더 이름`).fill(FOLDER)
+  await page.waitForTimeout(300)
+  const autoSel = attachSelect(F_AUTO)
+  const shown = await autoSel.count()
+  const preselected = shown ? await autoSel.inputValue() : 'N/A'
+  check('A11', '제안 폴더 이름을 기존 폴더로 고치면 그 폴더의 후보가 미리 선택돼 보인다',
+    shown === 1 && preselected === target?.id, `선택칸=${shown} 값=${preselected} 대상=${target?.id}`)
+
+  const since = new Date()
+  await dialog().getByRole('button', { name: '업로드 시작' }).click()
+  await waitUploadSettled()
+  rows = await docsInFolder()
+  const createdFolders = await withDb(async (c) => (await c.query(
+    `select name from folders where created_at >= $1::timestamp`, [since.toISOString()])).rows)
+  check('A12', '시작하면 그 문서의 새 버전이 되고 새 폴더는 안 생긴다',
+    rows.find((r) => r.id === target?.id)?.versions === 6 && createdFolders.length === 0,
+    `${shape(rows)} 새 폴더=${JSON.stringify(createdFolders)}`)
+  await closeDialog()
 } finally {
   await browser.close()
-
   let objects = 0
   for (const row of await docsInFolder()) objects += (await purgeDocument(row.id)).length
   await fetch(`${APP}/api/folders/${folderId}`, { method: 'DELETE', headers: H }).catch(() => null)
   rmSync(TMP, { recursive: true, force: true })
-  console.log(`\n정리: 폴더 '${FOLDER}' + 그 안의 문서 전부 + S3 객체 ${objects}개`)
-
+  console.log(`\n정리: 폴더 '${FOLDER}' + 문서 전부 + S3 객체 ${objects}개`)
   const pass = results.filter((r) => r.pass).length
   const missing = EXPECTED_CHECKS - results.length
-  if (missing > 0) console.log(`!! 검사 ${missing}건이 실행되지 않았다 — 중간에 죽었다는 뜻이다.`)
+  if (missing > 0) console.log(`!! 검사 ${missing}건이 실행되지 않았다`)
   console.log(`===== ${pass}/${EXPECTED_CHECKS} PASS =====`)
   process.exitCode = pass === EXPECTED_CHECKS ? 0 : 1
 }
