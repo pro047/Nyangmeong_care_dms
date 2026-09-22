@@ -45,7 +45,7 @@ export function DocumentTable({
             <th scope="col" className="hidden w-28 px-3 py-2.5 font-medium md:table-cell">폴더</th>
             <th scope="col" className="hidden w-28 px-3 py-2.5 font-medium lg:table-cell">올린 사람</th>
             <th scope="col" className="hidden w-20 px-3 py-2.5 font-medium sm:table-cell">크기</th>
-            <th scope="col" className="w-24 px-3 py-2.5 font-medium">올린 날짜</th>
+            <th scope="col" className="w-24 px-3 py-2.5 font-medium">최근 업로드</th>
             <th scope="col" className="w-12 px-4 py-2.5"><span className="sr-only">다운로드</span></th>
             <th scope="col" className="w-12 px-4 py-2.5"><span className="sr-only">삭제</span></th>
           </tr>

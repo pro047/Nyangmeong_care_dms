@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  compareCandidatesByRecency,
   documentMatchKey,
   findSimilarDocuments,
   similarCandidateQuery,
@@ -17,6 +18,7 @@ function candidate(latestFileName: string, over: Partial<SimilarCandidate> = {})
     folderId: FOLDER,
     createdById: 'user_1',
     latestFileName,
+    latestVersionCreatedAt: new Date('2026-08-01'),
     ...over,
   }
 }
@@ -90,18 +92,75 @@ describe('similarCandidateQuery', () => {
     expect(select.versions.take).toBe(1)
     expect(select.createdById).toBe(true)
   })
+
+  it('그 최신 1건의 업로드 시각도 같이 읽어야 한다 — 쿼리를 늘리지 않는다(2026-09-22)', () => {
+    const { select } = similarCandidateQuery()
+
+    expect(select.versions.select).toEqual({ fileName: true, createdAt: true })
+  })
 })
 
 describe('toSimilarCandidates', () => {
   it('버전이 없는 문서는 빼야 한다 — 비교할 파일명이 없다', () => {
+    const uploadedAt = new Date('2026-08-01')
     const rows = [
-      { id: 'a', folderId: 'f', createdById: 'u', versions: [{ fileName: 'a_v0.1.html' }] },
+      { id: 'a', folderId: 'f', createdById: 'u', versions: [{ fileName: 'a_v0.1.html', createdAt: uploadedAt }] },
       { id: 'b', folderId: 'f', createdById: 'u', versions: [] },
     ]
 
     expect(toSimilarCandidates(rows)).toEqual([
-      { id: 'a', folderId: 'f', createdById: 'u', latestFileName: 'a_v0.1.html' },
+      {
+        id: 'a',
+        folderId: 'f',
+        createdById: 'u',
+        latestFileName: 'a_v0.1.html',
+        latestVersionCreatedAt: uploadedAt,
+      },
     ])
+  })
+})
+
+describe('compareCandidatesByRecency', () => {
+  it('버전이 높은 쪽이 앞서야 한다', () => {
+    const older = candidate('설계서_v0.3.html')
+    const newer = candidate('설계서_v0.6.html')
+
+    expect(compareCandidatesByRecency(newer, older)).toBeLessThan(0)
+    expect(compareCandidatesByRecency(older, newer)).toBeGreaterThan(0)
+  })
+
+  it('버전이 같으면 파일명 날짜가 늦은 쪽이 앞서야 한다', () => {
+    const older = candidate('설계서_v0.5_260913.html')
+    const newer = candidate('설계서_v0.5_260921.html')
+
+    expect(compareCandidatesByRecency(newer, older)).toBeLessThan(0)
+  })
+
+  it('버전·날짜가 같으면 최신 버전의 업로드 시각이 늦은 쪽이 앞서야 한다', () => {
+    const older = candidate('건강기록_기능명세서_v0.8_20260922.xlsx', {
+      latestVersionCreatedAt: new Date('2026-09-22T00:22:00Z'),
+    })
+    const newer = candidate('건강기록_기능명세서_v0.8_20260922.xlsx', {
+      id: 'doc_other',
+      latestVersionCreatedAt: new Date('2026-09-22T01:56:00Z'),
+    })
+
+    expect(compareCandidatesByRecency(newer, older)).toBeLessThan(0)
+  })
+
+  it('버전을 못 읽는 후보는 뒤로 밀려야 한다', () => {
+    const labelled = candidate('06_로그인_회원가입_와이어프레임_v0.2_260826.html')
+    const bare = candidate('06_로그인_회원가입_와이어프레임.html')
+
+    expect(compareCandidatesByRecency(bare, labelled)).toBeGreaterThan(0)
+  })
+
+  it('전부 같으면 id 로 결정적으로 갈라야 한다', () => {
+    const a = candidate('설계서_v0.5.html', { id: 'a' })
+    const b = candidate('설계서_v0.5.html', { id: 'b' })
+
+    expect(compareCandidatesByRecency(a, b)).toBeLessThan(0)
+    expect(compareCandidatesByRecency(b, a)).toBeGreaterThan(0)
   })
 })
 

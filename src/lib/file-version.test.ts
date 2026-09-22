@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { compareFileVersions, fileVersionLabel, parseFileVersion } from '@/lib/file-version'
+import {
+  compareFileVersions,
+  fileVersionLabel,
+  parseFileNameDate,
+  parseFileVersion,
+} from '@/lib/file-version'
 
 describe('fileVersionLabel', () => {
   it('점·밑줄 표기를 한 모양으로 접는다', () => {
@@ -121,5 +126,54 @@ describe('판번호 뒤에 날짜가 붙는 경우', () => {
 
   it('날짜가 붙어도 크기 비교가 뒤집히지 않아야 한다', () => {
     expect(compareFileVersions('a_v2_20260819.html', 'b_v2.1.html')).toBeLessThan(0)
+  })
+})
+
+describe('parseFileNameDate', () => {
+  // 실데이터(2026-09-22) — 자동 붙이기의 동률 비교(attach-plan.ts)가 이 값을 그대로 쓴다.
+  it('yymmdd(6자리, 2000년대)를 읽어야 한다', () => {
+    expect(parseFileNameDate('마이페이지_화면설계서_v0.5_260921.html')).toBe(20260921)
+  })
+
+  it('하이픈으로 구분된 yyyy-mm-dd 를 읽어야 한다', () => {
+    expect(parseFileNameDate('03_건강기록_화면설계서_HLT_v0_5_2026-08-31.html')).toBe(20260831)
+  })
+
+  it('밑줄로 구분된 yyyy_mm_dd 를 읽어야 한다 — 확장자 바로 앞이어도 된다', () => {
+    expect(parseFileNameDate('04_마이페이지_기능명세서_v0_2_2026_09_08.xlsx')).toBe(20260908)
+  })
+
+  it('중복 접미 (1) 뒤에 확장자가 와도 그 앞의 6자리 날짜를 읽어야 한다', () => {
+    expect(
+      parseFileNameDate('05_플레이스_동물병원_기능명세서_v0.2_260908 (1).xlsx'),
+    ).toBe(20260908)
+  })
+
+  it('날짜 토큰이 없으면 null 이어야 한다', () => {
+    expect(parseFileNameDate('06_로그인_회원가입_와이어프레임.html')).toBeNull()
+  })
+
+  it('판번호만 있고 날짜가 없으면 null 이어야 한다 — 판번호를 날짜로 오인하지 않는다', () => {
+    expect(parseFileNameDate('커뮤니티_기능명세서_v0_2_.xlsx')).toBeNull()
+    expect(parseFileNameDate('설계서_v0.5.html')).toBeNull()
+    expect(parseFileNameDate('설계서_v0_5.html')).toBeNull()
+  })
+
+  it('여러 개면 마지막 날짜 토큰을 써야 한다', () => {
+    expect(parseFileNameDate('2026_01_01_초안_설계서_v0.3_20260908.html')).toBe(20260908)
+  })
+
+  it('월이 1~12 밖이면 null 이어야 한다', () => {
+    expect(parseFileNameDate('보고서_2026_13_01.xlsx')).toBeNull()
+    expect(parseFileNameDate('보고서_2026_00_01.xlsx')).toBeNull()
+  })
+
+  it('일이 1~31 밖이면 null 이어야 한다', () => {
+    expect(parseFileNameDate('보고서_2026_01_32.xlsx')).toBeNull()
+    expect(parseFileNameDate('보고서_2026_01_00.xlsx')).toBeNull()
+  })
+
+  it('8자리(연속 숫자)도 읽어야 한다', () => {
+    expect(parseFileNameDate('03_메인페이지_화면설계서_v0.3_20260819.html')).toBe(20260819)
   })
 })

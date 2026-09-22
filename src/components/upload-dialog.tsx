@@ -17,8 +17,10 @@ import {
 import { classifyFileName, type ClassifyResult } from '@/lib/classify'
 import { titleFromFileName } from '@/lib/title'
 import {
+  attachDefault,
   attachVersionWarning,
   uploadTarget,
+  type AttachDefault,
   type UploadTarget,
 } from '@/lib/attach-plan'
 import { findSimilarDocuments, type SimilarCandidate } from '@/lib/similar-document'
@@ -49,8 +51,20 @@ type Item = {
   dest?: Destination
   /** 개별 셀렉트로 직접 고른 건은 "만들지 않음" 체크가 덮지 않는다. */
   destTouched?: boolean
-  /** 새 판으로 붙일 문서 id. undefined 가 기본값(새 문서)이다 — 붙이기는 되돌릴 수 없다. */
+  /**
+   * 새 판으로 붙일 문서 선택. **`undefined` 는 "아직 안 골랐다"이지 "새 문서로
+   * 올리기"가 아니다** (2026-09-20) — 기본값을 여기 저장하지 않고 `decisionFor` +
+   * `resolveAttachTo` 로 그때그때 파생시킨다. 목적지 폴더가 바뀌면 후보도 기본값도
+   * 같이 바뀌기 때문이다. 사람이 명시적으로 고르면 후보 id 또는 `NEW_DOCUMENT`
+   * (새 문서로 올리기)가 들어간다 — 붙이기는 되돌릴 수 없으니 그 뒤로는 파생값에
+   * 밀리지 않는다.
+   */
   attachTo?: string
+  /** 수동 모드에서 attachDefault 가 'none'·'auto' 로 판정해 기다리지 않고 곧장 올릴 때만
+      addFiles 가 채운다. 실제 업로드 대상은 이 값 하나로 고정된다. */
+  initialTarget?: UploadTarget
+  /** initialTarget 이 'attach' 였던 건의 안내 문구. 어디에 붙었는지 올린 뒤에도 보이게 한다. */
+  attachedLabel?: string
 }
 
 const MAX_PARALLEL = 3
@@ -59,6 +73,9 @@ const MAX_PARALLEL = 3
 const AUTO = '__auto__'
 /** 목적지 셀렉트에서 "새 폴더"를 고른 값. */
 const NEW_FOLDER = '__new__'
+/** 붙이기 셀렉트에서 "새 문서로 올리기"를 명시적으로 고른 값. 후보 id(cuid)와 겹치지
+    않는다. 빈 문자열('')은 여기 쓰지 않는다 — ask 미선택(placeholder)과 구분해야 한다. */
+const NEW_DOCUMENT = '__new_document__'
 
 async function errorMessage(res: Response, fallback: string) {
   const body = await res.json().catch(() => null)
@@ -140,6 +157,33 @@ export function UploadDialog({
     (fileName: string, folderId: string | null) =>
       findSimilarDocuments(fileName, folderId, candidates, permission),
     [candidates, permission],
+  )
+
+  /** 이 모달에 함께 담긴 다른 항목들의 파일명. 병렬 업로드(MAX_PARALLEL) 중 도착
+      순서가 뒤집히는 사고를 막으려면 폴더·목적지와 무관하게 전부 본다
+      (attach-plan.ts 의 attachDefault 참고). **끝난(done) 항목도 남긴다** — `candidates`
+      는 모달을 닫을 때까지 갱신되지 않아서(router.refresh 는 close 에 있다), v0.8 을
+      올린 뒤 같은 모달에 v0.7 을 담으면 옛 후보(v0.6)와 비교해 자동으로 붙고 v0.7 이
+      최신이 된다. 실패(error)한 항목은 붙은 적이 없으니 뺀다. */
+  const batchSiblingNames = useCallback(
+    (selfId: string) =>
+      items.filter((i) => i.id !== selfId && i.status !== 'error').map((i) => i.file.name),
+    [items],
+  )
+
+  /** 이 항목의 기본 판정(none/auto/ask). 목적지 폴더가 바뀌면 후보도 판정도 같이 바뀐다. */
+  const decisionFor = useCallback(
+    (item: Item, folderId: string | null): AttachDefault =>
+      attachDefault(item.file.name, candidatesFor(item.file.name, folderId), batchSiblingNames(item.id)),
+    [candidatesFor, batchSiblingNames],
+  )
+
+  /** 사람이 아직 건드리지 않은 항목의 실효 선택. auto 면 그 후보로, 그 외(none·ask)는
+      미선택('')으로 파생시킨다 — 기본값을 state 에 저장하지 않는 이유가 이것이다. */
+  const resolveAttachTo = useCallback(
+    (item: Item, decision: AttachDefault): string =>
+      item.attachTo ?? (decision.kind === 'auto' ? decision.documentId : ''),
+    [],
   )
 
   const uploadOne = useCallback(
@@ -274,19 +318,58 @@ export function UploadDialog({
       if (!fileList?.length) return
 
       const folderId = mode === AUTO || mode === '' ? null : mode
+      const incoming = Array.from(fileList)
+      const incomingNames = incoming.map((file) => file.name)
+      // 이미 담겨 있는 항목의 파일명(끝난 것 포함 — batchSiblingNames 와 같은 이유).
+      // 지금 담는 파일들은 아직 items state 에 없어 그 헬퍼를 그대로 쓸 수 없다.
+      const inFlightNames = items.filter((i) => i.status !== 'error').map((i) => i.file.name)
 
-      const added: Item[] = Array.from(fileList).map((file) => {
-        const result = autoPreview ? classifyFileName(file.name, folders) : undefined
-        // 자동 모드는 목적지가 미리보기에서 정해지므로 여기서는 후보를 볼 수 없다 —
-        // 어차피 전건이 시작 버튼을 기다리므로 물어볼 자리는 그쪽 행이다.
-        const waiting = !autoPreview && candidatesFor(file.name, folderId).length > 0
+      const added: Item[] = incoming.map((file, idx) => {
+        // 자동 모드는 목적지가 미리보기에서 정해지므로 여기서는 후보를 판정하지 않는다 —
+        // 시작 버튼을 눌러야 폴더가 확정되고, 그때(startAuto) 다시 판정한다.
+        if (autoPreview) {
+          const result = classifyFileName(file.name, folders)
+          return {
+            id: crypto.randomUUID(),
+            file,
+            status: 'pending' as const,
+            progress: 0,
+            result,
+            dest: result ? defaultDestination(result) : undefined,
+          }
+        }
+
+        const found = candidatesFor(file.name, folderId)
+        const others = [...inFlightNames, ...incomingNames.filter((_, i2) => i2 !== idx)]
+        const decision = attachDefault(file.name, found, others)
+
+        // ask 는 지금처럼 사람의 선택을 기다린다.
+        if (decision.kind === 'ask') {
+          return { id: crypto.randomUUID(), file, status: 'waiting' as const, progress: 0 }
+        }
+
+        // none · auto 는 기다리지 않고 곧장 올린다 — auto 는 후보 1건 + 버전이 엄격히
+        // 높을 때만이라 사람에게 물을 것이 없다(attach-plan.ts).
+        if (decision.kind === 'none') {
+          return {
+            id: crypto.randomUUID(),
+            file,
+            status: 'pending' as const,
+            progress: 0,
+            initialTarget: { kind: 'new', folderId },
+          }
+        }
+
+        const target = found.find((c) => c.id === decision.documentId)
         return {
           id: crypto.randomUUID(),
           file,
-          status: waiting ? ('waiting' as const) : ('pending' as const),
+          status: 'pending' as const,
           progress: 0,
-          result,
-          dest: result ? defaultDestination(result) : undefined,
+          initialTarget: { kind: 'attach', documentId: decision.documentId },
+          attachedLabel: target
+            ? `‘${target.latestFileName}’ 의 새 버전으로 올렸습니다`
+            : undefined,
         }
       })
       setItems((prev) => [...prev, ...added])
@@ -295,9 +378,12 @@ export function UploadDialog({
       // 사람이 미리보기를 확인하고 시작 버튼을 눌러야 시작한다.
       if (autoPreview) return
 
-      // 후보가 잡힌 건만 붙잡는다. 나머지는 지금까지처럼 담는 즉시 올라간다 —
-      // 후보 없는 평범한 업로드에까지 클릭을 하나 더 붙이지 않는 것이 이 화면의 전제다.
-      const jobs = added.filter((item) => item.status === 'pending')
+      // initialTarget 이 있는 건(none·auto)만 붙잡는다. 나머지(ask → waiting)는 사람의
+      // 선택을 기다린다 — 후보 없는 평범한 업로드에까지 클릭을 하나 더 붙이지 않는 것이
+      // 이 화면의 전제다.
+      const jobs = added.filter(
+        (item): item is Item & { initialTarget: UploadTarget } => item.initialTarget !== undefined,
+      )
       if (jobs.length === 0) return
 
       // 동시 업로드 수를 제한해 브라우저 커넥션과 S3 요청이 몰리지 않게 한다.
@@ -305,11 +391,11 @@ export function UploadDialog({
       batches.current.add(batch)
       runBatch(
         batch,
-        jobs.map((item) => ({ item, target: { kind: 'new', folderId } as UploadTarget })),
+        jobs.map((item) => ({ item, target: item.initialTarget })),
         [],
       )
     },
-    [autoPreview, candidatesFor, folders, mode, runBatch],
+    [autoPreview, candidatesFor, folders, items, mode, runBatch],
   )
 
   /** 붙잡아 둔 건을 사람이 고른 대로 올린다. 수동 모드에만 있다(자동은 startAuto 가 겸한다). */
@@ -317,6 +403,14 @@ export function UploadDialog({
     const folderId = mode === AUTO || mode === '' ? null : mode
     const jobs = items.filter((item) => item.status === 'waiting')
     if (jobs.length === 0) return
+
+    // 버튼이 비활성일 때만 막지 않는다(2026-09-20) — 미선택 ask 가 섞여 들어오면
+    // uploadTarget('', ...) 이 어떤 후보 id 와도 안 겹쳐 조용히 새 문서로 떨어진다.
+    const unresolved = jobs.some((item) => {
+      const decision = decisionFor(item, folderId)
+      return decision.kind === 'ask' && resolveAttachTo(item, decision) === ''
+    })
+    if (unresolved) return
 
     const batch: UploadBatch = { cancelled: false }
     batches.current.add(batch)
@@ -327,13 +421,16 @@ export function UploadDialog({
     )
     runBatch(
       batch,
-      jobs.map((item) => ({
-        item,
-        target: uploadTarget(item.attachTo, folderId, candidatesFor(item.file.name, folderId)),
-      })),
+      jobs.map((item) => {
+        const attachTo = resolveAttachTo(item, decisionFor(item, folderId))
+        return {
+          item,
+          target: uploadTarget(attachTo, folderId, candidatesFor(item.file.name, folderId)),
+        }
+      }),
       [],
     )
-  }, [items, mode, candidatesFor, runBatch])
+  }, [items, mode, candidatesFor, decisionFor, resolveAttachTo, runBatch])
 
   /** 화면에 보이는 목적지. "만들지 않음"은 직접 고르지 않은 제안 건에만 걸린다. */
   const effectiveDest = useCallback(
@@ -372,6 +469,22 @@ export function UploadDialog({
     [folders],
   )
 
+  /**
+   * 붙이기 후보를 찾을 폴더. **새 폴더 이름이 기존 폴더와 같으면 그 폴더다** — startAuto 가
+   * 그 폴더로 흡수하기 때문이다. 미리보기와 startAuto 가 이 함수 하나를 봐야 한다: 미리보기만
+   * `dest.kind === 'folder'` 로 판정하면 화면은 후보 없음(셀렉트 없음)인데 시작 시점엔 후보가
+   * 생겨, ask 면 버튼이 아무 말 없이 멈추고 auto 면 사람이 본 적 없는 선택으로 붙는다
+   * (2026-09-22 코드 리뷰).
+   */
+  const attachFolderId = useCallback(
+    (dest: Destination): string | null => {
+      if (dest.kind === 'folder') return dest.folderId
+      if (dest.kind === 'new') return findExistingFolderByName(dest.name, dest.parentId, folders)
+      return null
+    },
+    [folders],
+  )
+
   const startAuto = useCallback(async () => {
     // 확정 시점의 목록을 붙잡아 둔다. 시작 뒤 화면이 바뀌어도 보낼 것은 이것이다.
     const jobItems = items
@@ -380,11 +493,19 @@ export function UploadDialog({
     // 실제로 생긴 폴더 이름이 어긋난다.
     const dests = jobItems.map(effectiveDest).map((dest): Destination => {
       if (dest.kind !== 'new') return dest
-      const existingId = findExistingFolderByName(dest.name, dest.parentId, folders)
+      const existingId = attachFolderId(dest)
       return existingId !== null
         ? { kind: 'folder', folderId: existingId }
         : { kind: 'new', parentId: dest.parentId, name: dest.name.trim() }
     })
+
+    // 버튼이 비활성일 때만 막지 않는다(2026-09-20) — handleStartWaiting 과 같은 이유.
+    const unresolved = jobItems.some((item, i) => {
+      const folderId = attachFolderId(dests[i])
+      const decision = decisionFor(item, folderId)
+      return decision.kind === 'ask' && resolveAttachTo(item, decision) === ''
+    })
+    if (unresolved) return
 
     setStarted(true)
     setPreparing(true)
@@ -416,9 +537,10 @@ export function UploadDialog({
         const folderId = resolveDestination(dests[i], created)
         // 확정된 목적지로 후보를 다시 판정한다 — 선택한 뒤에 폴더를 바꿨으면 그 선택은
         // 여기서 버려진다(uploadTarget). 화면의 선택을 그대로 믿으면 다른 폴더의 문서에 붙는다.
+        const attachTo = resolveAttachTo(item, decisionFor(item, folderId))
         return {
           item,
-          target: uploadTarget(item.attachTo, folderId, candidatesFor(item.file.name, folderId)),
+          target: uploadTarget(attachTo, folderId, candidatesFor(item.file.name, folderId)),
         }
       }),
       createdIds,
@@ -426,11 +548,13 @@ export function UploadDialog({
   }, [
     items,
     effectiveDest,
-    folders,
     createFolder,
     cleanupCreatedFolders,
     runBatch,
     candidatesFor,
+    decisionFor,
+    resolveAttachTo,
+    attachFolderId,
   ])
 
   const close = useCallback(() => {
@@ -476,6 +600,21 @@ export function UploadDialog({
   const invalidNameCount = toNew.filter(
     (r) => r.dest.kind === 'new' && folderNameError(r.dest.name) !== null,
   ).length
+
+  // 미선택 ask 건수(2026-09-20). previewing 이면 미리보기의 전건을, 아니면 waiting 상태만
+  // 본다 — 후보가 없거나(none) auto 로 이미 채워진 행은 고를 게 없다. 0건이어야 "선택
+  // 확정하고 올리기"·"업로드 시작" 버튼이 눌린다.
+  const unresolvedCount = previewing
+    ? rows.filter((r) => {
+        const decision = decisionFor(r.item, attachFolderId(r.dest))
+        return decision.kind === 'ask' && resolveAttachTo(r.item, decision) === ''
+      }).length
+    : items.filter((item) => {
+        if (item.status !== 'waiting') return false
+        const folderId = mode === AUTO || mode === '' ? null : mode
+        const decision = decisionFor(item, folderId)
+        return decision.kind === 'ask' && resolveAttachTo(item, decision) === ''
+      }).length
 
   const changeDest = (item: Item, value: string) => {
     const proposal = item.result?.kind === 'propose' ? item.result : null
@@ -533,29 +672,48 @@ export function UploadDialog({
   }
 
   /**
-   * "새 문서 / 기존 문서의 새 버전" 선택칸. 후보가 없으면 아무것도 그리지 않는다.
+   * "새 문서 / 기존 문서의 새 버전" 선택칸. 후보가 없으면(kind: 'none') 아무것도 그리지
+   * 않는다 — `attachDefault` 가 'none'·'auto' 로 판정한 건은 애초에 이 함수까지 오지
+   * 않는다(수동 모드는 addFiles 가 곧장 올린다). 여기 그려지는 건 전부 `ask` 이거나,
+   * 자동 분류 미리보기에서 사람이 아직 안 건드린 `auto` 행이다.
    *
-   * **기본값은 항상 새 문서다.** 새 문서로 잘못 간 것은 나중에 붙이면 되지만, 잘못 붙인
-   * 판을 떼는 화면은 앱에 없다(버전 롤백은 범위 밖). 그 비대칭이 이 기본값의 전부다.
+   * **기본값은 항상 새 문서였다** — 2026-09-20 부로 뒤집는다. 팀원이 선택칸의 뜻을 몰라
+   * 기본값(새 문서)으로 그대로 올려 같은 문서가 여러 건으로 쪼개졌다(운영 실측:
+   * `마이페이지_화면설계서_v0.5` 5건). 잘못 붙인 판을 떼는 화면이 없다는 비대칭은
+   * 그대로이므로, 그 조건을 못 채우면(ask) 사람이 "새 문서로 올리기"나 후보 중 하나를
+   * 직접 고를 때까지 미선택 placeholder 로 둔다 — 조용히 어느 쪽으로도 가지 않는다.
+   *
+   * **자동 조건은 2026-09-22 에 넓어졌다.** 처음엔 "후보가 정확히 1건이고 버전이 엄격히
+   * 높을 때만"이었는데, 운영 업로드 66건 재생에서 자동이 14/66뿐이었다(팀원이 버전
+   * 번호를 안 올리고 날짜만 바꿔 재업로드하는 습관 + 이미 쪼개진 문서로 후보가 여럿인
+   * 폴더). 지금은 후보가 여러 건이어도 `attachDefault` 가 그중 가장 최신 하나를 target
+   * 으로 골라 비교하고, "버전은 같지만 파일명 날짜가 같거나 늦음"도 자동에 넣는다(재생
+   * 실측: 약 42/66). 셀렉트에 보이는 후보 순서(`findSimilarDocuments`)도 같은 기준으로
+   * 정렬돼 있어 첫 항목이 곧 target 이다.
    */
   const renderAttachChoice = (item: Item, folderId: string | null) => {
     const found = candidatesFor(item.file.name, folderId)
     if (found.length === 0) return null
 
-    const target = found.find((c) => c.id === item.attachTo)
+    const decision = decisionFor(item, folderId)
+    const value = resolveAttachTo(item, decision)
+    const target = found.find((c) => c.id === value)
     const warning = target ? attachVersionWarning(item.file.name, target.latestFileName) : null
 
     return (
       <div className="mt-2">
         <select
-          value={item.attachTo ?? ''}
+          value={value}
           aria-label={`${item.file.name} 올리는 방식`}
-          onChange={(e) =>
-            update(item.id, { attachTo: e.target.value === '' ? undefined : e.target.value })
-          }
+          onChange={(e) => update(item.id, { attachTo: e.target.value })}
           className="w-full rounded-lg border border-border bg-surface py-1.5 pr-8 pl-2.5 text-xs text-ink outline-none focus:border-accent"
         >
-          <option value="">새 문서로 올리기</option>
+          {/* 미선택일 때만 뜨는 placeholder. hidden 이라 다른 값을 고른 뒤에는 목록에
+              안 남는다 — 한 번 고르면 되돌릴(다시 미선택으로 갈) 이유가 없다. */}
+          <option value="" disabled hidden>
+            올리는 방식을 골라 주세요
+          </option>
+          <option value={NEW_DOCUMENT}>새 문서로 올리기</option>
           {/* 제목이 아니라 **파일명**으로 보여준다. 여기서 묻는 것은 "이 파일이 저 파일의
               다음 판인가"이고, 제목은 사람이 고칠 수 있어 파일과 어긋나 있을 수 있다. */}
           {found.map((c) => (
@@ -625,7 +783,7 @@ export function UploadDialog({
                 ))}
               </select>
               {dest.kind === 'new' && renderNameEditor(item, dest)}
-              {renderAttachChoice(item, dest.kind === 'folder' ? dest.folderId : null)}
+              {renderAttachChoice(item, attachFolderId(dest))}
             </li>
           ))}
         </ul>
@@ -844,6 +1002,11 @@ export function UploadDialog({
                       )}
                       {item.status === 'waiting' &&
                         renderAttachChoice(item, mode === AUTO || mode === '' ? null : mode)}
+                      {/* attachDefault 가 곧장 붙인(auto) 건. 어디에 붙었는지 올린 뒤에도
+                          보이게 한다 — 셀렉트를 안 보여주고 넘어갔으니 결과라도 알아야 한다. */}
+                      {item.attachedLabel && item.status === 'done' && (
+                        <p className="mt-1.5 text-xs text-ink-muted">{item.attachedLabel}</p>
+                      )}
                       {item.error && <p className="mt-1.5 text-xs text-danger">{item.error}</p>}
                     </li>
                   ))}
@@ -856,14 +1019,18 @@ export function UploadDialog({
                 {previewing
                   ? invalidNameCount > 0
                     ? `새 폴더 이름 ${invalidNameCount}건을 고쳐야 시작할 수 있습니다`
-                    : `${items.length}건 · 올리기 전에 확인하세요`
+                    : unresolvedCount > 0
+                      ? `${unresolvedCount}건은 새 문서인지 기존 문서의 새 버전인지 골라 주세요`
+                      : `${items.length}건 · 올리기 전에 확인하세요`
                   : items.length === 0
                     ? ' '
-                    : waitingCount > 0
-                      ? `${waitingCount}건은 새 문서인지 기존 문서의 새 버전인지 골라 주세요`
-                      : uploading
-                        ? `업로드 중… ${doneCount}/${items.length}`
-                        : `완료 ${doneCount}건${errorCount > 0 ? ` · 실패 ${errorCount}건` : ''}`}
+                    : unresolvedCount > 0
+                      ? `${unresolvedCount}건은 새 문서인지 기존 문서의 새 버전인지 골라 주세요`
+                      : waitingCount > 0
+                        ? `${waitingCount}건 선택 완료 · 눌러서 올리세요`
+                        : uploading
+                          ? `업로드 중… ${doneCount}/${items.length}`
+                          : `완료 ${doneCount}건${errorCount > 0 ? ` · 실패 ${errorCount}건` : ''}`}
               </p>
               <div className="flex shrink-0 items-center gap-2">
                 <button
@@ -884,7 +1051,7 @@ export function UploadDialog({
                 {previewing && (
                   <button
                     type="button"
-                    disabled={preparing || invalidNameCount > 0}
+                    disabled={preparing || invalidNameCount > 0 || unresolvedCount > 0}
                     onClick={() => void startAuto()}
                     className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-hover disabled:opacity-60"
                   >
@@ -894,8 +1061,9 @@ export function UploadDialog({
                 {!previewing && waitingCount > 0 && (
                   <button
                     type="button"
+                    disabled={unresolvedCount > 0}
                     onClick={handleStartWaiting}
-                    className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-hover"
+                    className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-hover disabled:opacity-60"
                   >
                     선택 확정하고 올리기
                   </button>

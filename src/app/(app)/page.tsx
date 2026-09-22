@@ -18,6 +18,7 @@ import {
 import {
   documentListOrderBy,
   latestCandidateQuery,
+  sortByLastActivity,
   supersededDocumentIds,
 } from '@/lib/latest'
 import { pageErrorMessage } from '@/lib/page-error'
@@ -135,7 +136,7 @@ export default async function DocumentsPage({
   // **폴더·태그를 걸면 아예 안 읽는다** (2026-09-14, 사람 지시). 지표는 전체 문서를 본
   // 결과라 좁힌 화면에 두면 *그 폴더의 지표* 로 읽힌다. 안 그릴 것을 읽을 이유도 없다 —
   // findings 284행이 딸린 조회다.
-  const [documents, latestRows, similarRows, snapshot, activeRows] = await Promise.all([
+  const [rawDocuments, latestRows, similarRows, snapshot, activeRows] = await Promise.all([
     getDocuments({
       AND: [
         activeDocumentWhere(),
@@ -153,6 +154,10 @@ export default async function DocumentsPage({
     // 더하는 것이 당연한 다음 수인데, 공유했다면 미분류 문서의 링크가 말없이 사라진다.
     prisma.document.findMany({ where: activeDocumentWhere(), select: { id: true } }),
   ])
+  // DB 는 documentListOrderBy(생성순)로 읽는다 — 관계(버전)의 최신값 정렬은 Prisma
+  // orderBy 로 안 된다. 화면 순서는 여기서 lastActivityAt 기준으로 다시 정렬한다
+  // (latest.ts, 2026-09-20) — 안 그러면 재업로드해도 목록 위치가 안 바뀐다.
+  const documents = sortByLastActivity(rawDocuments)
   const supersededIds = supersededDocumentIds(latestRows)
   const activeDocumentIds = new Set(activeRows.map((row) => row.id))
 

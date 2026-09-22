@@ -1,4 +1,4 @@
-import { stripExtension, VERSION_TOKEN } from '@/lib/classify'
+import { DATE_TOKEN, stripExtension, VERSION_TOKEN } from '@/lib/classify'
 
 /** matchAll 은 원본 정규식의 lastIndex 를 건드리지 않는다 — exec 로 바꾸면 g 플래그
     때문에 호출마다 결과가 달라진다. 버전은 파일명 뒤쪽에 붙으므로 마지막 것을 쓴다
@@ -84,4 +84,53 @@ export function compareFileVersions(a: string, b: string): number | null {
   if (left.major !== right.major) return left.major - right.major
   if (left.minor !== right.minor) return left.minor - right.minor
   return left.suffix < right.suffix ? -1 : left.suffix > right.suffix ? 1 : 0
+}
+
+/** 확장자를 뗀 뒤에 찾는다 — `04_..._2026_09_08.xlsx` 처럼 날짜가 확장자 바로 앞에 오면
+    안 떼는 한 뒤쪽 boundary(`$`)를 못 만난다. `parseFileVersion` 의 `bestVersionMatch` 와
+    달리 원본(확장자 포함)과는 대조하지 않는다 — 그쪽은 "확장자 없는 파일명의 마지막 점"을
+    구하려는 것인데, 날짜 토큰은 한 파일명에 여러 개 올 수 있어(`2026_01_01_초안_..._
+    20260908`) 두 문자열의 "마지막 토큰"을 길이로 비교하면 서로 다른 자리의 토큰을 비교하게
+    된다. */
+function lastDateMatch(fileName: string): RegExpExecArray | undefined {
+  return [...stripExtension(fileName).matchAll(DATE_TOKEN)].at(-1)
+}
+
+/**
+ * 파일명이 말하는 날짜를 `yyyymmdd` 숫자로 돌려준다. 없으면 null (2026-09-22).
+ *
+ * 새 날짜 파서를 만들지 않는다 — `classify.ts` 의 `DATE_TOKEN` 이 이미 파일명 날짜 토큰
+ * (`2026_08_17`·`2026.08.17`·`20260819`·`260817`)을 알아본다. 여러 개면 마지막 토큰을
+ * 쓴다 — `parseFileVersion` 과 같은 이유로 날짜도 파일명 뒤쪽에 몰린다.
+ *
+ * **6자리는 `yymmdd`(2000년대)로 읽는다.** 월이 1~12, 일이 1~31 범위 밖이면 null 이다 —
+ * 판번호(`v0.5`, `v0_5`)는 애초에 DATE_TOKEN 이 4·6·8자리 연속 숫자만 보므로 안 걸리지만,
+ * 달력에 없는 날짜(우연히 그 자리·자릿수가 맞아떨어진 숫자열)를 "날짜 있음"으로 잘못
+ * 판정하면 `attachDefault` 의 동률 비교가 틀린 답을 낸다.
+ */
+export function parseFileNameDate(fileName: string): number | null {
+  const token = lastDateMatch(fileName)?.[0]
+  if (token === undefined) return null
+
+  const parts = token.split(/[._-]/)
+  let year: number
+  let month: number
+  let day: number
+  if (parts.length === 3) {
+    // `2026_08_17` · `2026.08.17` · `2026-08-17`.
+    ;[year, month, day] = parts.map(Number)
+  } else if (token.length === 8) {
+    // `20260819`.
+    year = Number(token.slice(0, 4))
+    month = Number(token.slice(4, 6))
+    day = Number(token.slice(6, 8))
+  } else {
+    // `260817` — 6자리는 2000년대 yymmdd 뿐이다 (DATE_TOKEN 이 4·6·8자리만 잡는다).
+    year = 2000 + Number(token.slice(0, 2))
+    month = Number(token.slice(2, 4))
+    day = Number(token.slice(4, 6))
+  }
+
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null
+  return year * 10000 + month * 100 + day
 }
