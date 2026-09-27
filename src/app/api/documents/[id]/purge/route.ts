@@ -3,6 +3,7 @@ import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
 import { deleteObject } from '@/lib/s3'
 import { denyIfNotOwner } from '@/lib/ownership-guard'
+import { hasDocKey, scheduleConsistencyMeasure } from '@/lib/consistency-schedule'
 import {
   outcomeFromCount,
   purgeCandidateKeys,
@@ -33,6 +34,9 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   const denial = await denyIfNotOwner(id, session)
   if (denial) return denial
 
+  // docKey 문서면 바뀐 뒤 다시 잰다 — 바꾼 뒤에는 (영구삭제면) 읽을 수 없어서 먼저 본다
+  const measured = await hasDocKey(id)
+
   // 지우기 전에 키를 확보한다. 삭제 후에는 버전 행이 없어서 무엇을 지울지 알 수 없다.
   const versions = await prisma.documentVersion.findMany({
     where: { documentId: id, document: trashedDocumentWhere() },
@@ -50,6 +54,8 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   if (!outcome.ok) {
     return NextResponse.json({ error: outcome.error }, { status: outcome.status })
   }
+
+  if (measured) scheduleConsistencyMeasure()
 
   // 다른 문서가 같은 키를 가리키면 지우지 않는다. `keyToken` 이 5분간 재사용 가능해서
   // 서로 다른 문서가 같은 S3 객체를 공유할 수 있고(HANDOFF "미룬 항목"), 그걸 모르고

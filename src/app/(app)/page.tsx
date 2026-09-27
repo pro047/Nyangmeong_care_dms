@@ -5,6 +5,7 @@ import { UploadDialog } from '@/components/upload-dialog'
 import { DocumentTable } from '@/components/document-table'
 import { ConsistencyPanel } from '@/components/consistency-panel'
 import { measuredAgo } from '@/lib/consistency-view'
+import { scheduleConsistencyRefresh } from '@/lib/consistency-schedule'
 import { formatDateTime } from '@/lib/format'
 import { prisma } from '@/lib/prisma'
 import { activeDocumentWhere } from '@/lib/trash'
@@ -154,6 +155,8 @@ export default async function DocumentsPage({
     // 더하는 것이 당연한 다음 수인데, 공유했다면 미분류 문서의 링크가 말없이 사라진다.
     prisma.document.findMany({ where: activeDocumentWhere(), select: { id: true } }),
   ])
+  // 필터를 걸면 스냅샷을 안 읽으니 판정할 것이 없다 — 안전망은 전체 목록에서만 돈다.
+  if (!filtered) scheduleConsistencyRefresh(snapshot)
   // DB 는 documentListOrderBy(생성순)로 읽는다 — 관계(버전)의 최신값 정렬은 Prisma
   // orderBy 로 안 된다. 화면 순서는 여기서 lastActivityAt 기준으로 다시 정렬한다
   // (latest.ts, 2026-09-20) — 안 그러면 재업로드해도 목록 위치가 안 바뀐다.

@@ -7,6 +7,7 @@ import { verifyUploadToken } from '@/lib/upload-token'
 import { versionCreateSchema } from '@/lib/version-create'
 import { addVersion } from '@/lib/upload-commit'
 import { env } from '@/lib/env'
+import { scheduleConsistencyMeasure } from '@/lib/consistency-schedule'
 
 export const dynamic = 'force-dynamic'
 
@@ -39,6 +40,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     headObjectSize,
     notifyUpload,
     adminDiscordId: env.ADMIN_DISCORD_ID,
+    scheduleMeasure: scheduleConsistencyMeasure,
   })
   if (!outcome.ok) {
     return NextResponse.json({ error: outcome.error }, { status: outcome.status })

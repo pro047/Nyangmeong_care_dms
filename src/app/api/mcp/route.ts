@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { presignDownload, presignUpload, buildS3Key, headObjectSize, deleteObject, getObjectBytes } from '@/lib/s3'
 import { verifyUploadToken, signUploadToken } from '@/lib/upload-token'
 import { notifyUpload } from '@/lib/discord'
+import { scheduleConsistencyMeasure } from '@/lib/consistency-schedule'
 import { verifyMcpBearer } from '@/lib/mcp/auth'
 import { registerDmsTools } from '@/lib/mcp/server'
 import { createDocument, addVersion, discardUpload } from '@/lib/upload-commit'
@@ -25,6 +26,7 @@ const handler = withMcpAuth(
         deleteObject,
         notifyUpload,
         adminDiscordId: env.ADMIN_DISCORD_ID,
+        scheduleMeasure: scheduleConsistencyMeasure,
       }
       registerDmsTools(server, {
         prisma,

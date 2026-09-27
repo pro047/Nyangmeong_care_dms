@@ -40,6 +40,9 @@ export type CommitDeps = {
   }) => Promise<void>
   /** `env.ADMIN_DISCORD_ID`. 비었으면 관리자 없음 (ownership.ts:29-31) */
   adminDiscordId: string | undefined
+  /** docKey 가 달린 문서에 새 판이 붙으면 정합성 측정을 응답 뒤로 예약한다(`consistency-schedule.ts`).
+   *  라우트와 MCP 가 같은 것을 넘긴다 — 여기서 직접 부르면 테스트가 `after()` 를 끌고 온다. */
+  scheduleMeasure: () => void
 }
 
 /**
@@ -85,7 +88,8 @@ export type DiscardUploadInput = z.infer<typeof discardUploadSchema>
 export async function createDocument(
   input: DocumentCreateInput,
   uploader: Uploader,
-  deps: Omit<CommitDeps, 'deleteObject'>,
+  // 새 문서에는 docKey 가 없다 — 측정 대상이 아니다
+  deps: Omit<CommitDeps, 'deleteObject' | 'scheduleMeasure'>,
 ): Promise<CommitOutcome<{ id: string; title: string }>> {
   const { title, description, folderId, ...file } = input
 
@@ -167,9 +171,10 @@ export async function addVersion(
   uploader: Uploader,
   deps: Omit<CommitDeps, 'deleteObject'>,
 ): Promise<CommitOutcome<{ id: string; title: string; versionNo: number }>> {
+  // docKey 도 여기서 같이 집는다 — 측정 예약 판정에 쿼리를 더 내지 않는다
   const owned = await deps.prisma.document.findUnique({
     where: { id: documentId },
-    select: { createdById: true },
+    select: { createdById: true, docKey: true },
   })
   if (owned && !canManageDocument(uploader, owned, deps.adminDiscordId)) {
     return { ok: false, status: 403, error: VERSION_FORBIDDEN }
@@ -250,6 +255,14 @@ export async function addVersion(
     console.error('디스코드 알림 실패:', err)
   }
 
+  if (owned?.docKey) {
+    try {
+      deps.scheduleMeasure()
+    } catch (err) {
+      console.error('정합성 측정 예약 실패:', err)
+    }
+  }
+
   return { ok: true, status: 201, value: { id: updated.id, title: updated.title, versionNo } }
 }
 
@@ -259,7 +272,7 @@ export async function addVersion(
 export async function discardUpload(
   input: DiscardUploadInput,
   viewer: Viewer,
-  deps: Omit<CommitDeps, 'headObjectSize'>,
+  deps: Omit<CommitDeps, 'headObjectSize' | 'scheduleMeasure'>,
 ): Promise<CommitOutcome<{ deleted: boolean }>> {
   const { s3Key, keyToken } = input
 

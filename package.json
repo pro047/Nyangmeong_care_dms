@@ -24,7 +24,10 @@
     "test:e2e:attach": "node --env-file=.env test/e2e/attach-version.mjs",
     "test:e2e:version-history": "node --env-file=.env test/e2e/version-history.mjs",
     "test:e2e:consistency": "node --env-file=.env test/e2e/consistency.mjs",
-    "test:e2e:consistency-view": "node --env-file=.env test/e2e/consistency-view.mjs"
+    "test:e2e:consistency-view": "node --env-file=.env test/e2e/consistency-view.mjs",
+    "test:e2e:consistency-measure": "node --env-file=.env test/e2e/consistency-measure.mjs",
+    "test:e2e:consistency-refresh": "node --env-file=.env test/e2e/consistency-refresh.mjs",
+    "test:e2e:doc-key": "node --env-file=.env test/e2e/doc-key-api.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1114.0",
@@ -36,6 +39,7 @@
     "clsx": "^2.1.1",
     "exceljs": "4.4.0",
     "geist": "^1.7.2",
+    "htmlparser2": "^10.1.0",
     "jose": "^6.2.9",
     "jszip": "3.10.1",
     "lucide-react": "^1.33.0",

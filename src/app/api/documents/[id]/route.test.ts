@@ -7,8 +7,10 @@ import { DELETE_FORBIDDEN } from '@/lib/ownership'
 
 // DB·쿠키는 테스트 환경에 없다. 라우트가 "무엇을 어떤 인자로 부르고
 // 무엇을 돌려주는가"만 본다 (download/route.test.ts 와 같은 패턴).
-const { getSession, updateMany, findUnique, envValues } = vi.hoisted(() => ({
+const { getSession, updateMany, findUnique, hasDocKey, scheduleConsistencyMeasure, envValues } = vi.hoisted(() => ({
   getSession: vi.fn(),
+  hasDocKey: vi.fn(),
+  scheduleConsistencyMeasure: vi.fn(),
   updateMany: vi.fn(),
   findUnique: vi.fn(),
   // env.ts 는 import 시점에 process.env 를 검증하며 던지므로 통째로 갈아 끼운다.
@@ -17,6 +19,7 @@ const { getSession, updateMany, findUnique, envValues } = vi.hoisted(() => ({
 vi.mock('@/lib/session', () => ({ getSession }))
 vi.mock('@/lib/prisma', () => ({ prisma: { document: { updateMany, findUnique } } }))
 vi.mock('@/lib/env', () => ({ env: envValues }))
+vi.mock('@/lib/consistency-schedule', () => ({ hasDocKey, scheduleConsistencyMeasure }))
 
 const BASE = 'http://localhost:3002/api/documents/doc_1'
 const PARAMS = { params: Promise.resolve({ id: 'doc_1' }) }
@@ -37,6 +40,8 @@ beforeEach(() => {
   getSession.mockReset().mockResolvedValue(SESSION)
   updateMany.mockReset().mockResolvedValue({ count: 1 })
   findUnique.mockReset().mockResolvedValue({ createdById: 'user_1' })
+  hasDocKey.mockReset().mockResolvedValue(false)
+  scheduleConsistencyMeasure.mockReset()
   envValues.ADMIN_DISCORD_ID = undefined
 })
 
@@ -175,3 +180,40 @@ describe('DELETE /api/documents/[id]', () => {
     expect(await res.json()).toEqual({ error: TRASH_NOT_FOUND })
   })
 })
+
+describe('DELETE /api/documents/[id] — 정합성 측정', () => {
+  it('docKey 문서를 휴지통에 보내면 다시 재야 한다 — 대시보드가 살아 있던 때 결과를 보이면 안 된다', async () => {
+    hasDocKey.mockResolvedValue(true)
+
+    const res = await DELETE(del(), PARAMS)
+
+    expect(res.status).toBe(200)
+    expect(scheduleConsistencyMeasure).toHaveBeenCalledTimes(1)
+  })
+
+  it('docKey 가 없는 문서는 재지 않아야 한다', async () => {
+    await DELETE(del(), PARAMS)
+
+    expect(scheduleConsistencyMeasure).not.toHaveBeenCalled()
+  })
+
+  it('지우지 못했으면(404) 재지 않아야 한다', async () => {
+    hasDocKey.mockResolvedValue(true)
+    updateMany.mockResolvedValue({ count: 0 })
+
+    const res = await DELETE(del(), PARAMS)
+
+    expect(res.status).toBe(404)
+    expect(scheduleConsistencyMeasure).not.toHaveBeenCalled()
+  })
+
+  it('남의 문서(403)면 docKey 조회도 하지 않아야 한다', async () => {
+    findUnique.mockResolvedValue({ createdById: 'user_2' })
+
+    const res = await DELETE(del(), PARAMS)
+
+    expect(res.status).toBe(403)
+    expect(hasDocKey).not.toHaveBeenCalled()
+  })
+})
+

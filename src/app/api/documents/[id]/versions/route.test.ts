@@ -16,6 +16,7 @@ const {
   verifyUploadToken,
   headObjectSize,
   notifyUpload,
+  scheduleConsistencyMeasure,
   envValues,
 } = vi.hoisted(() => ({
   getSession: vi.fn(),
@@ -26,6 +27,7 @@ const {
   verifyUploadToken: vi.fn(),
   headObjectSize: vi.fn(),
   notifyUpload: vi.fn(),
+  scheduleConsistencyMeasure: vi.fn(),
   // env.ts 는 import 시점에 process.env 를 검증하며 던지므로 통째로 갈아 끼운다.
   envValues: { ADMIN_DISCORD_ID: undefined as string | undefined },
 }))
@@ -37,6 +39,7 @@ vi.mock('@/lib/env', () => ({ env: envValues }))
 vi.mock('@/lib/s3', () => ({ MAX_UPLOAD_BYTES: 100 * 1024 * 1024, headObjectSize }))
 vi.mock('@/lib/upload-token', () => ({ verifyUploadToken }))
 vi.mock('@/lib/discord', () => ({ notifyUpload }))
+vi.mock('@/lib/consistency-schedule', () => ({ scheduleConsistencyMeasure }))
 
 const BASE = 'http://localhost:3002/api/documents/doc_1/versions'
 const PARAMS = { params: Promise.resolve({ id: 'doc_1' }) }
@@ -76,6 +79,7 @@ beforeEach(() => {
   envValues.ADMIN_DISCORD_ID = undefined
   update.mockReset().mockResolvedValue({ id: 'doc_1', title: '문서' })
   notifyUpload.mockReset().mockResolvedValue(undefined)
+  scheduleConsistencyMeasure.mockReset()
 })
 
 describe('POST /api/documents/[id]/versions — 차단 순서', () => {
@@ -320,5 +324,23 @@ describe('POST /api/documents/[id]/versions — 불변식', () => {
     expect(findFirst).toHaveBeenCalledTimes(2)
     const select = latestQuery().select
     expect(select).toMatchObject({ fileName: true, document: { select: { title: true } } })
+  })
+})
+
+describe('POST /api/documents/[id]/versions — 정합성 측정', () => {
+  it('docKey 가 달린 문서면 응답 뒤 측정을 예약한다 (MCP 와 같은 addVersion 을 탄다)', async () => {
+    findUnique.mockResolvedValue({ createdById: 'user_1', docKey: 'SCR-ACC' })
+
+    const res = await POST(post(BODY), PARAMS)
+
+    expect(res.status).toBe(201)
+    expect(scheduleConsistencyMeasure).toHaveBeenCalledTimes(1)
+  })
+
+  it('docKey 가 없으면 예약하지 않는다', async () => {
+    const res = await POST(post(BODY), PARAMS)
+
+    expect(res.status).toBe(201)
+    expect(scheduleConsistencyMeasure).not.toHaveBeenCalled()
   })
 })
