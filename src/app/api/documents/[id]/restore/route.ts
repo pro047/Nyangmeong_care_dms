@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
 import { denyIfNotOwner } from '@/lib/ownership-guard'
+import { hasDocKey, scheduleConsistencyMeasure } from '@/lib/consistency-schedule'
 import { outcomeFromCount, RESTORE_NOT_FOUND, trashedDocumentWhere } from '@/lib/trash'
 
 export const dynamic = 'force-dynamic'
@@ -21,6 +22,9 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   const denial = await denyIfNotOwner(id, session)
   if (denial) return denial
 
+  // docKey 문서면 바뀐 뒤 다시 잰다 — 바꾼 뒤에는 (영구삭제면) 읽을 수 없어서 먼저 본다
+  const measured = await hasDocKey(id)
+
   const { count } = await prisma.document.updateMany({
     where: { id, ...trashedDocumentWhere() },
     data: { deletedAt: null },
@@ -30,6 +34,8 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   if (!outcome.ok) {
     return NextResponse.json({ error: outcome.error }, { status: outcome.status })
   }
+
+  if (measured) scheduleConsistencyMeasure()
 
   return NextResponse.json({ id })
 }

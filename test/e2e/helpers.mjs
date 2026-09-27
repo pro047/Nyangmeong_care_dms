@@ -16,10 +16,13 @@ export async function withDb(fn) {
   }
 }
 
-/** 실제 users 행으로 서명한다 — 재업로드의 uploadedById 가 FK 라 가짜 id 로는 깨진다. */
-export async function mintSession() {
+/** 실제 users 행으로 서명한다 — 재업로드의 uploadedById 가 FK 라 가짜 id 로는 깨진다.
+ *  `discordId` 를 주면 그 계정으로(관리자 화면 검증용), 없으면 아무 계정이나. */
+export async function mintSession({ discordId } = {}) {
   const { rows } = await withDb((c) =>
-    c.query('select id, discord_id, username, avatar_url from users limit 1'),
+    discordId
+      ? c.query('select id, discord_id, username, avatar_url from users where discord_id = $1', [discordId])
+      : c.query('select id, discord_id, username, avatar_url from users limit 1'),
   )
   if (!rows.length) throw new Error('users 테이블이 비어 있다 — 먼저 브라우저로 한 번 로그인할 것')
   const u = rows[0]

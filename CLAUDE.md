@@ -25,6 +25,10 @@ Next.js 16 · React 19 · TypeScript · Tailwind 4 · Prisma 7 + PostgreSQL(RDS)
   - **읽기는 예외다** (2026-09-13). MCP 웹챗 읽기 도구에 한해 서버가 S3 에서 받아 텍스트로
     바꿔 응답에 싣는다 — 텍스트(html·md·csv·txt)·xlsx, 원본 1MB 이하. 올리기는 여전히
     presigned PUT 직결이다. 근거는 `MILESTONES.md` 설계 결정 표 '웹챗 읽기' 행.
+  - **정합성 측정도 읽는다** (2026-09-27). docKey 가 달린 문서의 최신판(html·xlsx)을
+    서버가 S3 에서 받아 태그 트리로 파싱하고 결과(숫자·문자열)만 저장한다 — 렌더하지
+    않는다. 측정은 업로드 응답 **뒤**(`after()`)에 돌고, 실패해도 업로드는 성공이다.
+    근거는 `MILESTONES.md` 설계 결정 표 '정합성 측정' 행.
 - **접근 제어는 디스코드 길드 멤버십 하나뿐.** 역할·권한 개념을 추가하지 않는다.
   - **삭제와 재업로드는 예외다** (삭제 2026-09-06 · 재업로드 2026-09-07). 문서 삭제
     3종(소프트 삭제·복구·영구삭제)과 **새 버전 올리기**를 **올린 사람**
@@ -39,6 +43,10 @@ Next.js 16 · React 19 · TypeScript · Tailwind 4 · Prisma 7 + PostgreSQL(RDS)
     > 그렇게 적혀 있었는데, 이 파일만 안 따라왔다. 근거: `[id]/versions/route.ts:44` 의
     > `denyIfNotOwner(id, session, VERSION_FORBIDDEN)`. **읽는 쪽이 갈리면 낡은 쪽을
     > 먼저 읽는다** — 이 파일은 매 세션 로딩되므로 특히 그렇다.
+  - **docKey 는 화면에서 다루지 않는다** (2026-09-27). 키 목록(`doc_keys`)도, 문서에 키를 다는 것도 관리자가
+    요청할 때 세션이 스크립트로 한다(`seed-dockey-table.mjs` · `seed-dockeys.mjs`). 상세 페이지 편집기·관리자
+    페이지를 만들지 말 것. API(`PUT …/doc-key` · `GET …/doc-key/suggest`)는 남아 있고 `ADMIN_DISCORD_ID` 만 부른다 —
+    docKey 는 "어느 문서가 측정의 정본인가"라서 문서 소유가 아니라 프로젝트 판단이다. 근거: `MILESTONES.md` 'docKey 지정 방식' 행.
 - **보호 구간은 이중으로 검사한다.** `proxy.ts`는 낙관적 확인이고, 실제 보호는
   서버 컴포넌트의 `getSession()`이 한다.
 

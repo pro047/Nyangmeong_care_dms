@@ -20,6 +20,7 @@ const verifyUploadToken = vi.fn()
 const headObjectSize = vi.fn()
 const deleteObject = vi.fn()
 const notifyUpload = vi.fn()
+const scheduleMeasure = vi.fn()
 
 const prisma = {
   documentVersion: { findFirst: documentVersionFindFirst, count: documentVersionCount },
@@ -42,6 +43,7 @@ function deps(adminDiscordId: string | undefined = undefined) {
     deleteObject,
     notifyUpload,
     adminDiscordId,
+    scheduleMeasure,
   }
 }
 
@@ -82,6 +84,7 @@ beforeEach(() => {
   headObjectSize.mockReset().mockResolvedValue(1234)
   deleteObject.mockReset().mockResolvedValue(undefined)
   notifyUpload.mockReset().mockResolvedValue(undefined)
+  scheduleMeasure.mockReset()
 })
 
 describe('createDocument — 차단 순서', () => {
@@ -244,7 +247,7 @@ describe('addVersion — 소유자 검사가 맨 앞', () => {
 
     expect(documentFindUnique).toHaveBeenCalledWith({
       where: { id: 'doc_1' },
-      select: { createdById: true },
+      select: { createdById: true, docKey: true },
     })
   })
 
@@ -386,6 +389,46 @@ describe('addVersion — 최신 판과 제목', () => {
   it('알림이 던져도 ok 로 남아야 한다', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
     notifyUpload.mockRejectedValue(new Error('webhook down'))
+
+    const outcome = await addVersion('doc_1', VERSION_INPUT, UPLOADER, deps())
+
+    expect(outcome.ok).toBe(true)
+    consoleError.mockRestore()
+  })
+})
+
+describe('addVersion — 정합성 측정 예약', () => {
+  it('docKey 가 달린 문서에 새 판이 붙으면 측정을 한 번 예약해야 한다', async () => {
+    documentFindUnique.mockResolvedValue({ createdById: UPLOADER.id, docKey: 'SCR-ACC' })
+
+    const outcome = await addVersion('doc_1', VERSION_INPUT, UPLOADER, deps())
+
+    expect(outcome.ok).toBe(true)
+    expect(scheduleMeasure).toHaveBeenCalledTimes(1)
+  })
+
+  it('docKey 가 없는 문서면 예약하지 않아야 한다', async () => {
+    await addVersion('doc_1', VERSION_INPUT, UPLOADER, deps())
+
+    expect(scheduleMeasure).not.toHaveBeenCalled()
+  })
+
+  it('실패한 업로드는 예약하지 않아야 한다', async () => {
+    documentFindUnique.mockResolvedValue({ createdById: UPLOADER.id, docKey: 'SCR-ACC' })
+    headObjectSize.mockResolvedValue(null)
+
+    const outcome = await addVersion('doc_1', VERSION_INPUT, UPLOADER, deps())
+
+    expect(outcome.ok).toBe(false)
+    expect(scheduleMeasure).not.toHaveBeenCalled()
+  })
+
+  it('예약이 던져도 업로드는 ok 로 남아야 한다', async () => {
+    documentFindUnique.mockResolvedValue({ createdById: UPLOADER.id, docKey: 'SCR-ACC' })
+    scheduleMeasure.mockImplementation(() => {
+      throw new Error('after() outside request scope')
+    })
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
 
     const outcome = await addVersion('doc_1', VERSION_INPUT, UPLOADER, deps())
 
