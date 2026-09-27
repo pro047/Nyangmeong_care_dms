@@ -1,0 +1,182 @@
+{
+  "groups": [
+    {
+      "docKey": "SCR-HLT",
+      "keepId": "cmtsab94u000004l5gqm8atja",
+      "keepFileName": "03_건강기록_화면설계서_v0_5_2026_09_04.html",
+      "order": [
+        {
+          "id": "cmtsab94u000004l5gqm8atja",
+          "fileName": "03_건강기록_화면설계서_v0_5_2026_09_04.html",
+          "label": "v0.5",
+          "versionCount": 1
+        },
+        {
+          "id": "cmtynovsd000204l4svdo9maz",
+          "fileName": "건강기록_화면설계서_v0.6_20260912.html",
+          "label": "v0.6",
+          "versionCount": 1
+        },
+        {
+          "id": "cmu0l3bb3000004jq53c9i29y",
+          "fileName": "건강기록_화면설계서_v0.6_20260914.html",
+          "label": "v0.6",
+          "versionCount": 1
+        },
+        {
+          "id": "cmu0xxcjs000204kzidnsmqx5",
+          "fileName": "건강기록_화면설계서_v0.6_20260914.html",
+          "label": "v0.6",
+          "versionCount": 1
+        },
+        {
+          "id": "cmu4r1qwu000004l0e28tuck4",
+          "fileName": "건강기록_화면설계서_v0_7_20260916.html",
+          "label": "v0.7",
+          "versionCount": 1
+        },
+        {
+          "id": "cmu58qtfs000204krfso9ffoj",
+          "fileName": "건강기록_화면설계서_v0.7_20260916.html",
+          "label": "v0.7",
+          "versionCount": 1
+        },
+        {
+          "id": "cmu7a8308000004jpq2vkadrp",
+          "fileName": "건강기록_화면설계서_v0.8_20260917.html",
+          "label": "v0.8",
+          "versionCount": 1
+        },
+        {
+          "id": "cmubxjdww000004kzuz8h2svv",
+          "fileName": "건강기록_화면설계서_v0.8_20260922.html",
+          "label": "v0.8",
+          "versionCount": 1
+        },
+        {
+          "id": "cmuc0wqw2000004l7i4jgs8z5",
+          "fileName": "건강기록_화면설계서_v0.8_20260922.html",
+          "label": "v0.8",
+          "versionCount": 1
+        }
+      ],
+      "retitle": {
+        "from": "03_건강기록_화면설계서_v0_5_2026_09_04",
+        "to": "건강기록_화면설계서_v0.8_20260922"
+      }
+    },
+    {
+      "docKey": "FN-HLT",
+      "keepId": "cmtsab94z000004jtc5l19o13",
+      "keepFileName": "04_건강기록_기능명세서_v0_5_2026_09_08.xlsx",
+      "order": [
+        {
+          "id": "cmtgt3hcq000004l746aggxlc",
+          "fileName": "04_건강기록_기능명세서_v0_5_2026_08_31.xlsx",
+          "label": "v0.5",
+          "versionCount": 1
+        },
+        {
+          "id": "cmtsab94z000004jtc5l19o13",
+          "fileName": "04_건강기록_기능명세서_v0_5_2026_09_08.xlsx",
+          "label": "v0.5",
+          "versionCount": 1
+        },
+        {
+          "id": "cmtynovt1000304l428pjcyer",
+          "fileName": "건강기록_기능명세서_v0.6_20260912.xlsx",
+          "label": "v0.6",
+          "versionCount": 1
+        },
+        {
+          "id": "cmu0l3bls000004l51jicuf34",
+          "fileName": "건강기록_기능명세서_v0.6_20260914.xlsx",
+          "label": "v0.6",
+          "versionCount": 1
+        },
+        {
+          "id": "cmu0xxc9m000004kz0kki271r",
+          "fileName": "건강기록_기능명세서_v0.6_20260914.xlsx",
+          "label": "v0.6",
+          "versionCount": 1
+        },
+        {
+          "id": "cmu4r1q3u000004juoh7ctrsh",
+          "fileName": "건강기록_기능명세서_v0_7_20260916.xlsx",
+          "label": "v0.7",
+          "versionCount": 1
+        },
+        {
+          "id": "cmu58qst9000004kr6kxegipi",
+          "fileName": "건강기록_기능명세서_v0.7_20260916.xlsx",
+          "label": "v0.7",
+          "versionCount": 1
+        },
+        {
+          "id": "cmu7a831c000004jgely43wg6",
+          "fileName": "건강기록_기능명세서_v0.8_20260917.xlsx",
+          "label": "v0.8",
+          "versionCount": 1
+        },
+        {
+          "id": "cmubxjdon000004jvnlf2i6b9",
+          "fileName": "건강기록_기능명세서_v0.8_20260922.xlsx",
+          "label": "v0.8",
+          "versionCount": 1
+        },
+        {
+          "id": "cmuc0wrf2000204l75os4ftys",
+          "fileName": "건강기록_기능명세서_v0.8_20260922.xlsx",
+          "label": "v0.8",
+          "versionCount": 1
+        }
+      ],
+      "retitle": {
+        "from": "04_건강기록_기능명세서_v0_5_2026_09_08",
+        "to": "건강기록_기능명세서_v0.8_20260922"
+      }
+    },
+    {
+      "docKey": "SCR-ACC",
+      "keepId": "cmt9saj1p000404jipaf35bew",
+      "keepFileName": "06_로그인_회원가입_와이어프레임_v0.5_260908.html",
+      "order": [
+        {
+          "id": "cmt88cywk000104l5g2o4rqry",
+          "fileName": "06_로그인_회원가입_와이어프레임.html",
+          "label": "판번호 없음",
+          "versionCount": 1
+        },
+        {
+          "id": "cmt9saj1p000404jipaf35bew",
+          "fileName": "06_로그인_회원가입_와이어프레임_v0.5_260908.html",
+          "label": "v0.5",
+          "versionCount": 2
+        },
+        {
+          "id": "cmtzzzubq000004ibpr87p5x1",
+          "fileName": "로그인·회원가입_화면설계서_v0.6_20260913.html",
+          "label": "v0.6",
+          "versionCount": 1
+        },
+        {
+          "id": "cmuazhyvt000104jmtuy7amxs",
+          "fileName": "로그인·회원가입_화면설계서_v0.7_20260921.html",
+          "label": "v0.7",
+          "versionCount": 1
+        },
+        {
+          "id": "cmuc36p0j000304juohpjf9v8",
+          "fileName": "로그인·회원가입_화면설계서_v0.8_20260922.html",
+          "label": "v0.8",
+          "versionCount": 1
+        }
+      ],
+      "retitle": {
+        "from": "06_로그인_회원가입_와이어프레임_v0.5_260908",
+        "to": "로그인·회원가입_화면설계서_v0.8_20260922"
+      }
+    }
+  ],
+  "skipped": []
+}

@@ -1,0 +1,1028 @@
+{
+  "plan": "runs/merge-plan-prod-20260922b.json",
+  "applied": true,
+  "mappingSent": true,
+  "at": "2026-09-22T14:49:12.110Z",
+  "groups": [
+    {
+      "keepId": "cmtsab94u000004l5gqm8atja",
+      "before": [
+        {
+          "id": "cmtynovsd000204l4svdo9maz",
+          "title": "건강기록_화면설계서_v0.6_20260912",
+          "description": null
+        },
+        {
+          "id": "cmu0l3bb3000004jq53c9i29y",
+          "title": "건강기록_화면설계서_v0.6_20260914",
+          "description": null
+        },
+        {
+          "id": "cmu0xxcjs000204kzidnsmqx5",
+          "title": "건강기록_화면설계서_v0.6_20260914",
+          "description": null
+        },
+        {
+          "id": "cmu4r1qwu000004l0e28tuck4",
+          "title": "건강기록_화면설계서_v0_7_20260916",
+          "description": null
+        },
+        {
+          "id": "cmu58qtfs000204krfso9ffoj",
+          "title": "건강기록_화면설계서_v0.7_20260916",
+          "description": null
+        },
+        {
+          "id": "cmu7a8308000004jpq2vkadrp",
+          "title": "건강기록_화면설계서_v0.8_20260917",
+          "description": null
+        },
+        {
+          "id": "cmtsab94u000004l5gqm8atja",
+          "title": "03_건강기록_화면설계서_v0_5_2026_09_04",
+          "description": null
+        },
+        {
+          "id": "cmubxjdww000004kzuz8h2svv",
+          "title": "건강기록_화면설계서_v0.8_20260922",
+          "description": null
+        },
+        {
+          "id": "cmuc0wqw2000004l7i4jgs8z5",
+          "title": "건강기록_화면설계서_v0.8_20260922",
+          "description": null
+        }
+      ],
+      "order": [
+        {
+          "id": "cmtsab94u000004l5gqm8atja",
+          "fileName": "03_건강기록_화면설계서_v0_5_2026_09_04.html",
+          "label": "v0.5",
+          "versionCount": 1
+        },
+        {
+          "id": "cmtynovsd000204l4svdo9maz",
+          "fileName": "건강기록_화면설계서_v0.6_20260912.html",
+          "label": "v0.6",
+          "versionCount": 1
+        },
+        {
+          "id": "cmu0l3bb3000004jq53c9i29y",
+          "fileName": "건강기록_화면설계서_v0.6_20260914.html",
+          "label": "v0.6",
+          "versionCount": 1
+        },
+        {
+          "id": "cmu0xxcjs000204kzidnsmqx5",
+          "fileName": "건강기록_화면설계서_v0.6_20260914.html",
+          "label": "v0.6",
+          "versionCount": 1
+        },
+        {
+          "id": "cmu4r1qwu000004l0e28tuck4",
+          "fileName": "건강기록_화면설계서_v0_7_20260916.html",
+          "label": "v0.7",
+          "versionCount": 1
+        },
+        {
+          "id": "cmu58qtfs000204krfso9ffoj",
+          "fileName": "건강기록_화면설계서_v0.7_20260916.html",
+          "label": "v0.7",
+          "versionCount": 1
+        },
+        {
+          "id": "cmu7a8308000004jpq2vkadrp",
+          "fileName": "건강기록_화면설계서_v0.8_20260917.html",
+          "label": "v0.8",
+          "versionCount": 1
+        },
+        {
+          "id": "cmubxjdww000004kzuz8h2svv",
+          "fileName": "건강기록_화면설계서_v0.8_20260922.html",
+          "label": "v0.8",
+          "versionCount": 1
+        },
+        {
+          "id": "cmuc0wqw2000004l7i4jgs8z5",
+          "fileName": "건강기록_화면설계서_v0.8_20260922.html",
+          "label": "v0.8",
+          "versionCount": 1
+        }
+      ],
+      "versions": [
+        {
+          "id": "cmtsab97c000104l50yeyw1vf",
+          "from": "cmtsab94u000004l5gqm8atja",
+          "fromNo": 1,
+          "toNo": 1
+        },
+        {
+          "id": "cmtynovuc000404l4lxpttviw",
+          "from": "cmtynovsd000204l4svdo9maz",
+          "fromNo": 1,
+          "toNo": 2
+        },
+        {
+          "id": "cmu0l3beb000104jqe1pgomyr",
+          "from": "cmu0l3bb3000004jq53c9i29y",
+          "fromNo": 1,
+          "toNo": 3
+        },
+        {
+          "id": "cmu0xxclp000304kzmeuhrufg",
+          "from": "cmu0xxcjs000204kzidnsmqx5",
+          "fromNo": 1,
+          "toNo": 4
+        },
+        {
+          "id": "cmu4r1qyr000104l0trpj7tn3",
+          "from": "cmu4r1qwu000004l0e28tuck4",
+          "fromNo": 1,
+          "toNo": 5
+        },
+        {
+          "id": "cmu58qthq000304krjh2pex22",
+          "from": "cmu58qtfs000204krfso9ffoj",
+          "fromNo": 1,
+          "toNo": 6
+        },
+        {
+          "id": "cmu7a832f000104jpai2ohse0",
+          "from": "cmu7a8308000004jpq2vkadrp",
+          "fromNo": 1,
+          "toNo": 7
+        },
+        {
+          "id": "cmubxjdyu000104kz3zve9w9k",
+          "from": "cmubxjdww000004kzuz8h2svv",
+          "fromNo": 1,
+          "toNo": 8
+        },
+        {
+          "id": "cmuc0wqy6000104l7daucf0tv",
+          "from": "cmuc0wqw2000004l7i4jgs8z5",
+          "fromNo": 1,
+          "toNo": 9
+        }
+      ],
+      "retitle": {
+        "from": "03_건강기록_화면설계서_v0_5_2026_09_04",
+        "to": "건강기록_화면설계서_v0.8_20260922"
+      },
+      "movingTags": [],
+      "applied": true,
+      "backup": {
+        "documents": [
+          {
+            "id": "cmtynovsd000204l4svdo9maz",
+            "title": "건강기록_화면설계서_v0.6_20260912",
+            "description": null,
+            "folder_id": "59ae0981-f5cd-4038-80b5-9a3c0cd813e0",
+            "created_by": "cmt86h0ai000304js1qshvvjr",
+            "created_at": "2026-09-12T17:25:39.949",
+            "updated_at": "2026-09-12T17:25:39.949",
+            "deleted_at": null
+          },
+          {
+            "id": "cmu0l3bb3000004jq53c9i29y",
+            "title": "건강기록_화면설계서_v0.6_20260914",
+            "description": null,
+            "folder_id": "59ae0981-f5cd-4038-80b5-9a3c0cd813e0",
+            "created_by": "cmt86h0ai000304js1qshvvjr",
+            "created_at": "2026-09-14T01:48:26.751",
+            "updated_at": "2026-09-14T01:48:26.751",
+            "deleted_at": null
+          },
+          {
+            "id": "cmu0xxcjs000204kzidnsmqx5",
+            "title": "건강기록_화면설계서_v0.6_20260914",
+            "description": null,
+            "folder_id": "59ae0981-f5cd-4038-80b5-9a3c0cd813e0",
+            "created_by": "cmt86h0ai000304js1qshvvjr",
+            "created_at": "2026-09-14T07:47:43.432",
+            "updated_at": "2026-09-14T07:47:43.432",
+            "deleted_at": null
+          },
+          {
+            "id": "cmu4r1qwu000004l0e28tuck4",
+            "title": "건강기록_화면설계서_v0_7_20260916",
+            "description": null,
+            "folder_id": "59ae0981-f5cd-4038-80b5-9a3c0cd813e0",
+            "created_by": "cmt86h0ai000304js1qshvvjr",
+            "created_at": "2026-09-16T23:46:16.062",
+            "updated_at": "2026-09-16T23:46:16.062",
+            "deleted_at": null
+          },
+          {
+            "id": "cmu58qtfs000204krfso9ffoj",
+            "title": "건강기록_화면설계서_v0.7_20260916",
+            "description": null,
+            "folder_id": "59ae0981-f5cd-4038-80b5-9a3c0cd813e0",
+            "created_by": "cmt86h0ai000304js1qshvvjr",
+            "created_at": "2026-09-17T08:01:39.208",
+            "updated_at": "2026-09-17T08:01:39.208",
+            "deleted_at": null
+          },
+          {
+            "id": "cmu7a8308000004jpq2vkadrp",
+            "title": "건강기록_화면설계서_v0.8_20260917",
+            "description": null,
+            "folder_id": "59ae0981-f5cd-4038-80b5-9a3c0cd813e0",
+            "created_by": "cmt86h0ai000304js1qshvvjr",
+            "created_at": "2026-09-18T18:18:36.728",
+            "updated_at": "2026-09-18T18:18:36.728",
+            "deleted_at": null
+          },
+          {
+            "id": "cmtsab94u000004l5gqm8atja",
+            "title": "03_건강기록_화면설계서_v0_5_2026_09_04",
+            "description": null,
+            "folder_id": "59ae0981-f5cd-4038-80b5-9a3c0cd813e0",
+            "created_by": "cmt86h0ai000304js1qshvvjr",
+            "created_at": "2026-09-08T06:24:31.998",
+            "updated_at": "2026-09-22T14:42:00.09",
+            "deleted_at": null
+          },
+          {
+            "id": "cmubxjdww000004kzuz8h2svv",
+            "title": "건강기록_화면설계서_v0.8_20260922",
+            "description": null,
+            "folder_id": "59ae0981-f5cd-4038-80b5-9a3c0cd813e0",
+            "created_by": "cmt86h0ai000304js1qshvvjr",
+            "created_at": "2026-09-22T00:22:19.952",
+            "updated_at": "2026-09-22T00:22:19.952",
+            "deleted_at": null
+          },
+          {
+            "id": "cmuc0wqw2000004l7i4jgs8z5",
+            "title": "건강기록_화면설계서_v0.8_20260922",
+            "description": null,
+            "folder_id": "59ae0981-f5cd-4038-80b5-9a3c0cd813e0",
+            "created_by": "cmt86h0ai000304js1qshvvjr",
+            "created_at": "2026-09-22T01:56:42.146",
+            "updated_at": "2026-09-22T01:56:42.146",
+            "deleted_at": null
+          }
+        ],
+        "versions": [
+          {
+            "id": "cmtsab97c000104l50yeyw1vf",
+            "document_id": "cmtsab94u000004l5gqm8atja",
+            "version_no": 1,
+            "s3_key": "documents/a2ab36e9-e14b-4ef4-9236-d3628fe1e08a.html",
+            "file_name": "03_건강기록_화면설계서_v0_5_2026_09_04.html",
+            "mime_type": "text/html",
+            "size_bytes": 86695,
+            "change_note": null,
+            "uploaded_by": "cmt86h0ai000304js1qshvvjr",
+            "created_at": "2026-09-08T06:24:31.998"
+          },
+          {
+            "id": "cmtynovuc000404l4lxpttviw",
+            "document_id": "cmtynovsd000204l4svdo9maz",
+            "version_no": 1,
+            "s3_key": "documents/d70fc3b1-a696-4908-b32a-ba3f22240011.html",
+            "file_name": "건강기록_화면설계서_v0.6_20260912.html",
+            "mime_type": "text/html",
+            "size_bytes": 143651,
+            "change_note": null,
+            "uploaded_by": "cmt86h0ai000304js1qshvvjr",
+            "created_at": "2026-09-12T17:25:39.949"
+          },
+          {
+            "id": "cmu0l3beb000104jqe1pgomyr",
+            "document_id": "cmu0l3bb3000004jq53c9i29y",
+            "version_no": 1,
+            "s3_key": "documents/432409ef-50ff-4eac-85d0-e98c2d7fe5b5.html",
+            "file_name": "건강기록_화면설계서_v0.6_20260914.html",
+            "mime_type": "text/html",
+            "size_bytes": 144874,
+            "change_note": null,
+            "uploaded_by": "cmt86h0ai000304js1qshvvjr",
+            "created_at": "2026-09-14T01:48:26.751"
+          },
+          {
+            "id": "cmu0xxclp000304kzmeuhrufg",
+            "document_id": "cmu0xxcjs000204kzidnsmqx5",
+            "version_no": 1,
+            "s3_key": "documents/54938117-3d4a-4604-a7c4-655da672e413.html",
+            "file_name": "건강기록_화면설계서_v0.6_20260914.html",
+            "mime_type": "text/html",
+            "size_bytes": 146778,
+            "change_note": null,
+            "uploaded_by": "cmt86h0ai000304js1qshvvjr",
+            "created_at": "2026-09-14T07:47:43.432"
+          },
+          {
+            "id": "cmu4r1qyr000104l0trpj7tn3",
+            "document_id": "cmu4r1qwu000004l0e28tuck4",
+            "version_no": 1,
+            "s3_key": "documents/f8704d2d-d463-422c-bad7-a84b0bfe850c.html",
+            "file_name": "건강기록_화면설계서_v0_7_20260916.html",
+            "mime_type": "text/html",
+            "size_bytes": 174610,
+            "change_note": null,
+            "uploaded_by": "cmt86h0ai000304js1qshvvjr",
+            "created_at": "2026-09-16T23:46:16.062"
+          },
+          {
+            "id": "cmu58qthq000304krjh2pex22",
+            "document_id": "cmu58qtfs000204krfso9ffoj",
+            "version_no": 1,
+            "s3_key": "documents/75db3943-f185-45eb-a269-493e7a32893a.html",
+            "file_name": "건강기록_화면설계서_v0.7_20260916.html",
+            "mime_type": "text/html",
+            "size_bytes": 174297,
+            "change_note": null,
+            "uploaded_by": "cmt86h0ai000304js1qshvvjr",
+            "created_at": "2026-09-17T08:01:39.208"
+          },
+          {
+            "id": "cmu7a832f000104jpai2ohse0",
+            "document_id": "cmu7a8308000004jpq2vkadrp",
+            "version_no": 1,
+            "s3_key": "documents/91aeb2d2-0993-4453-80a5-c93c0ac620c8.html",
+            "file_name": "건강기록_화면설계서_v0.8_20260917.html",
+            "mime_type": "text/html",
+            "size_bytes": 179905,
+            "change_note": null,
+            "uploaded_by": "cmt86h0ai000304js1qshvvjr",
+            "created_at": "2026-09-18T18:18:36.728"
+          },
+          {
+            "id": "cmubxjdyu000104kz3zve9w9k",
+            "document_id": "cmubxjdww000004kzuz8h2svv",
+            "version_no": 1,
+            "s3_key": "documents/c9d2d5b7-3c33-441e-8734-fd17d602bf1b.html",
+            "file_name": "건강기록_화면설계서_v0.8_20260922.html",
+            "mime_type": "text/html",
+            "size_bytes": 181819,
+            "change_note": null,
+            "uploaded_by": "cmt86h0ai000304js1qshvvjr",
+            "created_at": "2026-09-22T00:22:19.952"
+          },
+          {
+            "id": "cmuc0wqy6000104l7daucf0tv",
+            "document_id": "cmuc0wqw2000004l7i4jgs8z5",
+            "version_no": 1,
+            "s3_key": "documents/2c737ea0-5d43-40d0-9799-fded8397f3f1.html",
+            "file_name": "건강기록_화면설계서_v0.8_20260922.html",
+            "mime_type": "text/html",
+            "size_bytes": 182696,
+            "change_note": null,
+            "uploaded_by": "cmt86h0ai000304js1qshvvjr",
+            "created_at": "2026-09-22T01:56:42.146"
+          }
+        ],
+        "tags": []
+      }
+    },
+    {
+      "keepId": "cmtsab94z000004jtc5l19o13",
+      "before": [
+        {
+          "id": "cmu0l3bls000004l51jicuf34",
+          "title": "건강기록_기능명세서_v0.6_20260914",
+          "description": null
+        },
+        {
+          "id": "cmu0xxc9m000004kz0kki271r",
+          "title": "건강기록_기능명세서_v0.6_20260914",
+          "description": null
+        },
+        {
+          "id": "cmu4r1q3u000004juoh7ctrsh",
+          "title": "건강기록_기능명세서_v0_7_20260916",
+          "description": null
+        },
+        {
+          "id": "cmu58qst9000004kr6kxegipi",
+          "title": "건강기록_기능명세서_v0.7_20260916",
+          "description": null
+        },
+        {
+          "id": "cmtgt3hcq000004l746aggxlc",
+          "title": "04_건강기록_기능명세서_v0_5_2026_08_31",
+          "description": null
+        },
+        {
+          "id": "cmtynovt1000304l428pjcyer",
+          "title": "건강기록_기능명세서_v0.6_20260912",
+          "description": null
+        },
+        {
+          "id": "cmu7a831c000004jgely43wg6",
+          "title": "건강기록_기능명세서_v0.8_20260917",
+          "description": null
+        },
+        {
+          "id": "cmtsab94z000004jtc5l19o13",
+          "title": "04_건강기록_기능명세서_v0_5_2026_09_08",
+          "description": null
+        },
+        {
+          "id": "cmubxjdon000004jvnlf2i6b9",
+          "title": "건강기록_기능명세서_v0.8_20260922",
+          "description": null
+        },
+        {
+          "id": "cmuc0wrf2000204l75os4ftys",
+          "title": "건강기록_기능명세서_v0.8_20260922",
+          "description": null
+        }
+      ],
+      "order": [
+        {
+          "id": "cmtgt3hcq000004l746aggxlc",
+          "fileName": "04_건강기록_기능명세서_v0_5_2026_08_31.xlsx",
+          "label": "v0.5",
+          "versionCount": 1
+        },
+        {
+          "id": "cmtsab94z000004jtc5l19o13",
+          "fileName": "04_건강기록_기능명세서_v0_5_2026_09_08.xlsx",
+          "label": "v0.5",
+          "versionCount": 1
+        },
+        {
+          "id": "cmtynovt1000304l428pjcyer",
+          "fileName": "건강기록_기능명세서_v0.6_20260912.xlsx",
+          "label": "v0.6",
+          "versionCount": 1
+        },
+        {
+          "id": "cmu0l3bls000004l51jicuf34",
+          "fileName": "건강기록_기능명세서_v0.6_20260914.xlsx",
+          "label": "v0.6",
+          "versionCount": 1
+        },
+        {
+          "id": "cmu0xxc9m000004kz0kki271r",
+          "fileName": "건강기록_기능명세서_v0.6_20260914.xlsx",
+          "label": "v0.6",
+          "versionCount": 1
+        },
+        {
+          "id": "cmu4r1q3u000004juoh7ctrsh",
+          "fileName": "건강기록_기능명세서_v0_7_20260916.xlsx",
+          "label": "v0.7",
+          "versionCount": 1
+        },
+        {
+          "id": "cmu58qst9000004kr6kxegipi",
+          "fileName": "건강기록_기능명세서_v0.7_20260916.xlsx",
+          "label": "v0.7",
+          "versionCount": 1
+        },
+        {
+          "id": "cmu7a831c000004jgely43wg6",
+          "fileName": "건강기록_기능명세서_v0.8_20260917.xlsx",
+          "label": "v0.8",
+          "versionCount": 1
+        },
+        {
+          "id": "cmubxjdon000004jvnlf2i6b9",
+          "fileName": "건강기록_기능명세서_v0.8_20260922.xlsx",
+          "label": "v0.8",
+          "versionCount": 1
+        },
+        {
+          "id": "cmuc0wrf2000204l75os4ftys",
+          "fileName": "건강기록_기능명세서_v0.8_20260922.xlsx",
+          "label": "v0.8",
+          "versionCount": 1
+        }
+      ],
+      "versions": [
+        {
+          "id": "cmtgt3hev000104l7xnjx5l2u",
+          "from": "cmtgt3hcq000004l746aggxlc",
+          "fromNo": 1,
+          "toNo": 1
+        },
+        {
+          "id": "cmtsab97d000104jtla54oibc",
+          "from": "cmtsab94z000004jtc5l19o13",
+          "fromNo": 1,
+          "toNo": 2
+        },
+        {
+          "id": "cmtynovv2000504l4tym3eut9",
+          "from": "cmtynovt1000304l428pjcyer",
+          "fromNo": 1,
+          "toNo": 3
+        },
+        {
+          "id": "cmu0l3bnp000104l5bg9ik4m5",
+          "from": "cmu0l3bls000004l51jicuf34",
+          "fromNo": 1,
+          "toNo": 4
+        },
+        {
+          "id": "cmu0xxcbt000104kzpuo3wi9e",
+          "from": "cmu0xxc9m000004kz0kki271r",
+          "fromNo": 1,
+          "toNo": 5
+        },
+        {
+          "id": "cmu4r1q5z000104jujiqm52fe",
+          "from": "cmu4r1q3u000004juoh7ctrsh",
+          "fromNo": 1,
+          "toNo": 6
+        },
+        {
+          "id": "cmu58qsvd000104kr2zmsdvmp",
+          "from": "cmu58qst9000004kr6kxegipi",
+          "fromNo": 1,
+          "toNo": 7
+        },
+        {
+          "id": "cmu7a833a000104jglr5k6ego",
+          "from": "cmu7a831c000004jgely43wg6",
+          "fromNo": 1,
+          "toNo": 8
+        },
+        {
+          "id": "cmubxjdrt000104jvwpifzcmf",
+          "from": "cmubxjdon000004jvnlf2i6b9",
+          "fromNo": 1,
+          "toNo": 9
+        },
+        {
+          "id": "cmuc0wrh0000304l7vs2li84w",
+          "from": "cmuc0wrf2000204l75os4ftys",
+          "fromNo": 1,
+          "toNo": 10
+        }
+      ],
+      "retitle": {
+        "from": "04_건강기록_기능명세서_v0_5_2026_09_08",
+        "to": "건강기록_기능명세서_v0.8_20260922"
+      },
+      "movingTags": [],
+      "applied": true,
+      "backup": {
+        "documents": [
+          {
+            "id": "cmu0l3bls000004l51jicuf34",
+            "title": "건강기록_기능명세서_v0.6_20260914",
+            "description": null,
+            "folder_id": "78754f85-3fc7-4c74-9bd8-107e652add15",
+            "created_by": "cmt86h0ai000304js1qshvvjr",
+            "created_at": "2026-09-14T01:48:27.136",
+            "updated_at": "2026-09-14T01:48:27.136",
+            "deleted_at": null
+          },
+          {
+            "id": "cmu0xxc9m000004kz0kki271r",
+            "title": "건강기록_기능명세서_v0.6_20260914",
+            "description": null,
+            "folder_id": "78754f85-3fc7-4c74-9bd8-107e652add15",
+            "created_by": "cmt86h0ai000304js1qshvvjr",
+            "created_at": "2026-09-14T07:47:43.066",
+            "updated_at": "2026-09-14T07:47:43.066",
+            "deleted_at": null
+          },
+          {
+            "id": "cmu4r1q3u000004juoh7ctrsh",
+            "title": "건강기록_기능명세서_v0_7_20260916",
+            "description": null,
+            "folder_id": "78754f85-3fc7-4c74-9bd8-107e652add15",
+            "created_by": "cmt86h0ai000304js1qshvvjr",
+            "created_at": "2026-09-16T23:46:15.018",
+            "updated_at": "2026-09-16T23:46:15.018",
+            "deleted_at": null
+          },
+          {
+            "id": "cmu58qst9000004kr6kxegipi",
+            "title": "건강기록_기능명세서_v0.7_20260916",
+            "description": null,
+            "folder_id": "78754f85-3fc7-4c74-9bd8-107e652add15",
+            "created_by": "cmt86h0ai000304js1qshvvjr",
+            "created_at": "2026-09-17T08:01:38.397",
+            "updated_at": "2026-09-17T08:01:38.397",
+            "deleted_at": null
+          },
+          {
+            "id": "cmtgt3hcq000004l746aggxlc",
+            "title": "04_건강기록_기능명세서_v0_5_2026_08_31",
+            "description": null,
+            "folder_id": "78754f85-3fc7-4c74-9bd8-107e652add15",
+            "created_by": "cmt86h0ai000304js1qshvvjr",
+            "created_at": "2026-08-31T05:37:07.994",
+            "updated_at": "2026-08-31T05:37:07.994",
+            "deleted_at": null
+          },
+          {
+            "id": "cmtynovt1000304l428pjcyer",
+            "title": "건강기록_기능명세서_v0.6_20260912",
+            "description": null,
+            "folder_id": "78754f85-3fc7-4c74-9bd8-107e652add15",
+            "created_by": "cmt86h0ai000304js1qshvvjr",
+            "created_at": "2026-09-12T17:25:39.973",
+            "updated_at": "2026-09-12T17:25:39.973",
+            "deleted_at": null
+          },
+          {
+            "id": "cmu7a831c000004jgely43wg6",
+            "title": "건강기록_기능명세서_v0.8_20260917",
+            "description": null,
+            "folder_id": "78754f85-3fc7-4c74-9bd8-107e652add15",
+            "created_by": "cmt86h0ai000304js1qshvvjr",
+            "created_at": "2026-09-18T18:18:36.768",
+            "updated_at": "2026-09-18T18:18:36.768",
+            "deleted_at": null
+          },
+          {
+            "id": "cmtsab94z000004jtc5l19o13",
+            "title": "04_건강기록_기능명세서_v0_5_2026_09_08",
+            "description": null,
+            "folder_id": "78754f85-3fc7-4c74-9bd8-107e652add15",
+            "created_by": "cmt86h0ai000304js1qshvvjr",
+            "created_at": "2026-09-08T06:24:32.003",
+            "updated_at": "2026-09-22T14:42:46.775",
+            "deleted_at": null
+          },
+          {
+            "id": "cmubxjdon000004jvnlf2i6b9",
+            "title": "건강기록_기능명세서_v0.8_20260922",
+            "description": null,
+            "folder_id": "78754f85-3fc7-4c74-9bd8-107e652add15",
+            "created_by": "cmt86h0ai000304js1qshvvjr",
+            "created_at": "2026-09-22T00:22:19.655",
+            "updated_at": "2026-09-22T00:22:19.655",
+            "deleted_at": null
+          },
+          {
+            "id": "cmuc0wrf2000204l75os4ftys",
+            "title": "건강기록_기능명세서_v0.8_20260922",
+            "description": null,
+            "folder_id": "78754f85-3fc7-4c74-9bd8-107e652add15",
+            "created_by": "cmt86h0ai000304js1qshvvjr",
+            "created_at": "2026-09-22T01:56:42.83",
+            "updated_at": "2026-09-22T01:56:42.83",
+            "deleted_at": null
+          }
+        ],
+        "versions": [
+          {
+            "id": "cmtgt3hev000104l7xnjx5l2u",
+            "document_id": "cmtgt3hcq000004l746aggxlc",
+            "version_no": 1,
+            "s3_key": "documents/a345b320-5a32-4242-8600-64a3e7b3d995.xlsx",
+            "file_name": "04_건강기록_기능명세서_v0_5_2026_08_31.xlsx",
+            "mime_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "size_bytes": 20417,
+            "change_note": null,
+            "uploaded_by": "cmt86h0ai000304js1qshvvjr",
+            "created_at": "2026-08-31T05:37:07.994"
+          },
+          {
+            "id": "cmtsab97d000104jtla54oibc",
+            "document_id": "cmtsab94z000004jtc5l19o13",
+            "version_no": 1,
+            "s3_key": "documents/5a00c8fd-b6d3-4be8-b975-017da75b2d63.xlsx",
+            "file_name": "04_건강기록_기능명세서_v0_5_2026_09_08.xlsx",
+            "mime_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "size_bytes": 17534,
+            "change_note": null,
+            "uploaded_by": "cmt86h0ai000304js1qshvvjr",
+            "created_at": "2026-09-08T06:24:32.003"
+          },
+          {
+            "id": "cmtynovv2000504l4tym3eut9",
+            "document_id": "cmtynovt1000304l428pjcyer",
+            "version_no": 1,
+            "s3_key": "documents/94c420d3-5f31-4cb7-b98f-d2b97f5a87fd.xlsx",
+            "file_name": "건강기록_기능명세서_v0.6_20260912.xlsx",
+            "mime_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "size_bytes": 21508,
+            "change_note": null,
+            "uploaded_by": "cmt86h0ai000304js1qshvvjr",
+            "created_at": "2026-09-12T17:25:39.973"
+          },
+          {
+            "id": "cmu0l3bnp000104l5bg9ik4m5",
+            "document_id": "cmu0l3bls000004l51jicuf34",
+            "version_no": 1,
+            "s3_key": "documents/7eafc6a1-ae74-40aa-b974-f2ccdb6cdb0f.xlsx",
+            "file_name": "건강기록_기능명세서_v0.6_20260914.xlsx",
+            "mime_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "size_bytes": 17163,
+            "change_note": null,
+            "uploaded_by": "cmt86h0ai000304js1qshvvjr",
+            "created_at": "2026-09-14T01:48:27.136"
+          },
+          {
+            "id": "cmu0xxcbt000104kzpuo3wi9e",
+            "document_id": "cmu0xxc9m000004kz0kki271r",
+            "version_no": 1,
+            "s3_key": "documents/bbaf08ae-adac-4976-a680-55395f301e2f.xlsx",
+            "file_name": "건강기록_기능명세서_v0.6_20260914.xlsx",
+            "mime_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "size_bytes": 17992,
+            "change_note": null,
+            "uploaded_by": "cmt86h0ai000304js1qshvvjr",
+            "created_at": "2026-09-14T07:47:43.066"
+          },
+          {
+            "id": "cmu4r1q5z000104jujiqm52fe",
+            "document_id": "cmu4r1q3u000004juoh7ctrsh",
+            "version_no": 1,
+            "s3_key": "documents/55d6c644-9516-493f-9c38-71022f59ef20.xlsx",
+            "file_name": "건강기록_기능명세서_v0_7_20260916.xlsx",
+            "mime_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "size_bytes": 24239,
+            "change_note": null,
+            "uploaded_by": "cmt86h0ai000304js1qshvvjr",
+            "created_at": "2026-09-16T23:46:15.018"
+          },
+          {
+            "id": "cmu58qsvd000104kr2zmsdvmp",
+            "document_id": "cmu58qst9000004kr6kxegipi",
+            "version_no": 1,
+            "s3_key": "documents/c9a4ade6-affc-40c9-a61e-ac00e6217290.xlsx",
+            "file_name": "건강기록_기능명세서_v0.7_20260916.xlsx",
+            "mime_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "size_bytes": 24239,
+            "change_note": null,
+            "uploaded_by": "cmt86h0ai000304js1qshvvjr",
+            "created_at": "2026-09-17T08:01:38.397"
+          },
+          {
+            "id": "cmu7a833a000104jglr5k6ego",
+            "document_id": "cmu7a831c000004jgely43wg6",
+            "version_no": 1,
+            "s3_key": "documents/ff23c533-9421-4654-ac54-aacb1e6cf669.xlsx",
+            "file_name": "건강기록_기능명세서_v0.8_20260917.xlsx",
+            "mime_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "size_bytes": 28258,
+            "change_note": null,
+            "uploaded_by": "cmt86h0ai000304js1qshvvjr",
+            "created_at": "2026-09-18T18:18:36.768"
+          },
+          {
+            "id": "cmubxjdrt000104jvwpifzcmf",
+            "document_id": "cmubxjdon000004jvnlf2i6b9",
+            "version_no": 1,
+            "s3_key": "documents/56281009-f5df-49ed-81da-1981fc623763.xlsx",
+            "file_name": "건강기록_기능명세서_v0.8_20260922.xlsx",
+            "mime_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "size_bytes": 28838,
+            "change_note": null,
+            "uploaded_by": "cmt86h0ai000304js1qshvvjr",
+            "created_at": "2026-09-22T00:22:19.655"
+          },
+          {
+            "id": "cmuc0wrh0000304l7vs2li84w",
+            "document_id": "cmuc0wrf2000204l75os4ftys",
+            "version_no": 1,
+            "s3_key": "documents/a6f5fc89-1eac-48fa-a6c1-7270a9056147.xlsx",
+            "file_name": "건강기록_기능명세서_v0.8_20260922.xlsx",
+            "mime_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "size_bytes": 29047,
+            "change_note": null,
+            "uploaded_by": "cmt86h0ai000304js1qshvvjr",
+            "created_at": "2026-09-22T01:56:42.83"
+          }
+        ],
+        "tags": []
+      }
+    },
+    {
+      "keepId": "cmt9saj1p000404jipaf35bew",
+      "before": [
+        {
+          "id": "cmtzzzubq000004ibpr87p5x1",
+          "title": "로그인·회원가입_화면설계서_v0.6_20260913",
+          "description": null
+        },
+        {
+          "id": "cmt88cywk000104l5g2o4rqry",
+          "title": "06_로그인_회원가입_와이어프레임",
+          "description": null
+        },
+        {
+          "id": "cmt9saj1p000404jipaf35bew",
+          "title": "06_로그인_회원가입_와이어프레임_v0.5_260908",
+          "description": null
+        },
+        {
+          "id": "cmuazhyvt000104jmtuy7amxs",
+          "title": "로그인·회원가입_화면설계서_v0.7_20260921",
+          "description": null
+        },
+        {
+          "id": "cmuc36p0j000304juohpjf9v8",
+          "title": "로그인·회원가입_화면설계서_v0.8_20260922",
+          "description": null
+        }
+      ],
+      "order": [
+        {
+          "id": "cmt88cywk000104l5g2o4rqry",
+          "fileName": "06_로그인_회원가입_와이어프레임.html",
+          "label": "판번호 없음",
+          "versionCount": 1
+        },
+        {
+          "id": "cmt9saj1p000404jipaf35bew",
+          "fileName": "06_로그인_회원가입_와이어프레임_v0.5_260908.html",
+          "label": "v0.5",
+          "versionCount": 2
+        },
+        {
+          "id": "cmtzzzubq000004ibpr87p5x1",
+          "fileName": "로그인·회원가입_화면설계서_v0.6_20260913.html",
+          "label": "v0.6",
+          "versionCount": 1
+        },
+        {
+          "id": "cmuazhyvt000104jmtuy7amxs",
+          "fileName": "로그인·회원가입_화면설계서_v0.7_20260921.html",
+          "label": "v0.7",
+          "versionCount": 1
+        },
+        {
+          "id": "cmuc36p0j000304juohpjf9v8",
+          "fileName": "로그인·회원가입_화면설계서_v0.8_20260922.html",
+          "label": "v0.8",
+          "versionCount": 1
+        }
+      ],
+      "versions": [
+        {
+          "id": "cmt88cz31000204l5wmrqjhdo",
+          "from": "cmt88cywk000104l5g2o4rqry",
+          "fromNo": 1,
+          "toNo": 1
+        },
+        {
+          "id": "cmt9saj3m000504ji148e42f0",
+          "from": "cmt9saj1p000404jipaf35bew",
+          "fromNo": 1,
+          "toNo": 2
+        },
+        {
+          "id": "cmtwg6mut000004juabth8648",
+          "from": "cmt9saj1p000404jipaf35bew",
+          "fromNo": 2,
+          "toNo": 3
+        },
+        {
+          "id": "cmtzzzudw000104ibid4jeicq",
+          "from": "cmtzzzubq000004ibpr87p5x1",
+          "fromNo": 1,
+          "toNo": 4
+        },
+        {
+          "id": "cmuazhyxy000304jmp7nigfr9",
+          "from": "cmuazhyvt000104jmtuy7amxs",
+          "fromNo": 1,
+          "toNo": 5
+        },
+        {
+          "id": "cmuc36p2h000504jugkbqm7kj",
+          "from": "cmuc36p0j000304juohpjf9v8",
+          "fromNo": 1,
+          "toNo": 6
+        }
+      ],
+      "retitle": {
+        "from": "06_로그인_회원가입_와이어프레임_v0.5_260908",
+        "to": "로그인·회원가입_화면설계서_v0.8_20260922"
+      },
+      "movingTags": [],
+      "applied": true,
+      "backup": {
+        "documents": [
+          {
+            "id": "cmtzzzubq000004ibpr87p5x1",
+            "title": "로그인·회원가입_화면설계서_v0.6_20260913",
+            "description": null,
+            "folder_id": "3d7977bc-d446-4202-a64d-ea7b6f668ba2",
+            "created_by": "cmt88clm4000004l5h60hs82p",
+            "created_at": "2026-09-13T15:57:52.838",
+            "updated_at": "2026-09-13T15:57:52.838",
+            "deleted_at": null
+          },
+          {
+            "id": "cmt88cywk000104l5g2o4rqry",
+            "title": "06_로그인_회원가입_와이어프레임",
+            "description": null,
+            "folder_id": "3d7977bc-d446-4202-a64d-ea7b6f668ba2",
+            "created_by": "cmt88clm4000004l5h60hs82p",
+            "created_at": "2026-08-25T05:34:29.3",
+            "updated_at": "2026-08-25T05:34:29.3",
+            "deleted_at": null
+          },
+          {
+            "id": "cmt9saj1p000404jipaf35bew",
+            "title": "06_로그인_회원가입_와이어프레임_v0.5_260908",
+            "description": null,
+            "folder_id": "3d7977bc-d446-4202-a64d-ea7b6f668ba2",
+            "created_by": "cmt88clm4000004l5h60hs82p",
+            "created_at": "2026-08-26T07:40:13.933",
+            "updated_at": "2026-09-11T04:19:58.83",
+            "deleted_at": null
+          },
+          {
+            "id": "cmuazhyvt000104jmtuy7amxs",
+            "title": "로그인·회원가입_화면설계서_v0.7_20260921",
+            "description": null,
+            "folder_id": "3d7977bc-d446-4202-a64d-ea7b6f668ba2",
+            "created_by": "cmt88clm4000004l5h60hs82p",
+            "created_at": "2026-09-21T08:29:26.873",
+            "updated_at": "2026-09-21T08:29:26.873",
+            "deleted_at": null
+          },
+          {
+            "id": "cmuc36p0j000304juohpjf9v8",
+            "title": "로그인·회원가입_화면설계서_v0.8_20260922",
+            "description": null,
+            "folder_id": "3d7977bc-d446-4202-a64d-ea7b6f668ba2",
+            "created_by": "cmt88clm4000004l5h60hs82p",
+            "created_at": "2026-09-22T03:00:25.507",
+            "updated_at": "2026-09-22T03:00:25.507",
+            "deleted_at": null
+          }
+        ],
+        "versions": [
+          {
+            "id": "cmt88cz31000204l5wmrqjhdo",
+            "document_id": "cmt88cywk000104l5g2o4rqry",
+            "version_no": 1,
+            "s3_key": "documents/f11f8ddd-8a6e-4cec-979b-c337bff06bd4.html",
+            "file_name": "06_로그인_회원가입_와이어프레임.html",
+            "mime_type": "text/html",
+            "size_bytes": 51569,
+            "change_note": null,
+            "uploaded_by": "cmt88clm4000004l5h60hs82p",
+            "created_at": "2026-08-25T05:34:29.3"
+          },
+          {
+            "id": "cmt9saj3m000504ji148e42f0",
+            "document_id": "cmt9saj1p000404jipaf35bew",
+            "version_no": 1,
+            "s3_key": "documents/31f7909a-1810-40de-96f5-7cea607fe334.html",
+            "file_name": "06_로그인_회원가입_와이어프레임_v0.2_260826.html",
+            "mime_type": "text/html",
+            "size_bytes": 56689,
+            "change_note": null,
+            "uploaded_by": "cmt88clm4000004l5h60hs82p",
+            "created_at": "2026-08-26T07:40:13.933"
+          },
+          {
+            "id": "cmtwg6mut000004juabth8648",
+            "document_id": "cmt9saj1p000404jipaf35bew",
+            "version_no": 2,
+            "s3_key": "documents/2b49bcd1-6208-459b-a2da-30f4560b3524.html",
+            "file_name": "06_로그인_회원가입_와이어프레임_v0.5_260908.html",
+            "mime_type": "text/html",
+            "size_bytes": 112010,
+            "change_note": null,
+            "uploaded_by": "cmt88clm4000004l5h60hs82p",
+            "created_at": "2026-09-11T04:19:58.83"
+          },
+          {
+            "id": "cmtzzzudw000104ibid4jeicq",
+            "document_id": "cmtzzzubq000004ibpr87p5x1",
+            "version_no": 1,
+            "s3_key": "documents/bbc3a91f-9c74-4f69-a218-89beff3e329c.html",
+            "file_name": "로그인·회원가입_화면설계서_v0.6_20260913.html",
+            "mime_type": "text/html",
+            "size_bytes": 126077,
+            "change_note": null,
+            "uploaded_by": "cmt88clm4000004l5h60hs82p",
+            "created_at": "2026-09-13T15:57:52.838"
+          },
+          {
+            "id": "cmuazhyxy000304jmp7nigfr9",
+            "document_id": "cmuazhyvt000104jmtuy7amxs",
+            "version_no": 1,
+            "s3_key": "documents/6579fee9-2479-4660-9781-5702467dcce8.html",
+            "file_name": "로그인·회원가입_화면설계서_v0.7_20260921.html",
+            "mime_type": "text/html",
+            "size_bytes": 265972,
+            "change_note": null,
+            "uploaded_by": "cmt88clm4000004l5h60hs82p",
+            "created_at": "2026-09-21T08:29:26.873"
+          },
+          {
+            "id": "cmuc36p2h000504jugkbqm7kj",
+            "document_id": "cmuc36p0j000304juohpjf9v8",
+            "version_no": 1,
+            "s3_key": "documents/4ddae6ce-b1cb-462b-adb0-414827c70eb5.html",
+            "file_name": "로그인·회원가입_화면설계서_v0.8_20260922.html",
+            "mime_type": "text/html",
+            "size_bytes": 315985,
+            "change_note": null,
+            "uploaded_by": "cmt88clm4000004l5h60hs82p",
+            "created_at": "2026-09-22T03:00:25.507"
+          }
+        ],
+        "tags": []
+      }
+    }
+  ]
+}
