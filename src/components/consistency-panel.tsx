@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { ChevronDown } from 'lucide-react'
 import {
   axisGroups,
@@ -19,6 +20,7 @@ import {
   type MetricRow,
   type SnapshotDocRow,
 } from '@/lib/consistency-view'
+import type { RunStatus } from '@/lib/consistency-run'
 
 export type ConsistencySnapshotView = {
   /**
@@ -28,8 +30,6 @@ export type ConsistencySnapshotView = {
    * 날짜가 하루 어긋난 채 하이드레이션 불일치가 나고, 바로 옆 절대 시각과 모순된다.
    */
   measuredLabel: string
-  /** "3일 전 측정". 측정 시각이 미래면 null 이라 아무것도 안 붙는다. */
-  agoLabel: string | null
   reqVer: string
   errorCount: number
   warningCount: number
@@ -165,6 +165,51 @@ function FilterSelect({
 }
 
 /**
+ * 실행 상태 표시. **이 패널에서 색을 쓰는 유일한 곳이다** — 결과 지표의 신호등 금지(위 `Meter`)는 그대로고,
+ * 이것은 "검사가 돌았는가" 라는 사실이라 파서 한계가 빨갛게 보일 일이 없다(2026-09-27 사람 결정).
+ * `data-run-status` 는 E2E V8 이 이 영역만 신호등 검사에서 빼는 표지다.
+ */
+const RUN_BADGE = {
+  done: { dot: 'bg-success', label: '검사 완료' },
+  running: { dot: 'bg-warning motion-safe:animate-pulse', label: '검사 중' },
+  failed: { dot: 'bg-danger', label: '검사 실패' },
+} as const
+
+function RunBadge({ run }: { run: RunStatus }) {
+  const badge = RUN_BADGE[run.kind]
+  return (
+    <span data-run-status={run.kind} role="status" className="inline-flex items-center gap-1.5 text-xs font-medium text-ink">
+      {/* 색만으로 말하지 않는다 — 글자가 같이 간다 */}
+      <span aria-hidden className={`size-2 rounded-full ${badge.dot}`} />
+      {badge.label}
+    </span>
+  )
+}
+
+const RUN_POLL_MS = 3000
+
+/**
+ * 검사 중일 때만 3초마다 서버 컴포넌트를 다시 그린다 — 측정이 3~8초라 새로고침을 안 하면 "검사 중" 이
+ * 그대로 남는다. 상태가 바뀌면 `remainingMs` 가 null 이 되어 멈춘다.
+ *
+ * **상한은 서버가 준 남은 시간이다, 마운트 시각도 절대 시각도 아니다.** 마운트 기준이면 마지막 새로고침이 서버의
+ * 시간 초과 판정보다 먼저 나가 "검사 중" 에 멈출 수 있고, 절대 시각을 내 시계와 비교하면 PC 시계가 어긋난 만큼
+ * 틀린다. 남은 시간을 넘긴 뒤 한 번 더 그려 실패로 바뀌는 것을 받는다. 새로 그릴 때마다 남은 시간이 다시 온다.
+ */
+function useRefreshWhileRunning(remainingMs: number | null) {
+  const router = useRouter()
+  useEffect(() => {
+    if (remainingMs === null) return
+    const until = Date.now() + remainingMs + RUN_POLL_MS
+    const timer = setInterval(() => {
+      router.refresh()
+      if (Date.now() > until) clearInterval(timer)
+    }, RUN_POLL_MS)
+    return () => clearInterval(timer)
+  }, [remainingMs, router])
+}
+
+/**
  * 정합성 측정 1회를 메인 목록 위에 대시보드로 띄운다.
  *
  * **구획 셋이 팀원이 묻는 질문 셋이다** — 저쪽 데이터 모델("축 9개")을 그대로 늘어놓으면
@@ -185,12 +230,16 @@ function FilterSelect({
  */
 export function ConsistencyPanel({
   snapshot,
+  run,
   activeDocumentIds,
 }: {
   snapshot: ConsistencySnapshotView
+  /** 가장 최근에 시작한 측정의 상태. 숫자는 늘 마지막으로 **성공한** 측정 것이다. */
+  run: RunStatus
   /** 링크를 걸 수 있는 문서. `dmsId` 에 FK 가 없어 이미 사라진 문서가 섞여 있다. */
   activeDocumentIds: ReadonlySet<string>
 }) {
+  useRefreshWhileRunning(run.kind === 'running' ? run.remainingMs : null)
   const [open, setOpen] = useState(false)
   const [docsOpen, setDocsOpen] = useState(false)
   const [raw, setRaw] = useState<FindingFilter>(EMPTY_FILTER)
@@ -211,14 +260,18 @@ export function ConsistencyPanel({
             "정의만 해 놓고 안 쓴 것"이라 ID 가 맞는지와 다른 질문이다. 그리고 카드마다
             질문이 제목으로 붙어 있어 한 줄 요약이 할 일이 없다. */}
         <h2 className="text-sm font-semibold text-ink">정합성</h2>
-        {/* 이 숫자는 자동으로 갱신되지 않는다 — 문서를 올려도 안 바뀌고 정합성 저장소가
-            손으로 돌려야 새 값이 온다. 시각이 안 보이면 낡은 숫자가 현재값으로 읽히므로
-            "자동 갱신 안 됨" 을 말로도 적는다. */}
-        <p className="text-xs text-ink-muted">
+        {/* 측정 시각 옆에 실행 상태 하나만 둔다 (2026-09-28, 사람 지시 — "오늘 측정"·요구사항 판을 뺐다).
+            측정 시각은 계속 보인다 — 실패·검사 중일 때 아래 숫자가 **언제 것인지**가 여기서 드러난다. */}
+        <p className="flex items-center gap-1.5 text-xs text-ink-muted">
           <span className="text-ink">{snapshot.measuredLabel} 측정</span>
-          {snapshot.agoLabel && ` · ${snapshot.agoLabel}`} · 요구사항 {snapshot.reqVer} · 자동 갱신
-          안 됨
+          <span aria-hidden>·</span>
+          <RunBadge run={run} />
         </p>
+        {run.kind === 'failed' && (
+          <p data-run-status="failed-reason" className="w-full text-xs text-danger">
+            {run.reason} — 아래 숫자는 {snapshot.measuredLabel} 측정 결과입니다
+          </p>
+        )}
       </div>
 
       <div className="grid gap-3 p-4 lg:grid-cols-[minmax(0,12rem)_minmax(0,1.5fr)_minmax(0,1fr)]">

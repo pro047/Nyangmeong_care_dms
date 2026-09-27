@@ -29,6 +29,8 @@
   --color-danger: #c50000;
   --color-danger-soft: #fff0f0;
   --color-success: #067647;
+  /* 정합성 패널의 "검사 중" 점에만 쓴다(2026-09-27). 글자가 아니라 점이라 비텍스트 대비 3:1 이면 된다. */
+  --color-warning: #b54708;
 
   /* Geist 의 xl 은 24px 로 Tailwind 기본(20px)과 다르다. 폰트를 Geist 로 쓰면서
      스케일만 Tailwind 기본을 두면 이름은 같은데 값이 갈린다.

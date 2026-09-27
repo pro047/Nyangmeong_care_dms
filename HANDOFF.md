@@ -35,6 +35,10 @@ docKey 는 **화면이 없다 — 관리자가 요청하면 세션이 스크립�
 만들었다가 걷었다 · API 두 개는 남김 — 2026-09-27 사람 결정). 운영 매핑 20개는 운영 MCP 읽기로 만들어 **사람이 확인했다** →
 `runs/dockeys-plan-prod-20260927.json`.
 
+> **실행 상태 표시 (2026-09-28, 브랜치 `feature/consistency-run-status`)** — 패널 헤더 검사 완료 · 검사 중 · 검사 실패 + 자동 새로고침.
+> dev 에 `consistency_run` 표 적용, **운영 스키마는 머지 전에 사람이** (`prisma/manual/2026-09-27-consistency-run.sql`). 상세는
+> `MILESTONES.md` '실행 상태 표시'. dev 서버는 세션이 백그라운드로 다시 띄웠다(스키마 변경 뒤 옛 Prisma 클라이언트로 500 이 났다).
+>
 > **머신 상태 (2026-09-27 23:40 KST).** **정합성 측정 이관 + 메인 안전망이 운영에 배포됐다** — PR #18 → `7a1cf9d`, Vercel `success`.
 > 운영 DB 에 스키마 · 키 표 20 · docKey 20건, 첫 스냅샷 23:33(문서 20 · errors 20 · warnings 348 · reqVer 0.8.4 · 3141ms).
 > 백업 브랜치 `backup-before-dockey-20260927`(컴퓨트 없음). 이 맥에 `npx neonctl` 로그인이 남아 있다 — 운영 URL 을
