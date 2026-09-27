@@ -2,6 +2,8 @@ import { after } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getObjectBytes } from '@/lib/s3'
 import { measureWhenQuiet } from '@/lib/consistency-measure'
+import { inRefreshCooldown, measuredDocsDiffer, type MeasuredDoc } from '@/lib/consistency-refresh'
+import { activeDocumentWhere } from '@/lib/trash'
 
 /**
  * 응답을 보낸 **뒤**에 정합성을 잰다. 측정 실패가 업로드 실패가 되면 안 된다(인계문 §7).
@@ -36,3 +38,29 @@ export async function hasDocKey(documentId: string): Promise<boolean> {
   return Boolean(document?.docKey)
 }
 
+
+/**
+ * 메인 페이지가 부른다 — 최신 스냅샷이 지금 판과 다르면 다시 잰다(`consistency-refresh.ts`).
+ * **비교 조회까지 응답 뒤로 미룬다.** 판정 결과를 화면에 쓰지 않으므로(새 결과는 다음 새로고침에
+ * 보인다) 메인이 이 조회를 기다릴 이유가 없다. 쿨다운 안이면 조회도 내지 않는다.
+ */
+export function scheduleConsistencyRefresh(snapshot: { measuredAt: Date; docs: MeasuredDoc[] } | null): void {
+  if (inRefreshCooldown(snapshot?.measuredAt ?? null, new Date())) return
+  after(async () => {
+    try {
+      const rows = await prisma.document.findMany({
+        where: { docKey: { not: null }, ...activeDocumentWhere() },
+        select: { id: true, docKey: true, versions: { orderBy: { versionNo: 'desc' }, take: 1, select: { versionNo: true } } },
+      })
+      // 측정도 버전 없는 문서는 docs 에 넣지 않는다 — 여기서 넣으면 영원히 "다르다" 가 된다
+      const current = rows.flatMap((r) =>
+        r.docKey && r.versions[0] ? [{ key: r.docKey, dmsId: r.id, dmsVersion: r.versions[0].versionNo }] : [],
+      )
+      if (!measuredDocsDiffer(snapshot?.docs ?? null, current)) return
+      console.log('정합성 재측정 예약: 최신 스냅샷이 지금 판과 다르다 (메인 방문)')
+      scheduleConsistencyMeasure()
+    } catch (err) {
+      console.error('정합성 재측정 판정 실패:', err)
+    }
+  })
+}
