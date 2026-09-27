@@ -4,8 +4,9 @@
 //   PLAN_OUT     output path (required)
 //   PLAN_FOLDER  only this folder id (dev fixture runs)
 //   PLAN_KEEP    comma-separated survivor ids (overrides the §4 docKey map)
+//   PLAN_GROUPS  JSON file of human-decided groups [{ name, keep, ids }] (overrides key grouping)
 import { it } from 'vitest'
-import { writeFileSync } from 'node:fs'
+import { readFileSync, writeFileSync } from 'node:fs'
 import pg from 'pg'
 import { documentMatchKey, compareCandidatesByRecency, type SimilarCandidate } from '@/lib/similar-document'
 import { fileVersionLabel } from '@/lib/file-version'
@@ -27,10 +28,17 @@ const PARALLEL = new Set(['cmt88cywk000104l5g2o4rqry'])
 it('merge plan', async () => {
   const out = process.env.PLAN_OUT
   if (!out) throw new Error('PLAN_OUT required')
+  // Human-decided groups: [{ name, keep, ids }]. Used when file names differ across the lineage
+  // (e.g. 와이어프레임 → 화면설계서) so documentMatchKey cannot group them. Ordering, version counts
+  // and retitle are still computed with the app's functions below.
+  const explicit: { name: string; keep: string; ids: string[] }[] | null = process.env.PLAN_GROUPS
+    ? JSON.parse(readFileSync(process.env.PLAN_GROUPS, 'utf8'))
+    : null
   const onlyFolder = process.env.PLAN_FOLDER
   // Scope must be explicit: an empty PLAN_FOLDER (e.g. a failed shell substitution) must not
   // silently widen the plan to the whole database.
-  if (!onlyFolder && process.env.PLAN_SCOPE !== 'all') throw new Error('set PLAN_FOLDER or PLAN_SCOPE=all')
+  if (!explicit && !onlyFolder && process.env.PLAN_SCOPE !== 'all') throw new Error('set PLAN_GROUPS, PLAN_FOLDER or PLAN_SCOPE=all')
+  const explicitIds = explicit ? explicit.flatMap((g) => [g.keep, ...g.ids]) : null
   const keepOverride = new Set((process.env.PLAN_KEEP ?? '').split(',').filter(Boolean))
 
   const c = new pg.Client({ connectionString: process.env.PLAN_DB_URL })
@@ -40,22 +48,32 @@ it('merge plan', async () => {
             json_agg(json_build_object('no', v.version_no, 'file', v.file_name, 'at', v.created_at)
                      order by v.version_no desc) as versions
        from documents d join document_versions v on v.document_id = d.id
-      where d.deleted_at is null and d.folder_id is not null ${onlyFolder ? 'and d.folder_id = $1' : ''}
+      where d.deleted_at is null and d.folder_id is not null
+            ${explicitIds ? 'and d.id = any($1::text[])' : onlyFolder ? 'and d.folder_id = $1' : ''}
       group by d.id`,
-    onlyFolder ? [onlyFolder] : [],
+    explicitIds ? [explicitIds] : onlyFolder ? [onlyFolder] : [],
   )
   await c.end()
 
   type Row = { id: string; title: string; folder_id: string; created_by: string; versions: { no: number; file: string; at: string }[] }
   const groups = new Map<string, Row[]>()
-  for (const d of rows as Row[]) {
-    const key = documentMatchKey(d.versions[0].file)
-    if (key === null) continue
-    const g = `${d.folder_id}|${d.created_by}|${key}`
-    groups.set(g, [...(groups.get(g) ?? []), d])
+  if (explicit) {
+    const found = new Map((rows as Row[]).map((r) => [r.id, r]))
+    const missing = explicitIds!.filter((id) => !found.has(id))
+    if (missing.length > 0) throw new Error(`active documents not found: ${missing.join(', ')}`)
+    for (const g of explicit) groups.set(`explicit|${g.name}`, [g.keep, ...g.ids].map((id) => found.get(id)!))
+  } else {
+    for (const d of rows as Row[]) {
+      const key = documentMatchKey(d.versions[0].file)
+      if (key === null) continue
+      const g = `${d.folder_id}|${d.created_by}|${key}`
+      groups.set(g, [...(groups.get(g) ?? []), d])
+    }
   }
 
-  const isKeep = (id: string) => (keepOverride.size > 0 ? keepOverride.has(id) : id in DOCKEY)
+  const explicitKeep = new Set(explicit?.map((g) => g.keep) ?? [])
+  const isKeep = (id: string) =>
+    explicit ? explicitKeep.has(id) : keepOverride.size > 0 ? keepOverride.has(id) : id in DOCKEY
   const plan: { groups: unknown[]; skipped: { reason: string; files: string[] }[] } = { groups: [], skipped: [] }
   for (const [g, members] of groups) {
     if (members.length < 2) continue
@@ -66,8 +84,10 @@ it('merge plan', async () => {
     }))
     const ordered = [...cands].sort(compareCandidatesByRecency).reverse()
     const files = ordered.map((x) => x.latestFileName)
-    const key = g.split('|')[2]
-    if (members.some((m) => PARALLEL.has(m.id))) {
+    const key = g.startsWith('explicit|') ? g.slice('explicit|'.length) : g.split('|')[2]
+    // Explicit groups are a human decision and may include the parallel edition
+    // (reversed by the team lead on 2026-09-22).
+    if (!explicit && members.some((m) => PARALLEL.has(m.id))) {
       plan.skipped.push({ reason: `[${key}] 꼬리연구소 병행 판이 섞여 있다 — 합치지 않는다 (2026-09-10 팀장 결정)`, files })
       continue
     }

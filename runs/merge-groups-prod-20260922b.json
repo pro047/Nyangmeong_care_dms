@@ -1,0 +1,8 @@
+[
+  { "name": "SCR-HLT 건강기록 화면설계서", "keep": "cmtsab94u000004l5gqm8atja",
+    "ids": ["cmtynovsd000204l4svdo9maz","cmu0l3bb3000004jq53c9i29y","cmu0xxcjs000204kzidnsmqx5","cmu4r1qwu000004l0e28tuck4","cmu58qtfs000204krfso9ffoj","cmu7a8308000004jpq2vkadrp","cmubxjdww000004kzuz8h2svv","cmuc0wqw2000004l7i4jgs8z5"] },
+  { "name": "FN-HLT 건강기록 기능명세서", "keep": "cmtsab94z000004jtc5l19o13",
+    "ids": ["cmtgt3hcq000004l746aggxlc","cmtynovt1000304l428pjcyer","cmu0l3bls000004l51jicuf34","cmu0xxc9m000004kz0kki271r","cmu4r1q3u000004juoh7ctrsh","cmu58qst9000004kr6kxegipi","cmu7a831c000004jgely43wg6","cmubxjdon000004jvnlf2i6b9","cmuc0wrf2000204l75os4ftys"] },
+  { "name": "SCR-ACC 로그인 와이어프레임→화면설계서 (+꼬리연구소 병행 판, 2026-09-22 팀장 결정)", "keep": "cmt9saj1p000404jipaf35bew",
+    "ids": ["cmt88cywk000104l5g2o4rqry","cmtzzzubq000004ibpr87p5x1","cmuazhyvt000104jmtuy7amxs","cmuc36p0j000304juohpjf9v8"] }
+]
