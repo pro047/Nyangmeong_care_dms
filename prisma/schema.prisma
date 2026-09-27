@@ -228,3 +228,13 @@ model ConsistencySnapshotDoc {
   @@unique([snapshotId, key])
   @@map("consistency_snapshot_docs")
 }
+
+/// 메인 재측정 안전망의 마지막 **시도** 시각. 측정이 실패하면 스냅샷이 안 생겨 `measuredAt` 쿨다운이
+/// 안 걸리고, 인스턴스끼리 메모리를 못 나눠서 여기에 둔다. 행은 `id = 'main'` 하나뿐이다.
+/// 시각은 DB `now()` 만 쓴다 — 조건부 UPSERT 한 문장이 권리를 잡으므로 동시 방문도 한 번만 잰다.
+model ConsistencyRefresh {
+  id          String   @id
+  attemptedAt DateTime @map("attempted_at") @db.Timestamptz
+
+  @@map("consistency_refresh")
+}
