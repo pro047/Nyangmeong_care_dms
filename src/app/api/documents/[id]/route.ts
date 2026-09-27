@@ -72,7 +72,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   const denial = await denyIfNotOwner(id, session)
   if (denial) return denial
 
-  // docKey 문서면 바뀐 뒤 다시 잰다 — 바꾼 뒤에는 (영구삭제면) 읽을 수 없어서 먼저 본다
+  // docKey 문서면 바뀐 뒤 다시 잰다. 행이 남으므로 순서는 상관없다 — 영구삭제 라우트(바꾼 뒤엔 못 읽는다)와 모양만 맞췄다
   const measured = await hasDocKey(id)
 
   // updateMany + count: 조회 후 수정하면 그 사이에 남이 지울 수 있다. 한 쿼리로 끝낸다.
