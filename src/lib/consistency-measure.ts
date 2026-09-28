@@ -21,10 +21,11 @@ export type MeasureOutcome =
   | { ok: true; snapshotId: string; docs: number; missing: number }
   | { ok: false; reason: string }
 
-const UNASSIGNED = '이 키에 지정된 문서가 없다 — 관리자가 요청하면 세션이 스크립트로 단다'
-const TRASHED = '휴지통에 있는 문서다 — docKey 를 살아 있는 문서로 옮겨야 다시 잰다'
-const NO_VERSION = '버전이 없다'
-const UNREADABLE = 'S3 에서 파일을 읽지 못했다'
+// 패널의 "측정 제외 문서" 에 그대로 나간다 — 팀원이 읽는 문구라 존댓말·쉬운 말(2026-09-28 사람 지시)
+const UNASSIGNED = '연결된 문서가 없습니다'
+const TRASHED = '문서가 휴지통에 있습니다'
+const NO_VERSION = '올라간 파일이 없습니다'
+const UNREADABLE = '파일을 불러오지 못했습니다'
 
 /** 연달아 올라온 변경을 한 번의 측정으로 합치는 대기 시간(2026-09-27 사람 결정) */
 export const MEASURE_QUIET_MS = 5000

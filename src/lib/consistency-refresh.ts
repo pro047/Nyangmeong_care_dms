@@ -1,3 +1,5 @@
+import { ARROW_AXES } from '@/lib/consistency-arrow-keys'
+
 /**
  * 메인 페이지의 재측정 안전망 판정. 측정은 업로드·삭제 같은 계기가 있을 때만 도는데, 스크립트로
  * 키를 심은 직후(스크립트는 `after()` 를 못 부른다)나 `after()` 가 놓친 경우에는 대시보드가
@@ -15,6 +17,15 @@
 export const REFRESH_COOLDOWN_MS = 10 * 60 * 1000
 
 export type MeasuredDoc = { key: string; dmsId: string; dmsVersion: number }
+
+/**
+ * 스냅샷에 세 화살표 축이 하나라도 없으면 true — 엔진에 화살표가 들어가기(2026-09-28) 전 측정이다. 패널은 그런
+ * 스냅샷을 그리지 못하고 "곧 다시 잽니다" 만 띄우므로, 판이 같아도 다시 재야 한다. 쿨다운은 그대로 적용된다.
+ */
+export function lacksArrowAxes(metrics: { axis: string }[]): boolean {
+  const axes = new Set(metrics.map((m) => m.axis))
+  return Object.values(ARROW_AXES).some((axis) => !axes.has(axis))
+}
 
 export function inRefreshCooldown(measuredAt: Date | null, now: Date): boolean {
   if (!measuredAt) return false

@@ -6,6 +6,7 @@ import { DocumentTable } from '@/components/document-table'
 import { ConsistencyPanel } from '@/components/consistency-panel'
 import { scheduleConsistencyRefresh } from '@/lib/consistency-schedule'
 import { runStatus } from '@/lib/consistency-run'
+import { ARROW_AXES, ARROW_CHECKS, PARSE_CHECK } from '@/lib/consistency-arrow-keys'
 import { formatDateTime } from '@/lib/format'
 import { prisma } from '@/lib/prisma'
 import { activeDocumentWhere } from '@/lib/trash'
@@ -54,8 +55,7 @@ async function getDocuments(where: Prisma.DocumentWhereInput) {
  * 최신 측정 1건. **`measuredAt` 으로 고른다 — `createdAt` 이 아니다.** 전송 시각과 측정
  * 시각은 다르고, 저쪽이 오래된 측정을 뒤늦게 보내면 순서가 뒤집힌다.
  *
- * `findings` 149행이 그대로 HTML 에 실린다. 필터를 클라이언트에서 하기 때문인데, 여기가
- * 메인이라 searchParams 로 거르면 필터 한 번에 문서 목록까지 전부 다시 조회된다.
+ * findings 는 **세 화살표와 `파싱`(읽지 못한 문서)만** 읽는다 — 패널이 그것만 그리고, 전부 읽으면 400여 행이 HTML 에 실린다.
  */
 async function latestConsistencySnapshot() {
   return prisma.consistencySnapshot.findFirst({
@@ -68,8 +68,13 @@ async function latestConsistencySnapshot() {
       //
       // `id` 로 거는 이유: cuid 는 시각 접두사라 한 번의 중첩 create 안에서 삽입 순으로
       // 정렬된다(실측). 축 순서는 의미가 있어 axis 로 따로 건다 — 저쪽이 보낸 순서와 같다.
-      metrics: { orderBy: [{ axis: 'asc' }, { fromKind: 'asc' }, { toKind: 'asc' }] },
-      findings: { orderBy: { id: 'asc' } },
+      // 패널과 안전망이 화살표 3축만 본다 — 나머지 축은 클라이언트로 넘길 이유가 없다
+      metrics: { where: { axis: { in: Object.values(ARROW_AXES) } }, orderBy: [{ axis: 'asc' }, { fromKind: 'asc' }, { toKind: 'asc' }] },
+      findings: {
+        where: { check: { in: [...Object.values(ARROW_CHECKS), PARSE_CHECK] } },
+        orderBy: { id: 'asc' },
+        select: { check: true, doc: true, refId: true, message: true },
+      },
       docs: { orderBy: { key: 'asc' } },
     },
   })
@@ -245,10 +250,13 @@ export default async function DocumentsPage({
       {snapshot && (
         <ConsistencyPanel
           snapshot={{
-            ...snapshot,
             // 시각 포매팅은 서버에서 끝낸다 — 패널이 클라이언트라 여기서 안 하면
             // 하이드레이션에서 TZ 와 Date.now() 가 갈린다.
             measuredLabel: formatDateTime(snapshot.measuredAt),
+            // 펼쳐 넘기지 않는다 — 클라이언트 컴포넌트라 넘긴 필드가 전부 HTML 에 실린다
+            metrics: snapshot.metrics,
+            findings: snapshot.findings,
+            docs: snapshot.docs,
           }}
           run={runStatus(consistency?.run ?? null, snapshot.measuredAt, new Date())}
           activeDocumentIds={activeDocumentIds}

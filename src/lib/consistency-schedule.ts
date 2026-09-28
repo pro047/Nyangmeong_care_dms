@@ -3,7 +3,7 @@ import { after } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getObjectBytes } from '@/lib/s3'
 import { SUPERSEDED, measureConsistency, measureWhenQuiet, type MeasureOutcome } from '@/lib/consistency-measure'
-import { REFRESH_COOLDOWN_MS, inRefreshCooldown, measuredDocsDiffer, type MeasuredDoc } from '@/lib/consistency-refresh'
+import { REFRESH_COOLDOWN_MS, inRefreshCooldown, lacksArrowAxes, measuredDocsDiffer, type MeasuredDoc } from '@/lib/consistency-refresh'
 import { activeDocumentWhere } from '@/lib/trash'
 import { CONSISTENCY_DUPLICATE } from '@/lib/consistency'
 
@@ -119,7 +119,9 @@ export async function hasDocKey(documentId: string): Promise<boolean> {
  * `measureWhenQuiet` 의 5초 대기를 타지 않는다 — 그건 연달아 들어오는 쓰기를 합치는 장치인데
  * 메인 방문에는 합칠 쓰기가 없다. 동시 방문의 중복은 `claimRefresh()` 가 막는다.
  */
-export function scheduleConsistencyRefresh(snapshot: { measuredAt: Date; docs: MeasuredDoc[] } | null): void {
+export function scheduleConsistencyRefresh(
+  snapshot: { measuredAt: Date; docs: MeasuredDoc[]; metrics: { axis: string }[] } | null,
+): void {
   if (inRefreshCooldown(snapshot?.measuredAt ?? null, new Date())) return
   after(async () => {
     try {
@@ -132,9 +134,13 @@ export function scheduleConsistencyRefresh(snapshot: { measuredAt: Date; docs: M
         r.docKey && r.versions[0] ? [{ key: r.docKey, dmsId: r.id, dmsVersion: r.versions[0].versionNo }] : [],
       )
       // 비교가 먼저다 — 판이 같은데 권리부터 잡으면 10분 동안 쓸데없이 막는다
-      if (!measuredDocsDiffer(snapshot?.docs ?? null, current)) return
+      // 판이 같아도 화살표 축이 없는 옛 스냅샷이면 잰다 — 엔진이 바뀐 뒤 첫 측정을 업로드까지 미루지 않게
+      const docsDiffer = measuredDocsDiffer(snapshot?.docs ?? null, current)
+      const oldEngine = lacksArrowAxes(snapshot?.metrics ?? [])
+      if (!docsDiffer && !oldEngine) return
       if (!(await claimRefresh())) return
-      console.log('정합성 재측정: 최신 스냅샷이 지금 판과 다르다 (메인 방문)')
+      // 이유를 로그에 남긴다 — 문서가 안 바뀌었는데 왜 쟀는지 운영에서 가를 수 있게
+      console.log(`정합성 재측정: ${docsDiffer ? '최신 스냅샷이 지금 판과 다르다' : '화살표 축이 없는 옛 스냅샷이다'} (메인 방문)`)
       const runId = await startRun()
       const started = Date.now()
       const outcome = await measureConsistency({ prisma, getObjectBytes })

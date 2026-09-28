@@ -8,7 +8,9 @@ export const FN_SHEET = '기능 목록'
 export const REQ_SHEET = '요구사항'
 export const REV_SHEET = '제.개정내역'
 // 요구사항정의서 v0.6(2026-09-13)에 생긴 열. 이전 판에는 없다 — 없으면 그냥 안 읽는다.
-const REQ_SCR_COL = '관련 화면 ID'
+export const REQ_SCR_COL = '관련 화면 ID'
+export const REQ_NAME_COL = '요구사항명'
+export const REQ_DETAIL_COL = '세부내용'
 
 type Grid = unknown[][]
 
@@ -109,6 +111,10 @@ export function parseXlsx(wb: ExcelJS.Workbook, key: string): ParsedXlsx {
     if (!header) throw new Error('요구사항 시트 헤더(요구사항번호) 없음')
     const idc = header.headers.indexOf('요구사항번호')
     const cScr = header.headers.indexOf(REQ_SCR_COL)
+    // 패널이 이름·세부내용을 보이고, 세 화살표가 "관련 화면 ID = 해당 없음" 을 분모에서 뺀다(`arrows.ts`).
+    // **`요구사항명` 머리글이 두 번 있다** — 앞은 대분류("공통"), 뒤가 실제 이름이라 마지막 것을 쓴다
+    const cName = header.headers.lastIndexOf('요구사항명')
+    const cDetail = header.headers.indexOf('세부내용')
     for (let r = header.index + 1; r < grid.length; r++) {
       const row = grid[r]
       const ids = splitIds(row[idc])
@@ -119,7 +125,11 @@ export function parseXlsx(wb: ExcelJS.Workbook, key: string): ParsedXlsx {
         if (existing) {
           ;(existing.dupRows ??= []).push(r + 1)
         } else {
-          entries.set(i, { row: r + 1, cells: {}, reqRefs: [], scrRefs: scrIds })
+          const cells: Record<string, unknown> = {}
+          if (cName >= 0) cells[REQ_NAME_COL] = row[cName]
+          if (cDetail >= 0) cells[REQ_DETAIL_COL] = row[cDetail]
+          if (cScr >= 0) cells[REQ_SCR_COL] = row[cScr]
+          entries.set(i, { row: r + 1, cells, reqRefs: [], scrRefs: scrIds })
           for (const x of scrIds) pushRef('SCR', x)
         }
       }

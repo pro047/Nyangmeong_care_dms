@@ -164,7 +164,7 @@ try {
   await waitForSnapshot(since, 5)
   const purge = await fetch(`${APP}/api/documents/${keyedDoc}/purge`, { method: 'DELETE', headers: H })
   const afterPurge = await latestReason(6)
-  check('C11', '영구삭제하면 다시 재고 그 키는 문서 없음으로 나온다', purge.status === 200 && afterPurge.includes('지정된 문서가 없다'), afterPurge)
+  check('C11', '영구삭제하면 다시 재고 그 키는 문서 없음으로 나온다', purge.status === 200 && afterPurge.includes('연결된 문서가 없습니다'), afterPurge)
 } catch (err) {
   console.error('중단:', err)
 } finally {

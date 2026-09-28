@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { ARROW_AXES, ARROW_CHECKS } from './arrows'
 import { runEngine, type EngineDoc } from './index'
 import { definedIdCounts, suggestDocKey } from './suggest'
 
@@ -68,7 +69,21 @@ describe.skipIf(!available)('골든 대조 (정합성 저장소 2026-09-22_1)', 
       ver: e.ver,
     }))
 
-    const got = await runEngine(docs, [], new Date())
+    const all = await runEngine(docs, [], new Date())
+    // 세 화살표는 DMS 전용이라 정본에 없다 — 빼고 대조한다(`arrows.ts`)
+    const arrowAxes = new Set<string>(Object.values(ARROW_AXES))
+    const arrowChecks = new Set<string>(Object.values(ARROW_CHECKS))
+    const findings = all.findings.filter((f) => !arrowChecks.has(f.check))
+    const got = {
+      ...all,
+      findings,
+      metrics: all.metrics.filter((x) => !arrowAxes.has(x.axis)),
+      counts: {
+        ...all.counts,
+        errors: findings.filter((f) => f.level === 'error').length,
+        warnings: findings.filter((f) => f.level === 'warning').length,
+      },
+    }
 
     expect(got.reqVer).toBe(manifest.REQ.ver)
 
