@@ -27,6 +27,7 @@
     "test:e2e:consistency-view": "node --env-file=.env test/e2e/consistency-view.mjs",
     "test:e2e:consistency-measure": "node --env-file=.env test/e2e/consistency-measure.mjs",
     "test:e2e:consistency-refresh": "node --env-file=.env test/e2e/consistency-refresh.mjs",
+    "test:e2e:consistency-run": "node --env-file=.env test/e2e/consistency-run.mjs",
     "test:e2e:doc-key": "node --env-file=.env test/e2e/doc-key-api.mjs"
   },
   "dependencies": {

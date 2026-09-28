@@ -29,6 +29,12 @@ const UNREADABLE = 'S3 에서 파일을 읽지 못했다'
 /** 연달아 올라온 변경을 한 번의 측정으로 합치는 대기 시간(2026-09-27 사람 결정) */
 export const MEASURE_QUIET_MS = 5000
 
+/**
+ * 예외로 끝난 측정의 사유. **예외 원문을 사유로 쓰지 않는다** — 사유는 팀원 전원이 보는 패널(`consistency_run`)에
+ * 그대로 나가는데, Prisma·S3 예외에는 호스트·포트가 담긴 영문 원문이 들어 있다. 원문은 `console.error` 로 남는다.
+ */
+export const MEASURE_CRASHED = '측정 중 서버 오류가 났습니다 (자세한 내용은 서버 로그)'
+
 export const SUPERSEDED = '더 새로운 변경이 있어 건너뛴다 — 그 변경의 측정이 이것까지 잰다'
 
 /**
@@ -67,7 +73,7 @@ export async function measureWhenQuiet(
     if (newer > 0) return { ok: false, reason: SUPERSEDED }
   } catch (err) {
     console.error('정합성 측정 대기 실패:', err)
-    return { ok: false, reason: err instanceof Error ? err.message : String(err) }
+    return { ok: false, reason: MEASURE_CRASHED }
   }
   return measureConsistency(deps)
 }
@@ -77,7 +83,7 @@ export async function measureConsistency(deps: MeasureDeps): Promise<MeasureOutc
     return await measure(deps)
   } catch (err) {
     console.error('정합성 측정 실패:', err)
-    return { ok: false, reason: err instanceof Error ? err.message : String(err) }
+    return { ok: false, reason: MEASURE_CRASHED }
   }
 }
 
@@ -99,7 +105,7 @@ async function measure(deps: MeasureDeps): Promise<MeasureOutcome> {
       },
     },
   })
-  if (!keys.some((k) => k.document)) return { ok: false, reason: 'docKey 가 달린 문서가 없다' }
+  if (!keys.some((k) => k.document)) return { ok: false, reason: '정합성 키가 달린 문서가 없습니다' }
 
   const missing: MissingDoc[] = []
   const docs: EngineDoc[] = []
@@ -121,7 +127,7 @@ async function measure(deps: MeasureDeps): Promise<MeasureOutcome> {
       })
     }),
   )
-  if (!docs.length) return { ok: false, reason: `읽을 수 있는 문서가 없다 (${missing.length}건 전부 실패)` }
+  if (!docs.length) return { ok: false, reason: `읽을 수 있는 문서가 없습니다 (${missing.length}건 모두 실패)` }
 
   const payload = await runEngine(docs, missing, measuredAt)
 
@@ -129,7 +135,8 @@ async function measure(deps: MeasureDeps): Promise<MeasureOutcome> {
   const parsed = consistencySchema.safeParse(payload)
   if (!parsed.success) {
     const first = parsed.error.issues[0]
-    return { ok: false, reason: `페이로드 형식 오류: ${first?.path.join('.')} — ${first?.message}` }
+    console.error(`정합성 측정 페이로드 형식 오류: ${first?.path.join('.')} — ${first?.message}`)
+    return { ok: false, reason: '측정 결과가 저장 형식에 맞지 않습니다 (자세한 내용은 서버 로그)' }
   }
   const problem = consistencyProblem(parsed.data)
   if (problem) return { ok: false, reason: problem.error }

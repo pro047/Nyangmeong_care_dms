@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PrismaClient } from '@/generated/prisma/client'
-import { CLOCK_MARGIN_MS, MEASURE_QUIET_MS, SUPERSEDED, measureConsistency, measureWhenQuiet } from './consistency-measure'
+import { CLOCK_MARGIN_MS, MEASURE_CRASHED, MEASURE_QUIET_MS, SUPERSEDED, measureConsistency, measureWhenQuiet } from './consistency-measure'
 
 const findMany = vi.fn() // docKey.findMany
 const create = vi.fn()
@@ -81,7 +81,7 @@ describe('measureConsistency', () => {
     findMany.mockRejectedValue(new Error('connection refused'))
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
 
-    expect(await measureConsistency({ prisma, getObjectBytes })).toEqual({ ok: false, reason: 'connection refused' })
+    expect(await measureConsistency({ prisma, getObjectBytes })).toEqual({ ok: false, reason: MEASURE_CRASHED })
     consoleError.mockRestore()
   })
 
@@ -138,7 +138,7 @@ describe('measureWhenQuiet', () => {
     count.mockRejectedValue(new Error('db down'))
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
 
-    expect(await measureWhenQuiet({ prisma, getObjectBytes, since, wait })).toEqual({ ok: false, reason: 'db down' })
+    expect(await measureWhenQuiet({ prisma, getObjectBytes, since, wait })).toEqual({ ok: false, reason: MEASURE_CRASHED })
     consoleError.mockRestore()
   })
 })

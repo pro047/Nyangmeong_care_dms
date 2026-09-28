@@ -238,3 +238,19 @@ model ConsistencyRefresh {
 
   @@map("consistency_refresh")
 }
+
+/// 가장 최근에 **시작한** 측정 1건의 상태. 메인 패널의 검사 완료 · 검사 중 · 검사 실패 표시가 읽는다.
+/// 행은 `id = 'main'` 하나뿐이다. 스냅샷은 성공해야만 생겨서 진행 중·실패를 알 수 없어 따로 둔다.
+///
+/// **끝 기록은 `runId` 가 같을 때만 쓴다** — 겹친 두 측정 중 먼저 끝난 옛 쪽이 "완료" 를 써서 아직 도는
+/// 새 쪽을 가리면 안 된다. 끝 기록이 끝내 안 오면(함수가 끊김) 화면이 시간 초과로 실패 처리한다.
+model ConsistencyRun {
+  id         String    @id
+  runId      String    @map("run_id")
+  startedAt  DateTime  @map("started_at") @db.Timestamptz
+  finishedAt DateTime? @map("finished_at") @db.Timestamptz
+  ok         Boolean?
+  reason     String?
+
+  @@map("consistency_run")
+}

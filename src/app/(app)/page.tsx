@@ -4,8 +4,8 @@ import { redirect } from 'next/navigation'
 import { UploadDialog } from '@/components/upload-dialog'
 import { DocumentTable } from '@/components/document-table'
 import { ConsistencyPanel } from '@/components/consistency-panel'
-import { measuredAgo } from '@/lib/consistency-view'
 import { scheduleConsistencyRefresh } from '@/lib/consistency-schedule'
+import { runStatus } from '@/lib/consistency-run'
 import { formatDateTime } from '@/lib/format'
 import { prisma } from '@/lib/prisma'
 import { activeDocumentWhere } from '@/lib/trash'
@@ -75,6 +75,24 @@ async function latestConsistencySnapshot() {
   })
 }
 
+/**
+ * 최신 측정 + 가장 최근에 시작한 측정의 실행 상태. **스냅샷 조회 뒤에 차례로 낸다** — 메인은 이미 조회
+ * 5개를 동시에 내고 앱 풀 상한이 5라(`prisma.ts`, 공유 RDS 때문에 못 올린다) 6번째를 같이 보내면
+ * 줄을 선다. 스냅샷 조회가 끝난 자리에서 이어 내면 동시 커넥션이 5를 안 넘는다.
+ */
+async function latestConsistency() {
+  const snapshot = await latestConsistencySnapshot()
+  if (!snapshot) return null
+  // 상태 표시는 부가 기능이다 — 이 조회가 죽으면(표가 없는 DB 에 코드가 먼저 붙는 등) 메인 전체가 500 이 된다
+  const run = await prisma.consistencyRun
+    .findUnique({ where: { id: 'main' }, select: { startedAt: true, finishedAt: true, ok: true, reason: true } })
+    .catch((err: unknown) => {
+      console.error('정합성 실행 상태 조회 실패:', err)
+      return null
+    })
+  return { snapshot, run }
+}
+
 export default async function DocumentsPage({
   searchParams,
 }: {
@@ -137,7 +155,7 @@ export default async function DocumentsPage({
   // **폴더·태그를 걸면 아예 안 읽는다** (2026-09-14, 사람 지시). 지표는 전체 문서를 본
   // 결과라 좁힌 화면에 두면 *그 폴더의 지표* 로 읽힌다. 안 그릴 것을 읽을 이유도 없다 —
   // findings 284행이 딸린 조회다.
-  const [rawDocuments, latestRows, similarRows, snapshot, activeRows] = await Promise.all([
+  const [rawDocuments, latestRows, similarRows, consistency, activeRows] = await Promise.all([
     getDocuments({
       AND: [
         activeDocumentWhere(),
@@ -147,7 +165,7 @@ export default async function DocumentsPage({
     }),
     prisma.document.findMany(latestCandidateQuery()),
     prisma.document.findMany(similarCandidateQuery()),
-    filtered ? null : latestConsistencySnapshot(),
+    filtered ? null : latestConsistency(),
     // 링크를 걸 수 있는지 판정할 집합. dmsId 에 FK 가 없어 사라진 문서가 섞여 있다.
     // **`latestCandidateQuery()` 를 재사용하지 않는다** — 그쪽은 폴더 기반 구버전 판정용이고
     // `latest.ts` 가 "두 판정이 한 조회를 공유하면 한쪽 요구로 컬럼을 고칠 때 다른 쪽이
@@ -155,6 +173,7 @@ export default async function DocumentsPage({
     // 더하는 것이 당연한 다음 수인데, 공유했다면 미분류 문서의 링크가 말없이 사라진다.
     prisma.document.findMany({ where: activeDocumentWhere(), select: { id: true } }),
   ])
+  const snapshot = consistency?.snapshot ?? null
   // 필터를 걸면 스냅샷을 안 읽으니 판정할 것이 없다 — 안전망은 전체 목록에서만 돈다.
   if (!filtered) scheduleConsistencyRefresh(snapshot)
   // DB 는 documentListOrderBy(생성순)로 읽는다 — 관계(버전)의 최신값 정렬은 Prisma
@@ -230,8 +249,8 @@ export default async function DocumentsPage({
             // 시각 포매팅은 서버에서 끝낸다 — 패널이 클라이언트라 여기서 안 하면
             // 하이드레이션에서 TZ 와 Date.now() 가 갈린다.
             measuredLabel: formatDateTime(snapshot.measuredAt),
-            agoLabel: measuredAgo(snapshot.measuredAt, new Date()),
           }}
+          run={runStatus(consistency?.run ?? null, snapshot.measuredAt, new Date())}
           activeDocumentIds={activeDocumentIds}
         />
       )}

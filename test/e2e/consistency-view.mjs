@@ -182,8 +182,12 @@ try {
     text.includes('59.68%') && text.includes('74.00%'))
 
   // 신호등 금지. 확인 필요 14 는 "14개가 잘못됐다" 가 아니라 "14개를 사람이 봐야 한다" 다.
-  const dangerish = await band.locator('[class*="danger"], [class*="success"]').count()
-  check('V8', '밴드에 신호등(빨강·초록)이 없다', dangerish === 0, `색 요소 ${dangerish}개`)
+  // 실행 상태 표시(`data-run-status`)만 뺀다 — 결과가 아니라 "검사가 돌았는가" 라는 사실이다(2026-09-27 사람 결정)
+  const outsideStatus = ':not([data-run-status]):not([data-run-status] *)'
+  const dangerish = await band
+    .locator(`[class*="danger"]${outsideStatus}, [class*="success"]${outsideStatus}, [class*="warning"]${outsideStatus}`)
+    .count()
+  check('V8', '결과 지표에 신호등(빨강·초록·노랑)이 없다 — 실행 상태 표시만 예외', dangerish === 0, `색 요소 ${dangerish}개`)
 
   // 화면이 영문 약어·화살표로 말하지 않아야 한다 — 팀원 7명이 보는 화면이다.
   const jargon = ['FN→', 'SCR→', '→REQ', 'error', 'warning', 'unresolved 2', 'REQ 커버리지']
