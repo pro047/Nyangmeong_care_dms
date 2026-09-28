@@ -2,6 +2,7 @@ import type { ConsistencyInput } from '@/lib/consistency'
 import { parseHtml } from './parse-html'
 import { loadWorkbook, parseXlsx, reqVersionFromRevisions } from './parse-xlsx'
 import { verify, type DocInput } from './verify'
+import { arrows } from './arrows'
 import type { DocResult, Finding } from './types'
 
 /**
@@ -36,7 +37,7 @@ export async function parseEngineDoc(doc: Pick<EngineDoc, 'key' | 'fileName' | '
   reqVer: string | null
 }> {
   if (doc.bytes.byteLength > ENGINE_MAX_BYTES) {
-    return { result: { parsed: false, error: `파일이 너무 큼 (${doc.bytes.byteLength} bytes)` }, reqVer: null }
+    return { result: { parsed: false, error: `파일이 너무 큽니다 (최대 ${ENGINE_MAX_BYTES / 1024 / 1024}MB)` }, reqVer: null }
   }
   const kindError = formatMismatch(doc.key, doc.fileName)
   if (kindError) return { result: { parsed: false, error: kindError }, reqVer: null }
@@ -62,7 +63,8 @@ function formatMismatch(key: string, fileName: string): string | null {
   const name = fileName.toLowerCase()
   const want = key.startsWith('SCR-') ? ['.html', '.htm'] : ['.xlsx']
   if (want.some((ext) => name.endsWith(ext))) return null
-  return `형식이 docKey 와 다르다 — ${key} 는 ${want[0]} 이어야 하는데 '${fileName}' 이다`
+  // 패널의 "측정 제외 문서" 에 그대로 나간다 — 팀원이 읽는 문구(2026-09-28)
+  return `파일 형식이 맞지 않습니다 (${want[0]} 필요 · 올라간 파일 '${fileName}')`
 }
 
 /** 판이 없거나 읽을 수 없는 문서. 조용히 빠지면 그 키가 영영 안 재진다 — `파싱` error 로 남긴다 */
@@ -84,9 +86,13 @@ export async function runEngine(
   inputs.sort((a, b) => keyOrder(a.key) - keyOrder(b.key) || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0))
 
   const result = verify(inputs, reqVer)
+  // 정본에 없는 DMS 전용 화살표 — 정본 산출 뒤에 덧붙인다(골든 대조가 이 부분만 빼고 비교한다)
+  const arrow = arrows(inputs)
+  const errors = [...result.errors, ...arrow.errors]
+  const warnings = [...result.warnings, ...arrow.warnings]
   const findings = [
-    ...result.errors.map((f) => toFinding(f, 'error')),
-    ...result.warnings.map((f) => toFinding(f, 'warning')),
+    ...errors.map((f) => toFinding(f, 'error')),
+    ...warnings.map((f) => toFinding(f, 'warning')),
     ...result.unresolved.map((f) => toFinding(f, 'unresolved')),
   ]
   const m = result.metrics
@@ -95,8 +101,8 @@ export async function runEngine(
     // 스냅샷에 필수값이다. 못 읽었으면 검사 4 는 건너뛰었고(reqVer null) 그 사실을 라벨로 남긴다
     reqVer: reqVer ?? '미상',
     counts: {
-      errors: result.errors.length,
-      warnings: result.warnings.length,
+      errors: errors.length,
+      warnings: warnings.length,
       pending: 0,
       unresolved: result.unresolved.length,
     },
@@ -112,6 +118,7 @@ export async function runEngine(
       { axis: 'triangle', from: null, to: null, ...m.triangle },
       // `to` 에 문서키가 온다(다른 축의 `to` 는 문서 *종류*라 뜻이 다르다)
       ...[...m.scrFuncCoverage].map(([docKey, v]) => ({ axis: 'scrFuncCoverage', from: null, to: docKey, ...v })),
+      ...arrow.metrics.map((v) => ({ from: null, to: null, ...v })),
     ],
     findings,
     docs: docs.map((d) => ({ key: d.key, ver: d.ver, dmsId: d.dmsId, dmsVersion: d.dmsVersion })),

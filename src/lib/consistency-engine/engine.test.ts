@@ -206,7 +206,7 @@ describe('형식 검사', () => {
 
     const parse = payload.findings.filter((f) => f.check === '파싱')
     expect(parse.map((f) => f.doc).sort()).toEqual(['REQ', 'SCR-TST'])
-    expect(parse.find((f) => f.doc === 'REQ')?.message).toContain('.xlsx 이어야')
+    expect(parse.find((f) => f.doc === 'REQ')?.message).toContain('파일 형식이 맞지 않습니다 (.xlsx 필요')
   })
 })
 

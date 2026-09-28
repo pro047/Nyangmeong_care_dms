@@ -1,3 +1,4 @@
+import { PARSE_CHECK } from '@/lib/consistency-arrow-keys'
 import { existsOrAlias, idFields, pyListRepr, pyRepr } from './ids'
 import type { DocResult, Finding, ParsedDoc } from './types'
 
@@ -76,7 +77,7 @@ export function verify(inputs: DocInput[], reqVer: string | null): VerifyResult 
 
   for (const { key, result } of inputs) {
     if (!result.parsed) {
-      errors.push({ check: '파싱', doc: key, msg: result.error })
+      errors.push({ check: PARSE_CHECK, doc: key, msg: result.error })
       continue
     }
     const d = result.doc

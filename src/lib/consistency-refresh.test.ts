@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { REFRESH_COOLDOWN_MS, inRefreshCooldown, measuredDocsDiffer, type MeasuredDoc } from './consistency-refresh'
+import { ARROW_AXES } from './consistency-arrow-keys'
+import { REFRESH_COOLDOWN_MS, inRefreshCooldown, lacksArrowAxes, measuredDocsDiffer, type MeasuredDoc } from './consistency-refresh'
 
 const NOW = new Date('2026-09-27T05:00:00.000Z')
 const ago = (ms: number) => new Date(NOW.getTime() - ms)
@@ -51,5 +52,15 @@ describe('inRefreshCooldown', () => {
     expect(measuredDocsDiffer([SCR], [SCR, FN])).toBe(true)
     expect(inRefreshCooldown(ago(60_000), NOW)).toBe(true)
     expect(inRefreshCooldown(ago(REFRESH_COOLDOWN_MS), NOW)).toBe(false)
+  })
+})
+
+describe('lacksArrowAxes', () => {
+  it('세 화살표 축이 다 있으면 false 여야 한다', () => {
+    expect(lacksArrowAxes([{ axis: 'referenceTotal' }, ...Object.values(ARROW_AXES).map((axis) => ({ axis }))])).toBe(false)
+  })
+
+  it('화살표 축이 하나라도 없으면 true 여야 한다 — 화살표 전 스냅샷은 다시 잰다', () => {
+    expect(lacksArrowAxes([{ axis: 'referenceTotal' }, { axis: ARROW_AXES.reqBySCR }])).toBe(true)
   })
 })
