@@ -38,5 +38,18 @@
       "Read(./.env.*)",
       "WebFetch"
     ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/hooks/pipeline-launcher-guard.sh\""
+          }
+        ]
+      }
+    ]
   }
 }
