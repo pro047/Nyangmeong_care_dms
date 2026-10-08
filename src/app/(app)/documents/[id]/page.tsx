@@ -5,6 +5,7 @@ import { DocumentMetaEditor } from '@/components/document-meta-editor'
 import { DocumentRowActions } from '@/components/document-row-actions'
 import { DocumentFolderSelect } from '@/components/document-folder-select'
 import { TagEditor } from '@/components/tag-editor'
+import { MarkdownPreview } from '@/components/markdown-preview'
 import { SpreadsheetPreview } from '@/components/spreadsheet-preview'
 import { VersionUploadDialog } from '@/components/version-upload-dialog'
 import { prisma } from '@/lib/prisma'
@@ -51,7 +52,7 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
 
   const latest = document.versions[0]
   const folderOptions = flattenFolderTree(buildFolderTree(folders))
-  const kind = latest ? previewKind(latest.mimeType) : 'none'
+  const kind = latest ? previewKind(latest.mimeType, latest.fileName) : 'none'
   // versionNo 를 URL 에 박는다. 라우트는 ?v 없이도 최신을 주지만 그러면 v1 과 v2 의
   // 주소가 같아서, 재업로드 후 router.refresh() 로 이 컴포넌트가 다시 그려져도
   // src 가 안 바뀌어 브라우저가 캐시된 v1 을 계속 보여준다 (2026-08-28 실측).
@@ -170,6 +171,15 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
             <SpreadsheetPreview
               // 재업로드하면 src 의 ?v 가 바뀐다. key 로 갈아끼워야 이전 버전의
               // 시트가 남지 않는다 — 상태를 effect 안에서 되돌리는 것보다 싸다.
+              key={previewSrc}
+              src={previewSrc}
+              fileName={latest.fileName}
+              sizeBytes={latest.sizeBytes}
+              downloadHref={`/api/documents/${document.id}/download`}
+            />
+          )}
+          {kind === 'markdown' && (
+            <MarkdownPreview
               key={previewSrc}
               src={previewSrc}
               fileName={latest.fileName}
