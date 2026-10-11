@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   activeDocumentWhere,
+  emptyTrashMessage,
   outcomeFromCount,
   RESTORE_NOT_FOUND,
   TRASH_NOT_FOUND,
@@ -9,6 +10,16 @@ import {
   purgeCandidateKeys,
   PURGE_NOT_FOUND,
 } from '@/lib/trash'
+
+describe('emptyTrashMessage', () => {
+  it('삭제 건수가 0이면 비울 문서가 없다고 알려야 한다', () => {
+    expect(emptyTrashMessage(0)).toBe('비울 문서가 없습니다.')
+  })
+
+  it.each([1, 3])('삭제 건수가 %i이면 해당 건수를 알려야 한다', (count) => {
+    expect(emptyTrashMessage(count)).toBe(`문서 ${count}개를 영구삭제했습니다.`)
+  })
+})
 
 describe('activeDocumentWhere', () => {
   it('두 번 호출하면 서로 다른 객체이고 둘 다 { deletedAt: null } 이어야 한다', () => {

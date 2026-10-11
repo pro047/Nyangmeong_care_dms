@@ -101,7 +101,7 @@ function logOutcome(outcome: MeasureOutcome, ms: number): void {
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
 
 /**
- * 삭제·복구·영구삭제 라우트가 **바꾸기 전에** 부른다. 영구삭제 뒤에는 행이 없어 읽을 수 없고,
+ * 삭제·복구 라우트가 **바꾸기 전에** 부른다. 영구삭제는 지울 문서를 읽을 때 docKey 를 같이 읽는다(purge.ts).
  * 휴지통에 들어간 docKey 문서는 측정에 `파싱` error 로 나와야 하므로(안 재면 대시보드가 옛 결과를 보인다)
  * 다시 재야 하는지 여기서 가른다. 삭제는 드물어 조회 한 번을 더 낸다.
  */
