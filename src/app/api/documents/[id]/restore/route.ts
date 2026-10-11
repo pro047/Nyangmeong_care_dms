@@ -22,7 +22,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   const denial = await denyIfNotOwner(id, session)
   if (denial) return denial
 
-  // docKey 문서면 바뀐 뒤 다시 잰다. 행이 남으므로 순서는 상관없다 — 영구삭제 라우트(바꾼 뒤엔 못 읽는다)와 모양만 맞췄다
+  // docKey 문서면 바뀐 뒤 다시 잰다. 행이 남으므로 순서는 상관없다
   const measured = await hasDocKey(id)
 
   const { count } = await prisma.document.updateMany({
