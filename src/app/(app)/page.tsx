@@ -2,6 +2,7 @@ import { FileText } from 'lucide-react'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { UploadDialog } from '@/components/upload-dialog'
+import { BulkDownloadDialog } from '@/components/bulk-download-dialog'
 import { DocumentTable } from '@/components/document-table'
 import { ConsistencyPanel } from '@/components/consistency-panel'
 import { scheduleConsistencyRefresh } from '@/lib/consistency-schedule'
@@ -10,6 +11,7 @@ import { ARROW_AXES, ARROW_CHECKS, PARSE_CHECK } from '@/lib/consistency-arrow-k
 import { formatDateTime } from '@/lib/format'
 import { prisma } from '@/lib/prisma'
 import { activeDocumentWhere } from '@/lib/trash'
+import { bulkDocumentQuery, toBulkDocuments } from '@/lib/bulk-download'
 import { folderFilterWhere, tagFilterWhere } from '@/lib/search'
 import {
   childFolderCards,
@@ -160,7 +162,7 @@ export default async function DocumentsPage({
   // **폴더·태그를 걸면 아예 안 읽는다** (2026-09-14, 사람 지시). 지표는 전체 문서를 본
   // 결과라 좁힌 화면에 두면 *그 폴더의 지표* 로 읽힌다. 안 그릴 것을 읽을 이유도 없다 —
   // findings 284행이 딸린 조회다.
-  const [rawDocuments, latestRows, similarRows, consistency, activeRows] = await Promise.all([
+  const [rawDocuments, latestRows, similarRows, consistency, activeRows, bulkRows] = await Promise.all([
     getDocuments({
       AND: [
         activeDocumentWhere(),
@@ -177,6 +179,8 @@ export default async function DocumentsPage({
     // 조용히 따라 바뀐다"고 못박아 뒀다. 실제로 그 조회에 `folderId: { not: null }` 을
     // 더하는 것이 당연한 다음 수인데, 공유했다면 미분류 문서의 링크가 말없이 사라진다.
     prisma.document.findMany({ where: activeDocumentWhere(), select: { id: true } }),
+    // 종류 전체를 받아야 하므로 폴더·태그 필터와 무관하게 전량을 별도로 읽는다.
+    prisma.document.findMany(bulkDocumentQuery()),
   ])
   const snapshot = consistency?.snapshot ?? null
   // 필터를 걸면 스냅샷을 안 읽으니 판정할 것이 없다 — 안전망은 전체 목록에서만 돈다.
@@ -199,7 +203,7 @@ export default async function DocumentsPage({
 
   return (
     <div>
-      <div className="mb-5 flex items-center justify-between gap-4">
+      <div className="mb-5 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div className="min-w-0">
           {crumbs.length > 0 ? (
             // 조상은 링크로 두되 제목은 마지막 세그먼트만 담는다 — 경로 전체를 h1 에 넣으면
@@ -228,15 +232,21 @@ export default async function DocumentsPage({
             {summary ?? '최근 올린 순으로 표시됩니다'}
           </p>
         </div>
-        {/* 폴더를 열어 둔 채 업로드하면 그 폴더가 기본값이 된다. activeFolder 로 가드하는
-            이유는 위에서 없는 폴더면 필터를 안 걸기 때문이다 — 죽은 링크에서 올린 문서가
-            존재하지 않는 폴더를 참조해 FK 위반이 나면 안 된다. */}
-        <UploadDialog
-          defaultFolderId={activeFolder ? folderId : null}
-          folders={folderRows}
-          candidates={toSimilarCandidates(similarRows)}
-          permission={permission}
-        />
+        <div className="flex shrink-0 items-center gap-2 self-end sm:self-auto">
+          <BulkDownloadDialog
+            folders={folderRows.map(({ id, name, parentId }) => ({ id, name, parentId }))}
+            documents={toBulkDocuments(bulkRows)}
+          />
+          {/* 폴더를 열어 둔 채 업로드하면 그 폴더가 기본값이 된다. activeFolder 로 가드하는
+              이유는 위에서 없는 폴더면 필터를 안 걸기 때문이다 — 죽은 링크에서 올린 문서가
+              존재하지 않는 폴더를 참조해 FK 위반이 나면 안 된다. */}
+          <UploadDialog
+            defaultFolderId={activeFolder ? folderId : null}
+            folders={folderRows}
+            candidates={toSimilarCandidates(similarRows)}
+            permission={permission}
+          />
+        </div>
       </div>
 
       {errorMessage && (
