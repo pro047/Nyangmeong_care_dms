@@ -1,9 +1,10 @@
 import { Trash2 } from 'lucide-react'
 import { redirect } from 'next/navigation'
 import { TrashRowActions } from '@/components/trash-row-actions'
+import { TrashEmptyButton } from '@/components/trash-empty-button'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/session'
-import { trashOwnerWhere, type Viewer } from '@/lib/ownership'
+import { isAdmin, trashOwnerWhere, type Viewer } from '@/lib/ownership'
 import { env } from '@/lib/env'
 import { formatBytes, formatRelative, fileLabel } from '@/lib/format'
 import { trashedDocumentWhere, trashOrderBy } from '@/lib/trash'
@@ -31,17 +32,28 @@ async function getTrashedDocuments(viewer: Viewer) {
 export default async function TrashPage() {
   const session = await getSession()
   if (!session) redirect('/login')
+  // 조회 뒤 들어온 문서까지 지우지 않도록 삭제 기준 시각을 조회 전에 고정한다.
+  const before = new Date().toISOString()
   const documents = await getTrashedDocuments(session)
 
   return (
     <div>
-      <div className="mb-5">
-        <h1 className="text-xl font-semibold text-ink">휴지통</h1>
-        <p className="mt-0.5 text-sm text-ink-muted">
-          {documents.length > 0
-            ? `${documents.length}개 문서 · 복구하면 전체 문서로 돌아갑니다`
-            : '삭제한 문서는 여기에 보관됩니다'}
-        </p>
+      <div className="mb-5 flex items-center justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="text-xl font-semibold text-ink">휴지통</h1>
+          <p className="mt-0.5 text-sm text-ink-muted">
+            {documents.length > 0
+              ? `${documents.length}개 문서 · 복구하면 전체 문서로 돌아갑니다`
+              : '삭제한 문서는 여기에 보관됩니다'}
+          </p>
+        </div>
+        {documents.length > 0 && (
+          <TrashEmptyButton
+            count={documents.length}
+            before={before}
+            includesOthers={isAdmin(session, env.ADMIN_DISCORD_ID)}
+          />
+        )}
       </div>
 
       {documents.length === 0 ? (

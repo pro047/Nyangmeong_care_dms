@@ -17,9 +17,13 @@ export type PurgeDeps = {
 /** 실제로 지워진 문서 수(deleteMany 의 count). 읽은 id 수가 아니다. */
 export type PurgeResult = { count: number }
 
+// `Date.prototype.toISOString()` 이 내는 모양만 받는다. `new Date()` 는 '9999' 나 시간대 없는
+// 시각도 읽어 주는데, 앞의 것은 기준이 사실상 없어지고 뒤의 것은 서버 시간대에 따라 9시간 어긋난다.
+const ISO_UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$/
+
 /** 비우기 요청의 `before` 값. 못 읽으면 null — 기준 시각 없이 비우지 않는다. */
 export function parseTrashCutoff(raw: string | null): Date | null {
-  if (raw === null || raw === '') return null
+  if (raw === null || !ISO_UTC.test(raw)) return null
   const cutoff = new Date(raw)
   return Number.isNaN(cutoff.getTime()) ? null : cutoff
 }
@@ -31,9 +35,14 @@ export function parseTrashCutoff(raw: string | null): Date | null {
  */
 function hasEmptyScopeValue(scope: PurgeScope): boolean {
   const values = scope as Record<string, unknown>
-  return ['id', 'createdById'].some(
+  const emptyText = ['id', 'createdById'].some(
     (key) => key in values && (typeof values[key] !== 'string' || values[key] === ''),
   )
+  // 기준 시각도 같다 — 키만 있고 값이 없으면 "기준 없음"으로 떨어져 범위가 가장 넓어진다.
+  const cutoff = values.deletedBefore
+  const emptyCutoff =
+    'deletedBefore' in values && !(cutoff instanceof Date && !Number.isNaN(cutoff.getTime()))
+  return emptyText || emptyCutoff
 }
 
 export function unreferencedKeys(candidates: string[], stillReferenced: { s3Key: string }[]): string[] {
@@ -77,10 +86,11 @@ export async function purgeTrashedDocuments(
   const measured = docs.some((d) => d.docKey !== null)
   const keys = purgeCandidateKeys(docs.flatMap((d) => d.versions))
 
-  // 조회와 삭제 사이에 남이 복구할 수 있다. 조건을 삭제 쿼리에 다시 건다.
+  // 조회와 삭제 사이에 남이 복구할 수 있다. 조건을 삭제 쿼리에 다시 건다 — 기준 시각까지
+  // 같이 걸어야 복구됐다가 다시 지워진 문서(새 deletedAt)가 빠진다.
   // 버전·태그 연결은 스키마의 onDelete: Cascade 가 함께 지운다.
   const { count } = await prisma.document.deleteMany({
-    where: { id: { in: ids }, ...trashedDocumentWhere() },
+    where: { id: { in: ids }, ...trashed },
   })
   if (count === 0) return { count: 0 }
 

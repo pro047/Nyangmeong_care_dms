@@ -345,6 +345,8 @@ describe('purgeTrashedDocuments — 빈 범위 값 · 기준 시각 (리뷰 뒤 
     ['createdById 가 빈 문자열', { createdById: '' }],
     ['id 가 undefined', { id: undefined }],
     ['id 가 빈 문자열', { id: '' }],
+    ['deletedBefore 가 undefined', { createdById: 'user_1', deletedBefore: undefined }],
+    ['deletedBefore 가 잘못된 날짜', { createdById: 'user_1', deletedBefore: new Date('abc') }],
   ])('%s 이면 던지고 조회조차 하지 않아야 한다', async (_label, scope) => {
     await expect(purgeTrashedDocuments(scope as unknown as PurgeScope, deps())).rejects.toThrow()
 
@@ -361,6 +363,16 @@ describe('purgeTrashedDocuments — 빈 범위 값 · 기준 시각 (리뷰 뒤 
     expect(documentFindMany.mock.calls[0][0].where).toEqual({
       createdById: 'user_1',
       deletedAt: { not: null, lte: deletedBefore },
+    })
+  })
+
+  it('deletedBefore 가 있으면 삭제 쿼리에도 같은 기준 시각을 다시 걸어야 한다', async () => {
+    const deletedBefore = new Date('2026-10-11T12:00:00.000Z')
+
+    await purgeTrashedDocuments({ createdById: 'user_1', deletedBefore }, deps())
+
+    expect(documentDeleteMany.mock.calls[0][0]).toEqual({
+      where: { id: { in: ['doc_1', 'doc_2'] }, deletedAt: { not: null, lte: deletedBefore } },
     })
   })
 
@@ -388,7 +400,22 @@ describe('parseTrashCutoff', () => {
     expect(parseTrashCutoff('2026-10-11T12:00:00.000Z')).toEqual(new Date('2026-10-11T12:00:00.000Z'))
   })
 
-  it.each([[null], [''], ['abc']])('%s 는 null 이어야 한다', (raw) => {
+  it('밀리초가 없는 UTC 시각도 읽어야 한다', () => {
+    expect(parseTrashCutoff('2026-10-11T12:00:00Z')).toEqual(new Date('2026-10-11T12:00:00.000Z'))
+  })
+
+  // new Date() 가 읽어 주는 느슨한 값들. 받으면 기준이 없어지거나 서버 시간대만큼 어긋난다.
+  it.each([
+    [null],
+    [''],
+    ['abc'],
+    ['9999'],
+    ['1'],
+    ['2026-10-11'],
+    ['2026-10-11T20:00:00'],
+    ['2026-10-11T20:00:00+09:00'],
+    ['2026-13-45T99:99:99.000Z'],
+  ])('%s 는 null 이어야 한다', (raw) => {
     expect(parseTrashCutoff(raw)).toBeNull()
   })
 })

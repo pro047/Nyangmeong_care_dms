@@ -102,6 +102,8 @@ describe('DELETE /api/documents/trash — 차단 (리뷰 뒤 추가)', () => {
     ['없으면', ''],
     ['비었으면', '?before='],
     ['날짜가 아니면', '?before=abc'],
+    ['시간대가 없으면', '?before=2026-10-11T12:00:00'],
+    ['연도뿐이면', '?before=9999'],
   ])('before 가 %s 400 이고 대상 조회조차 하지 않아야 한다', async (_label, query) => {
     const res = await DELETE(request(query))
 
@@ -145,7 +147,7 @@ describe('DELETE /api/documents/trash — 대상 범위', () => {
 
     expect(deleteMany).toHaveBeenCalledTimes(1)
     expect(deleteMany.mock.calls[0][0]).toEqual({
-      where: { id: { in: ['doc_1', 'doc_2'] }, deletedAt: { not: null } },
+      where: { id: { in: ['doc_1', 'doc_2'] }, deletedAt: TRASHED_BEFORE },
     })
   })
 })

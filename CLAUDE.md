@@ -37,7 +37,9 @@ Next.js 16 · React 19 · TypeScript · Tailwind 4 · Prisma 7 + PostgreSQL(RDS)
   - **삭제와 재업로드는 예외다** (삭제 2026-09-06 · 재업로드 2026-09-07). 문서 삭제
     3종(소프트 삭제·복구·영구삭제)과 **새 버전 올리기**를 **올린 사람**
     (`Document.createdById`)과 `ADMIN_DISCORD_ID` 계정에게만 준다 — 같은 경계를
-    `denyIfNotOwner()`(`src/lib/ownership-guard.ts`)가 공유한다. 조회·다운로드·
+    `denyIfNotOwner()`(`src/lib/ownership-guard.ts`)가 공유한다. **휴지통 비우기**
+    (2026-10-11, `DELETE /api/documents/trash`)도 같은 경계인데 거는 방식이 다르다 — 한 문서를
+    지목하지 않으므로 `trashOwnerWhere()` 로 범위를 좁힌다(403 없음, 관리자는 전원의 휴지통). 조회·다운로드·
     제목/설명 수정·태그·폴더는 **여전히 전원 동등**이다 — 범위를 넓히지 말 것.
     소유자는 `DocumentVersion.uploadedById`(그 판을 올린 사람)가 **아니다**;
     그쪽을 쓰면 남의 문서에 재업로드하는 순간 소유권이 조용히 넘어간다.
