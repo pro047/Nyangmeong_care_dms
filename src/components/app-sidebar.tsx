@@ -2,10 +2,11 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useRef, useState, useSyncExternalStore } from 'react'
+import { useRef, useState } from 'react'
 import { Files, Trash2 } from 'lucide-react'
 import { FolderTree } from '@/components/folder-tree'
 import type { FolderAliasRow } from '@/lib/folder'
+import { useStoredString, writeStoredString } from '@/lib/use-stored-string'
 
 const NAV = [
   { href: '/', label: '전체 문서', icon: Files },
@@ -23,27 +24,11 @@ const STEP = 16
 
 const clampWidth = (px: number) => Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, Math.round(px)))
 
-// localStorage 를 useState 초기화에서 읽으면 서버가 그린 224px 와 어긋나 하이드레이션
-// 불일치가 난다. useSyncExternalStore 는 서버 스냅샷을 따로 받아 이 경우를 정상 처리한다.
-// 다른 탭에서 바꾼 값까지 따라가려고 storage 이벤트를 구독한다.
-const subscribeWidth = (onChange: () => void) => {
-  window.addEventListener('storage', onChange)
-  return () => window.removeEventListener('storage', onChange)
-}
-const readWidth = () => {
-  try {
-    return window.localStorage.getItem(WIDTH_KEY)
-  } catch {
-    // 사파리 프라이빗 모드 등에서 접근 자체가 던진다. 기본값으로 떨어지면 된다.
-    return null
-  }
-}
-
 /** folders 가 null 이면 레이아웃의 폴더 조회가 실패한 것이다 (layout.tsx 의 try/catch). */
 export function AppSidebar({ folders }: { folders: FolderAliasRow[] | null }) {
   const pathname = usePathname()
 
-  const stored = useSyncExternalStore(subscribeWidth, readWidth, () => null)
+  const stored = useStoredString(WIDTH_KEY)
   // 드래그 중에는 저장된 값을 보지 않는다 — 손이 움직이는 동안 storage 이벤트가 끼어들어
   // 폭이 튀면 안 된다.
   const [dragged, setDragged] = useState<number | null>(null)
@@ -53,13 +38,7 @@ export function AppSidebar({ folders }: { folders: FolderAliasRow[] | null }) {
 
   const width = dragged ?? (stored === null ? DEFAULT_WIDTH : clampWidth(Number(stored)))
 
-  const commitWidth = (px: number) => {
-    try {
-      window.localStorage.setItem(WIDTH_KEY, String(px))
-    } catch {
-      // 저장에 실패해도 이번 세션의 폭은 유지된다. 알릴 만한 실패가 아니다.
-    }
-  }
+  const commitWidth = (px: number) => writeStoredString(WIDTH_KEY, String(px))
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     // 포인터를 캡처하면 커서가 핸들 밖으로 나가도 move/up 이 이 요소로 온다.

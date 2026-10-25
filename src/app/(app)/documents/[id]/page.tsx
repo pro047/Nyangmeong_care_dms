@@ -4,6 +4,7 @@ import { ArrowLeft, Download } from 'lucide-react'
 import { DocumentMetaEditor } from '@/components/document-meta-editor'
 import { DocumentRowActions } from '@/components/document-row-actions'
 import { DocumentFolderSelect } from '@/components/document-folder-select'
+import { ResizableTableHead } from '@/components/resizable-table-head'
 import { TagEditor } from '@/components/tag-editor'
 import { MarkdownPreview } from '@/components/markdown-preview'
 import { SpreadsheetPreview } from '@/components/spreadsheet-preview'
@@ -209,24 +210,14 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
 
       <h2 className="mt-6 mb-2.5 text-sm font-semibold text-ink">버전 이력</h2>
       <div className="overflow-hidden rounded-xl border border-border bg-surface">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border text-left text-xs text-ink-muted">
-              {/* 목록의 `버전` 열은 파일명에서 읽은 `v0.6`(팀이 문서에 매긴 번호)이고
-                  여기는 앱이 센 업로드 횟수다. 같은 이름으로 다른 숫자를 말하면 안 된다. */}
-              <th scope="col" className="w-20 px-4 py-2.5 font-medium">회차</th>
-              <th scope="col" className="px-4 py-2.5 font-medium">파일</th>
-              <th scope="col" className="hidden px-4 py-2.5 font-medium sm:table-cell">크기</th>
-              <th scope="col" className="hidden px-4 py-2.5 font-medium lg:table-cell">올린 사람</th>
-              <th scope="col" className="hidden px-4 py-2.5 font-medium md:table-cell">올린 시각</th>
-              <th scope="col" className="px-4 py-2.5 font-medium">변경 메모</th>
-              <th scope="col" className="w-12 px-4 py-2.5"><span className="sr-only">다운로드</span></th>
-            </tr>
-          </thead>
+        {/* 목록의 `버전` 열은 파일명에서 읽은 `v0.6`(팀이 문서에 매긴 번호)이고
+            여기 `회차` 는 앱이 센 업로드 횟수다. 같은 이름으로 다른 숫자를 말하면 안 된다. */}
+        <table className="w-full table-fixed text-sm">
+          <ResizableTableHead table="versions" />
           <tbody>
             {document.versions.map((version) => (
               <tr key={version.id} className="border-b border-border last:border-0 hover:bg-canvas">
-                <td className="px-4 py-3 whitespace-nowrap">
+                <td className="truncate-cell px-4 py-3">
                   <span className="font-medium text-ink">{version.versionNo}회</span>
                   {version.versionNo === latest?.versionNo && (
                     <span className="ml-1.5 rounded bg-accent-soft px-1.5 py-0.5 text-xs font-medium text-accent">
@@ -234,7 +225,7 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
                     </span>
                   )}
                 </td>
-                <td className="max-w-0 px-4 py-3">
+                <td className="px-4 py-3">
                   <span className="flex items-center gap-2.5">
                     <span className="flex h-7 w-9 shrink-0 items-center justify-center rounded bg-canvas text-xs font-semibold text-ink-muted">
                       {fileLabel(version.fileName)}
@@ -242,19 +233,19 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
                     <span className="truncate-cell block min-w-0 text-ink">{version.fileName}</span>
                   </span>
                 </td>
-                <td className="hidden px-4 py-3 whitespace-nowrap text-ink-muted sm:table-cell">
+                <td className="truncate-cell hidden px-4 py-3 text-ink-muted sm:table-cell">
                   {formatBytes(version.sizeBytes)}
                 </td>
-                <td className="hidden px-4 py-3 text-ink-muted lg:table-cell">
+                <td className="truncate-cell hidden px-4 py-3 text-ink-muted lg:table-cell">
                   {version.uploadedBy.username}
                 </td>
-                <td className="hidden px-4 py-3 whitespace-nowrap text-ink-muted md:table-cell">
+                <td className="truncate-cell hidden px-4 py-3 text-ink-muted md:table-cell">
                   {formatDateTime(version.createdAt)}
                 </td>
-                <td className="max-w-0 px-4 py-3 text-ink-muted">
+                <td className="px-4 py-3 text-ink-muted">
                   <span className="truncate-cell block">{version.changeNote ?? '—'}</span>
                 </td>
-                <td className="px-4 py-3">
+                <td className="px-3 py-3">
                   <a
                     href={`/api/documents/${document.id}/download?v=${version.versionNo}`}
                     aria-label={`${version.versionNo}회차 다운로드`}
