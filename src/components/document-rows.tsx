@@ -44,7 +44,7 @@ export function DocumentRow({
   return (
     <>
       <tr className="border-b border-border last:border-0 hover:bg-canvas">
-        <td className={`max-w-0 px-4 py-3 ${dim}`}>
+        <td className={`px-4 py-3 ${dim}`}>
           {/* 제목은 상세로 간다. 바로 받고 싶으면 오른쪽 다운로드 아이콘. */}
           <Link href={`/documents/${doc.id}`} className="flex items-center gap-2.5">
             <span className="flex h-7 w-9 shrink-0 items-center justify-center rounded bg-canvas text-xs font-semibold text-ink-muted">
@@ -77,41 +77,41 @@ export function DocumentRow({
           **1회면 안 붙인다.** 운영 33건 중 23건이 1회인데 전부에 `1회` 를 달면 이력이
           있다는 신호가 아니라 배경이 된다.
         */}
-        <td className={`w-24 px-3 py-3 whitespace-nowrap text-ink-muted ${dim}`}>
+        {/* 말줄임은 칸이 아니라 글자에만 건다 — 칸을 overflow:hidden 으로 두면 토글 버튼의
+            포커스 링이 칸 경계에서 잘린다. */}
+        <td className={`px-3 py-3 text-ink-muted ${dim}`}>
           {times > 1 ? (
             <button
               type="button"
               onClick={() => setOpen(!open)}
               aria-expanded={open}
               aria-label={`${doc.title} 올린 기록 ${times}회 ${open ? '접기' : '펼치기'}`}
-              className="flex items-center gap-1 rounded hover:text-ink"
+              className="flex max-w-full items-center gap-1 rounded hover:text-ink"
             >
-              <span>{label}</span>
+              <span className="truncate-cell min-w-0">{label}</span>
               <span className="text-ink-subtle">·</span>
-              <span className="tabular-nums">{times}회</span>
-              <ChevronDown className={`h-3 w-3 ${open ? 'rotate-180' : ''}`} aria-hidden />
+              <span className="shrink-0 tabular-nums">{times}회</span>
+              <ChevronDown className={`h-3 w-3 shrink-0 ${open ? 'rotate-180' : ''}`} aria-hidden />
             </button>
           ) : (
-            label
+            <span className="truncate-cell block">{label}</span>
           )}
         </td>
-        <td className={`truncate-cell hidden w-28 px-3 py-3 text-ink-muted md:table-cell ${dim}`}>
+        <td className={`truncate-cell hidden px-3 py-3 text-ink-muted md:table-cell ${dim}`}>
           {doc.folder?.name ?? '—'}
         </td>
-        <td className={`truncate-cell hidden w-28 px-3 py-3 text-ink-muted lg:table-cell ${dim}`}>
+        <td className={`truncate-cell hidden px-3 py-3 text-ink-muted lg:table-cell ${dim}`}>
           {latest?.uploadedBy.username ?? '—'}
         </td>
-        <td
-          className={`hidden w-20 px-3 py-3 whitespace-nowrap text-ink-muted sm:table-cell ${dim}`}
-        >
+        <td className={`truncate-cell hidden px-3 py-3 text-ink-muted sm:table-cell ${dim}`}>
           {latest ? formatBytes(latest.sizeBytes) : '—'}
         </td>
-        <td className={`w-24 px-3 py-3 whitespace-nowrap text-ink-muted ${dim}`}>
+        <td className={`truncate-cell px-3 py-3 text-ink-muted ${dim}`}>
           {/* "올린 날짜" 가 아니라 "최근 업로드" 다 — 최신 버전이 들어온 시각이지 문서가
               처음 만들어진 시각이 아니다(latest.ts 의 lastActivityAt). */}
           {formatRelative(lastActivityAt(doc))}
         </td>
-        <td className="px-4 py-3">
+        <td className="px-3 py-3">
           <a
             href={`/api/documents/${doc.id}/download`}
             aria-label={`${doc.title} 다운로드`}
@@ -120,7 +120,7 @@ export function DocumentRow({
             <Download className="h-4 w-4" />
           </a>
         </td>
-        <td className="px-4 py-3">
+        <td className="px-3 py-3">
           {/* 상세 페이지에도 같은 버튼이 있다. 목록에서도 바로 지울 수 있게 둔다.
               남의 문서면 칸을 비운다 — 비활성 버튼을 두면 누를 수 있어 보이고,
               매번 403 토스트를 띄우는 것보다 안 보이는 편이 조용하다. */}

@@ -1,6 +1,8 @@
 import Link from 'next/link'
 import { ChevronRight, Folder } from 'lucide-react'
 import { DocumentRow } from '@/components/document-rows'
+import { ResizableTableHead } from '@/components/resizable-table-head'
+import { TABLE_COLUMNS } from '@/lib/column-widths'
 import type { DeletePermission } from '@/lib/ownership'
 import type { DocumentListItem } from '@/lib/document-list'
 import type { FolderChildCard } from '@/lib/folder'
@@ -8,7 +10,7 @@ import type { FolderChildCard } from '@/lib/folder'
 export type { DocumentListItem }
 
 /** 열 수. 폴더 행과 펼친 이력 행이 전체 폭을 쓰려면 이 값이 thead 와 맞아야 한다. */
-const COLUMN_COUNT = 8
+const COLUMN_COUNT = TABLE_COLUMNS.documents.length
 
 /**
  * folders 는 지금 열어 둔 폴더의 직계 자식이다. 문서 행 위에 같은 표로 그려서 탐색이
@@ -32,24 +34,11 @@ export function DocumentTable({
 }) {
   return (
     <div className="overflow-hidden rounded-xl border border-border bg-surface">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-border text-left text-xs text-ink-muted">
-            {/* 제목 칸에 폭을 주지 않는 것이 핵심이다 — 나머지를 고정하면 남는 폭이 전부
-                제목으로 간다. 제목이 이 제품에서 가장 정보량이 큰 칸이고, 파일명이
-                "01_요구사항 정의서_v0.3_2026_08_17" 처럼 뒤쪽(버전·날짜)에 구별점이 몰려 있어
-                잘리면 앞부분만 남아 서로 구분이 안 된다. */}
-            <th scope="col" className="px-4 py-2.5 font-medium">문서</th>
-            {/* 숨기지 않는다 — 이 열을 보려고 만든 화면이고, 폭이 좁아 밀어내는 것도 없다. */}
-            <th scope="col" className="w-20 px-3 py-2.5 font-medium">버전</th>
-            <th scope="col" className="hidden w-28 px-3 py-2.5 font-medium md:table-cell">폴더</th>
-            <th scope="col" className="hidden w-28 px-3 py-2.5 font-medium lg:table-cell">올린 사람</th>
-            <th scope="col" className="hidden w-20 px-3 py-2.5 font-medium sm:table-cell">크기</th>
-            <th scope="col" className="w-24 px-3 py-2.5 font-medium">최근 업로드</th>
-            <th scope="col" className="w-12 px-4 py-2.5"><span className="sr-only">다운로드</span></th>
-            <th scope="col" className="w-12 px-4 py-2.5"><span className="sr-only">삭제</span></th>
-          </tr>
-        </thead>
+      {/* 제목 칸은 폭을 저장하지 않고 남는 폭을 먹는다 — 제목이 이 제품에서 가장 정보량이 큰
+          칸이고, 파일명이 "01_요구사항 정의서_v0.3_2026_08_17" 처럼 뒤쪽(버전·날짜)에 구별점이
+          몰려 있어 잘리면 앞부분만 남아 서로 구분이 안 된다. */}
+      <table className="w-full table-fixed text-sm">
+        <ResizableTableHead table="documents" />
         <tbody>
           {folders.map((folder) => (
             <tr key={folder.id} className="border-b border-border last:border-0 hover:bg-canvas">
