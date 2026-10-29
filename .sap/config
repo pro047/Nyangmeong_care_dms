@@ -4,4 +4,11 @@ TEST_CMDS=npm test
 TEST_CMDS=npm run lint
 TEST_CMDS=npm run build
 PROTECTED_FILES=package.json package-lock.json pnpm-lock.yaml yarn.lock pyproject.toml requirements.txt requirements-dev.txt setup.cfg pytest.ini mypy.ini ruff.toml .ruff.toml conftest.py tests/conftest.py vitest.config.ts vitest.config.mts jest.config.js jest.config.ts tsconfig.json pubspec.yaml pubspec.lock .gitignore CLAUDE.md AGENTS.md .env .env.example prisma/schema.prisma
-AGENT_TOOLS=Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git ls-files:*),Bash(npm test:*)
+
+# 단계 에이전트는 엔진 기본값(샌드박스 + Bash 전체)으로 돈다 — AGENT_TOOLS 를 적으면 그 좁은 목록이 이긴다.
+# npm test·npm run lint 는 샌드박스 안팎 결과가 같았다 (2026-10-29 실측, npm ci 후 복제본).
+# npm run build 는 샌드박스 안에서 next/font/google 이 Google Fonts 를 못 받아 실패한다 — allowedDomains 에
+# fonts 도메인을 넣어도 실패(실측). 에이전트가 작업 중 빌드를 확인할 수 있게 샌드박스 밖으로 뺀다(사용자 결정 2026-10-29).
+# ★ 단독 명령일 때만 빠진다: `npm run build 2>&1 | tail` 처럼 이어 붙이면 샌드박스 안에서 돌아 다시 실패한다(실측).
+# ★ 빌드는 저장소 코드(next.config.ts 등)를 샌드박스 밖에서 실행한다 — 예전 목록(npm test 만)보다 넓다.
+SANDBOX_EXCLUDE=npm run build:*
