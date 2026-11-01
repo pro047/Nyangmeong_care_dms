@@ -5,6 +5,7 @@ import { registerDmsTools } from '@/lib/mcp/server'
 import { SIMILAR_CANDIDATES_EXIST } from '@/lib/mcp/upload-tools'
 import { ACTIVE_DOCUMENT_NOT_FOUND } from '@/lib/trash'
 import { VERSION_FORBIDDEN } from '@/lib/ownership'
+import { SILENT_FORBIDDEN } from '@/lib/upload-commit'
 import { titleFromFileName } from '@/lib/title'
 import { READ_UNSUPPORTED_FORMAT, readVersionQuery } from '@/lib/mcp/read-tools'
 
@@ -30,7 +31,7 @@ const commitAddVersion = vi.fn()
 const commitDiscardUpload = vi.fn()
 const getObjectBytes = vi.fn()
 
-const tools = new Map<string, { config: { inputSchema?: unknown }; cb: ToolCallback }>()
+const tools = new Map<string, { config: { inputSchema?: unknown; description?: string }; cb: ToolCallback }>()
 
 const ADMIN_DISCORD_ID = '375871831044915200'
 const VIEWER = { id: 'user_1', discordId: '1000000000000000001', username: '홍길동' }
@@ -49,7 +50,7 @@ const AUTH_CTX = {
 function setup() {
   tools.clear()
   const server = {
-    registerTool: (name: string, config: { inputSchema?: unknown }, cb: ToolCallback) => {
+    registerTool: (name: string, config: { inputSchema?: unknown; description?: string }, cb: ToolCallback) => {
       tools.set(name, { config, cb })
     },
   } as unknown as McpServer
@@ -726,11 +727,11 @@ describe('add_version', () => {
     mimeType: 'application/pdf',
   }
 
-  it('commit.addVersion(documentId, 파일 입력, 토큰의 사용자) 로 넘기고 {id, versionNo} 를 돌려줘야 한다', async () => {
+  it('commit.addVersion(documentId, 파일 입력, 토큰의 사용자, 옵션) 로 넘기고 {id, versionNo} 를 돌려줘야 한다', async () => {
     const result = await callWithAuth('add_version', ARGS)
 
     const { documentId, ...file } = ARGS
-    expect(commitAddVersion).toHaveBeenCalledWith(documentId, file, VIEWER)
+    expect(commitAddVersion).toHaveBeenCalledWith(documentId, file, VIEWER, { silent: false })
     expect(result.structuredContent).toEqual({ id: 'doc_1', versionNo: 3 })
     expect(JSON.parse(result.content[0].text)).toEqual(result.structuredContent)
   })
@@ -746,6 +747,43 @@ describe('add_version', () => {
       s3Key: ARGS.s3Key,
     })
     expect(result.structuredContent).toBeUndefined()
+  })
+
+  it('AC-8: silent: true 는 넷째 인자로만 넘기고 파일 입력에 섞지 않아야 한다', async () => {
+    await callWithAuth('add_version', { ...ARGS, silent: true })
+
+    const { documentId, ...file } = ARGS
+    expect(commitAddVersion).toHaveBeenCalledWith(documentId, file, VIEWER, { silent: true })
+    expect(commitAddVersion.mock.calls[0][1]).not.toHaveProperty('silent')
+  })
+
+  it('AC-9: 커밋이 SILENT_FORBIDDEN 이면 isError 와 error·s3Key·hint 를 돌려줘야 한다', async () => {
+    commitAddVersion.mockResolvedValue({ ok: false, status: 403, error: SILENT_FORBIDDEN })
+
+    const result = await callWithAuth('add_version', { ...ARGS, silent: true })
+
+    expect(result.isError).toBe(true)
+    expect(SILENT_FORBIDDEN).toContain('관리자')
+    expect(JSON.parse(result.content[0].text)).toEqual({
+      error: SILENT_FORBIDDEN,
+      s3Key: ARGS.s3Key,
+      hint: expect.stringContaining('discard_upload'),
+    })
+    expect(result.structuredContent).toBeUndefined()
+  })
+
+  it('AC-10: 도구 설명에 silent 와 관리자 전용임이 함께 적혀 있어야 한다', () => {
+    const description = tools.get('add_version')?.config.description ?? ''
+
+    expect(description).toContain('silent')
+    expect(description).toContain('관리자')
+  })
+
+  it('토큰의 사용자가 없으면 silent 여부와 무관하게 커밋에 가지 않아야 한다', async () => {
+    const result = await callWithAuth('add_version', { ...ARGS, silent: true }, {})
+
+    expect(result.isError).toBe(true)
+    expect(commitAddVersion).not.toHaveBeenCalled()
   })
 })
 

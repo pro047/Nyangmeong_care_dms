@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import type { PrismaClient } from '@/generated/prisma/client'
-import { canManageDocument, VERSION_FORBIDDEN, type Viewer } from '@/lib/ownership'
+import { canManageDocument, isAdmin, VERSION_FORBIDDEN, type Viewer } from '@/lib/ownership'
 import { ACTIVE_DOCUMENT_NOT_FOUND, activeDocumentWhere } from '@/lib/trash'
 import { S3_KEY_ALREADY_USED } from '@/lib/upload-guard'
 import { MAX_UPLOAD_BYTES } from '@/lib/s3'
@@ -162,7 +162,13 @@ export async function createDocument(
   return { ok: true, status: 201, value: created }
 }
 
-/** `[id]/versions/route.ts:26-142` 와 동일한 순서 — 소유자 검사가 맨 앞이다.
+export const SILENT_FORBIDDEN =
+  '알림 끄기(silent)는 관리자만 쓸 수 있습니다. 새 판은 저장되지 않았습니다. 알림을 끄지 않으려면 silent 를 빼고 다시 호출하세요.'
+
+export type AddVersionOptions = { silent?: boolean }
+
+/** `[id]/versions/route.ts:26-142` 와 동일한 순서 — 단, `silent` 거절이 그보다 앞서고
+ * 그다음이 소유자 검사다.
  *
  * `deleteObject` 는 안 쓴다 (createDocument 와 같은 이유). */
 export async function addVersion(
@@ -170,7 +176,13 @@ export async function addVersion(
   input: VersionCreateInput,
   uploader: Uploader,
   deps: Omit<CommitDeps, 'deleteObject'>,
+  options: AddVersionOptions = {},
 ): Promise<CommitOutcome<{ id: string; title: string; versionNo: number }>> {
+  // 알림 끄기는 관리자 전용 — 쿼리·토큰 검증 전에 거절해 저장이 절대 일어나지 않게 한다
+  if (options.silent && !isAdmin(uploader, deps.adminDiscordId)) {
+    return { ok: false, status: 403, error: SILENT_FORBIDDEN }
+  }
+
   // docKey 도 여기서 같이 집는다 — 측정 예약 판정에 쿼리를 더 내지 않는다
   const owned = await deps.prisma.document.findUnique({
     where: { id: documentId },
@@ -242,17 +254,19 @@ export async function addVersion(
     return { ok: false, status: failure.status, error: failure.error }
   }
 
-  try {
-    await deps.notifyUpload({
-      documentId: updated.id,
-      title: updated.title,
-      versionNo,
-      fileName,
-      uploaderName: uploader.username,
-      changeNote: note,
-    })
-  } catch (err) {
-    console.error('디스코드 알림 실패:', err)
+  if (!options.silent) {
+    try {
+      await deps.notifyUpload({
+        documentId: updated.id,
+        title: updated.title,
+        versionNo,
+        fileName,
+        uploaderName: uploader.username,
+        changeNote: note,
+      })
+    } catch (err) {
+      console.error('디스코드 알림 실패:', err)
+    }
   }
 
   if (owned?.docKey) {
