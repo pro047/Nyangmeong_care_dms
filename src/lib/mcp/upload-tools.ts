@@ -61,6 +61,7 @@ export const addVersionInputSchema = z.object({
   fileName: z.string().min(1).max(255),
   mimeType: z.string().min(1),
   changeNote: z.string().trim().max(500).optional(),
+  silent: z.boolean().default(false),
 })
 
 export const discardUploadInputSchema = z.object({

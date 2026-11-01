@@ -237,6 +237,27 @@ describe('addVersionInputSchema', () => {
     expect(parsed.changeNote).toBe('')
     expect(parsed.changeNote).toBe(versionCreateSchema.parse({ ...FILE, changeNote: '   ' }).changeNote)
   })
+
+  it('AC-6: silent: true 를 그대로 받아야 한다', () => {
+    expect(addVersionInputSchema.parse({ ...FILE, documentId: 'doc_1', silent: true }).silent).toBe(true)
+  })
+
+  it('AC-6: silent 를 생략하면 false 로 채워야 한다', () => {
+    expect(addVersionInputSchema.parse({ ...FILE, documentId: 'doc_1' }).silent).toBe(false)
+  })
+
+  it.each([
+    ['문자열', 'true'],
+    ['숫자', 1],
+    ['null', null],
+  ])('AC-6: silent 가 %s 면 거부해야 한다', (_label, silent) => {
+    expect(addVersionInputSchema.safeParse({ ...FILE, documentId: 'doc_1', silent }).success).toBe(false)
+  })
+
+  it('AC-7: 화면 경로 스키마 versionCreateSchema 에는 silent 가 없어야 한다', () => {
+    expect(versionCreateSchema.shape).not.toHaveProperty('silent')
+    expect(versionCreateSchema.parse({ ...FILE, silent: true })).not.toHaveProperty('silent')
+  })
 })
 
 describe('discardUploadInputSchema', () => {

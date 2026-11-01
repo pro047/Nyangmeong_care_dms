@@ -38,8 +38,8 @@ const handler = withMcpAuth(
         getObjectBytes,
         commit: {
           createDocument: (input, uploader: Uploader) => createDocument(input, uploader, commitDeps),
-          addVersion: (documentId, input, uploader: Uploader) =>
-            addVersion(documentId, input, uploader, commitDeps),
+          addVersion: (documentId, input, uploader: Uploader, options) =>
+            addVersion(documentId, input, uploader, commitDeps, options),
           discardUpload: (input, viewer: Viewer) => discardUpload(input, viewer, commitDeps),
         },
       })

@@ -20,6 +20,7 @@ import { classifyFileName } from '@/lib/classify'
 import { deletePermission, type Viewer } from '@/lib/ownership'
 import { similarCandidateQuery, toSimilarCandidates, findSimilarDocuments } from '@/lib/similar-document'
 import type {
+  AddVersionOptions,
   CommitOutcome,
   DocumentCreateInput,
   DiscardUploadInput,
@@ -78,6 +79,7 @@ type Deps = {
       documentId: string,
       i: VersionCreateInput,
       u: Uploader,
+      options: AddVersionOptions,
     ) => Promise<CommitOutcome<{ id: string; title: string; versionNo: number }>>
     discardUpload: (i: DiscardUploadInput, v: Viewer) => Promise<CommitOutcome<{ deleted: boolean }>>
   }
@@ -379,14 +381,15 @@ export function registerDmsTools(server: McpServer, deps: Deps) {
     'add_version',
     {
       title: '새 버전 올리기',
-      description: '기존 문서에 새 판을 붙인다. 올린 사람과 관리자만 할 수 있다.',
+      description:
+        '기존 문서에 새 판을 붙인다. 올린 사람과 관리자만 할 수 있다. silent: true 는 디스코드 알림을 끄며 관리자 전용이다 — 관리자가 아니면 거절되어 판이 저장되지 않는다.',
       inputSchema: addVersionInputSchema,
     },
-    async ({ documentId, ...file }, ctx) => {
+    async ({ documentId, silent, ...file }, ctx) => {
       const viewer = viewerFromAuthInfo(ctx.http?.authInfo)
       if (!viewer) return authRequiredError()
 
-      const outcome = await commit.addVersion(documentId, file, viewer)
+      const outcome = await commit.addVersion(documentId, file, viewer, { silent })
       if (!outcome.ok) {
         const payload = uploadFailure(outcome.error, file.s3Key)
         return { content: [{ type: 'text' as const, text: JSON.stringify(payload) }], isError: true }

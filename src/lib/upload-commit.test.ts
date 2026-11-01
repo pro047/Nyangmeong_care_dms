@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PrismaClient } from '@/generated/prisma/client'
-import { addVersion, createDocument, discardUpload, type Uploader } from '@/lib/upload-commit'
+import { SILENT_FORBIDDEN, addVersion, createDocument, discardUpload, type Uploader } from '@/lib/upload-commit'
 import { MAX_UPLOAD_BYTES } from '@/lib/s3'
 import { VERSION_FORBIDDEN } from '@/lib/ownership'
 import { ACTIVE_DOCUMENT_NOT_FOUND } from '@/lib/trash'
@@ -434,6 +434,141 @@ describe('addVersion — 정합성 측정 예약', () => {
 
     expect(outcome.ok).toBe(true)
     consoleError.mockRestore()
+  })
+})
+
+describe('addVersion — silent (관리자 전용 알림 끄기)', () => {
+  const ADMIN: Uploader = { ...UPLOADER, discordId: ADMIN_DISCORD_ID }
+  const OTHER_OWNER = { createdById: 'user_2' }
+  const SAVED = { ok: true, status: 201, value: { id: 'doc_1', title: '문서', versionNo: 3 } }
+  const SILENT_REJECTED = { ok: false, status: 403, error: SILENT_FORBIDDEN }
+
+  it('AC-1: 관리자가 silent: true 로 올리면 저장되고 알림은 보내지 않아야 한다', async () => {
+    const outcome = await addVersion('doc_1', VERSION_INPUT, ADMIN, deps(ADMIN_DISCORD_ID), { silent: true })
+
+    expect(outcome).toEqual(SAVED)
+    expect(documentUpdate).toHaveBeenCalledTimes(1)
+    expect(notifyUpload).not.toHaveBeenCalled()
+  })
+
+  it('AC-1: 관리자가 남의 문서에 silent: true 로 올려도 저장되고 알림은 보내지 않아야 한다', async () => {
+    documentFindUnique.mockResolvedValue(OTHER_OWNER)
+
+    const outcome = await addVersion('doc_1', VERSION_INPUT, ADMIN, deps(ADMIN_DISCORD_ID), { silent: true })
+
+    expect(outcome).toEqual(SAVED)
+    expect(notifyUpload).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['options 생략', undefined],
+    ['빈 options', {}],
+    ['silent: false', { silent: false }],
+  ])('AC-2: %s 면 관리자여도 알림을 한 번 보내야 한다', async (_label, options) => {
+    const outcome = await addVersion('doc_1', VERSION_INPUT, ADMIN, deps(ADMIN_DISCORD_ID), options)
+
+    expect(outcome).toEqual(SAVED)
+    expect(notifyUpload).toHaveBeenCalledTimes(1)
+  })
+
+  it('AC-3: 거절 문구는 설계에 적힌 값 그대로여야 한다', () => {
+    // 문구가 "다시 호출하면 올라간다"고 단정하면 비소유자에게 거짓이 된다 (AC-14).
+    expect(SILENT_FORBIDDEN).toBe(
+      '알림 끄기(silent)는 관리자만 쓸 수 있습니다. 새 판은 저장되지 않았습니다. 알림을 끄지 않으려면 silent 를 빼고 다시 호출하세요.',
+    )
+  })
+
+  it('AC-3: 관리자가 아닌 소유자가 silent: true 면 403 이고 DB·토큰 검증에 가지 않아야 한다', async () => {
+    const outcome = await addVersion('doc_1', VERSION_INPUT, UPLOADER, deps(ADMIN_DISCORD_ID), { silent: true })
+
+    expect(outcome).toEqual(SILENT_REJECTED)
+    expect(documentFindUnique).not.toHaveBeenCalled()
+    expect(verifyUploadToken).not.toHaveBeenCalled()
+    expect(headObjectSize).not.toHaveBeenCalled()
+    expect(documentUpdate).not.toHaveBeenCalled()
+    expect(notifyUpload).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['빈 문자열', ''],
+    ['undefined', undefined],
+  ])('AC-4: adminDiscordId 가 %s 면 silent: true 는 403 이고 저장하지 않아야 한다', async (_label, adminDiscordId) => {
+    const outcome = await addVersion('doc_1', VERSION_INPUT, UPLOADER, deps(adminDiscordId), { silent: true })
+
+    expect(outcome).toEqual(SILENT_REJECTED)
+    expect(documentUpdate).not.toHaveBeenCalled()
+  })
+
+  it('AC-4: adminDiscordId 와 올린 사람의 discordId 가 둘 다 빈 문자열이어도 관리자로 보지 않아야 한다', async () => {
+    const blank: Uploader = { ...UPLOADER, discordId: '' }
+
+    const outcome = await addVersion('doc_1', VERSION_INPUT, blank, deps(''), { silent: true })
+
+    expect(outcome).toEqual(SILENT_REJECTED)
+    expect(documentUpdate).not.toHaveBeenCalled()
+  })
+
+  it('AC-5: docKey 문서에 관리자가 silent: true 로 올리면 측정은 예약하고 알림은 보내지 않아야 한다', async () => {
+    documentFindUnique.mockResolvedValue({ createdById: UPLOADER.id, docKey: 'SCR-ACC' })
+
+    const outcome = await addVersion('doc_1', VERSION_INPUT, ADMIN, deps(ADMIN_DISCORD_ID), { silent: true })
+
+    expect(outcome.ok).toBe(true)
+    expect(scheduleMeasure).toHaveBeenCalledTimes(1)
+    expect(notifyUpload).not.toHaveBeenCalled()
+  })
+
+  it('AC-12: 비관리자 소유자의 silent: false 는 거절 없이 저장되고 알림을 보내야 한다', async () => {
+    const outcome = await addVersion('doc_1', VERSION_INPUT, UPLOADER, deps(ADMIN_DISCORD_ID), { silent: false })
+
+    expect(outcome).toEqual(SAVED)
+    expect(documentUpdate).toHaveBeenCalledTimes(1)
+    expect(notifyUpload).toHaveBeenCalledTimes(1)
+  })
+
+  it('AC-14: 비관리자·비소유자는 silent: true 면 SILENT_FORBIDDEN, 빼면 VERSION_FORBIDDEN 이고 둘 다 저장하지 않아야 한다', async () => {
+    documentFindUnique.mockResolvedValue(OTHER_OWNER)
+
+    const withSilent = await addVersion('doc_1', VERSION_INPUT, UPLOADER, deps(ADMIN_DISCORD_ID), { silent: true })
+    const withoutSilent = await addVersion('doc_1', VERSION_INPUT, UPLOADER, deps(ADMIN_DISCORD_ID))
+
+    expect(withSilent).toEqual(SILENT_REJECTED)
+    expect(withoutSilent).toEqual({ ok: false, status: 403, error: VERSION_FORBIDDEN })
+    expect(documentUpdate).not.toHaveBeenCalled()
+  })
+
+  // 아래는 검증 기준 밖의 경계. silent 는 알림 하나만 끈다 — 나머지 차단·저장은 같아야 한다.
+  it('관리자의 silent: true 여도 토큰 검증에 실패하면 400 이고 저장하지 않아야 한다', async () => {
+    verifyUploadToken.mockResolvedValue(null)
+
+    const outcome = await addVersion('doc_1', VERSION_INPUT, ADMIN, deps(ADMIN_DISCORD_ID), { silent: true })
+
+    expect(outcome).toMatchObject({ ok: false, status: 400 })
+    expect(documentUpdate).not.toHaveBeenCalled()
+  })
+
+  it('관리자의 silent: true 여도 없는 문서면 404 여야 한다', async () => {
+    documentFindUnique.mockResolvedValue(null)
+    mockVersionLookups(null)
+
+    const outcome = await addVersion('doc_gone', VERSION_INPUT, ADMIN, deps(ADMIN_DISCORD_ID), { silent: true })
+
+    expect(outcome).toEqual({ ok: false, status: 404, error: ACTIVE_DOCUMENT_NOT_FOUND })
+  })
+
+  it('silent 여부가 저장 내용과 조회 수를 바꾸지 않아야 한다', async () => {
+    await addVersion('doc_1', VERSION_INPUT, ADMIN, deps(ADMIN_DISCORD_ID))
+    const loud = documentUpdate.mock.calls[0][0]
+    documentUpdate.mockClear()
+    documentFindUnique.mockClear()
+    documentVersionFindFirst.mockClear()
+
+    await addVersion('doc_1', VERSION_INPUT, ADMIN, deps(ADMIN_DISCORD_ID), { silent: true })
+
+    expect(documentUpdate.mock.calls[0][0]).toEqual(loud)
+    expect(documentFindUnique).toHaveBeenCalledTimes(1)
+    expect(documentVersionFindFirst).toHaveBeenCalledTimes(2)
+    expect(notifyUpload).toHaveBeenCalledTimes(1)
   })
 })
 
